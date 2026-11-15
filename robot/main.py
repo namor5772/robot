@@ -1,146 +1,219 @@
-"""Robot brain entry point: an interactive chat loop with the Anthropic API."""
+"""Robot brain entry point: run the agent from the command line.
 
-import json
-from pathlib import Path
+    python -m robot.main              chat: type the task at you>, then converse
+    python -m robot.main --help       every option
 
-import anthropic
-from dotenv import load_dotenv
-
-from robot.tools import SERVER_TOOLS, Tool, available_tools
-
-try:
-    import readline  # noqa: F401  (line editing and history for input() on the Pi)
-except ImportError:
-    pass  # not available on Windows
-
-MODEL = "claude-opus-5-5"
-ENV_FILE = Path(__file__).resolve().parent.parent / ".env"
-EXIT_WORDS = {"exit", "quit", "bye"}
-MAX_PAUSES = 5  # how many times one reply may resume a paused server-side tool
-
-SYSTEM_PROMPT = """\
-You are the brain of a small robot. You run as a program on a Raspberry Pi
-Zero 2 W, which is your body's onboard computer. The person talking to you is
-typing at a keyboard connected to the robot, or over SSH.
-
-Speak as the robot, in the first person. When asked about yourself, your
-temperature, or your hardware, answer about this Raspberry Pi, not about
-servers or data centres.
-
-Your only way to sense or act on the physical world is through the tools you
-have been given. If you have no tool for something (moving, seeing, hearing,
-speaking aloud), say plainly that you can't do it yet rather than pretending.
-Never invent sensor readings: use a tool to get the real value.
-
-Keep replies short and conversational, a sentence or two unless asked for more.
-Use plain text only, with no Markdown formatting, because your replies are
-shown in a plain terminal.
+Nothing here imports the Anthropic SDK directly. It takes many seconds to load
+on the Pi, so it is loaded in the background while the person types.
 """
 
+import argparse
+import os
+import sys
+import threading
+from pathlib import Path
 
-def run_tool(tools: dict[str, Tool], block) -> dict:
-    """Run one tool the model asked for and build the result to send back."""
-    detail = f": {json.dumps(block.input, ensure_ascii=False)}" if block.input else ""
-    print(f"\n[tool: {block.name}{detail}]", flush=True)
-    result = {"type": "tool_result", "tool_use_id": block.id}
+from dotenv import load_dotenv
+
+from robot import costs, instructions, models
+from robot.console import INTERRUPTED, Console, Interrupts, convo_end_word
+from robot.datastore import DataDir
+from robot.tools import available_tools
+
+ENV_FILE = Path(__file__).resolve().parent.parent / ".env"
+
+EXIT_OK = 0
+EXIT_RUN_ERROR = 1
+EXIT_CANNOT_START = 2
+
+
+class ClientLoader:
+    """Loads the Anthropic SDK and makes the client on a background thread."""
+
+    def __init__(self):
+        self._ready = threading.Event()
+        self._client = None
+        self._error = None
+        threading.Thread(target=self._load, name="sdk-loader", daemon=True).start()
+
+    def _load(self):
+        try:
+            import anthropic
+
+            import robot.agent  # noqa: F401  (everything else a run needs)
+            self._client = anthropic.Anthropic()  # reads ANTHROPIC_API_KEY
+        except BaseException as error:
+            self._error = error
+        finally:
+            self._ready.set()
+
+    def is_ready(self) -> bool:
+        return self._ready.is_set()
+
+    def get(self):
+        self._ready.wait()
+        if self._error is not None:
+            raise self._error
+        return self._client
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="python -m robot.main",
+        description="The robot's agent. With no options it asks for a task and then chats.")
+    run = parser.add_argument_group("the run")
+    run.add_argument("--model", metavar="ID", help="use this model for the run")
+    run.add_argument("--mode", metavar="LEVEL", choices=models.THINKING_MODES,
+                     help="thinking level for the run: " + ", ".join(models.THINKING_MODES))
+    run.add_argument("--headless", action="store_true",
+                     help="unattended: never read the terminal")
+    run.add_argument("--result-file", metavar="PATH",
+                     help="write the run's outcome here as JSON when it ends")
+    run.add_argument("--extra-file", metavar="PATH",
+                     help="text added after the task, for this run only")
+    run.add_argument("--prepend-file", metavar="PATH",
+                     help="text put in front of the task, for this run only")
+    run.add_argument("--relay-dir", metavar="DIR",
+                     help="folder through which another process answers the agent's questions")
+    run.add_argument("--dry-run", action="store_true",
+                     help="print the first request instead of sending it")
+    show = parser.add_argument_group("what is shown")
+    show.add_argument("--no-activity", action="store_true",
+                      help="hide tool lines, retries and the cost of each call")
+    show.add_argument("--thinking", action="store_true", help="show the model's thinking")
+    show.add_argument("--tool-calls", action="store_true", help="show each tool call as JSON")
+    show.add_argument("--debug", action="store_true", help="show every request sent")
+    show.add_argument("--save-thinking", action="store_true",
+                      help="keep thinking blocks in the saved chat")
+    return parser
+
+
+def _read_text_file(path, what, console):
+    if not path:
+        return ""
     try:
-        result["content"] = tools[block.name].run(block.input)
-    except Exception as err:  # report any failure to the model instead of crashing
-        result["content"] = f"{type(err).__name__}: {err}"
-        result["is_error"] = True
-    return result
+        return Path(path).read_text(encoding="utf-8").strip()
+    except OSError as error:
+        console.warn(f"Could not read the {what} file {path}: {error}")
+        return ""
 
 
-def reply(client: anthropic.Anthropic, messages: list, tools: dict[str, Tool]) -> None:
-    """Stream the model's reply, running any tools it asks for along the way."""
-    request = {
-        "model": MODEL,
-        "max_tokens": 64000,
-        "system": SYSTEM_PROMPT,
-        "output_config": {"effort": "low"},
-        "betas": ["server-side-fallback-2026-07-01"],
-        "fallbacks": "default",
-        "cache_control": {"type": "ephemeral"},
-    }
-    request["tools"] = [tool.definition for tool in tools.values()] + SERVER_TOOLS
+def default_settings() -> instructions.RunSettings:
+    """What a chat started without a saved instruction runs with."""
+    return instructions.RunSettings(
+        model=models.DEFAULT_MODEL, thinking_mode="low", conversational=True)
 
-    pauses = 0
+
+def apply_overrides(settings, args, console):
+    """--model and --mode change the run, not anything saved."""
+    if args.model:
+        settings.model = args.model
+    wanted = args.mode or settings.thinking_mode
+    settings.thinking_mode = models.coerce_mode(settings.model, wanted)
+    if settings.thinking_mode != wanted:
+        console.warn(f"{settings.model} has no thinking level '{wanted}'; "
+                     f"using '{settings.thinking_mode}'.")
+
+
+def offered_tool_names(settings) -> list:
+    blocked = set(settings.blocked_tools or ())
+    names = list(available_tools()) + ["user_prompt", "web_search"]
+    return [name for name in names if name not in blocked]
+
+
+def show_banner(console, settings):
+    mode = models.mode_label(settings.model, settings.thinking_mode,
+                             thinking_budget=settings.thinking_budget)
+    kind = "Conversation" if settings.conversational else "Single task"
+    title = f"instruction '{settings.name}'" if settings.name else "chat"
+    console.note(f"Robot agent: {title}. {kind} on {settings.model} ({mode}).")
+    console.note("Tools: " + ", ".join(offered_tool_names(settings)))
+    if settings.conversational and console.tty:
+        console.note("Type quit, stop or exit to end. Ctrl-C stops a reply.")
+
+
+def first_message(console) -> str:
+    """Ask for the task of an ad-hoc chat. Empty when the person leaves instead."""
     while True:
-        with client.beta.messages.stream(messages=messages, **request) as stream:
-            for event in stream:
-                if event.type == "text":
-                    print(event.text, end="", flush=True)
-                elif event.type == "content_block_stop":
-                    # Show each web search and its query. The search tool also
-                    # runs internal code_execution steps; those stay hidden.
-                    block = event.content_block
-                    if block.type == "server_tool_use" and block.name == "web_search":
-                        print(f"\n[tool: web_search: {block.input.get('query', '')}]", flush=True)
-            response = stream.get_final_message()
-
-        # Keep the whole content list, not just the text: thinking, tool-use and
-        # search-result blocks must be passed back unchanged on later requests.
-        messages.append({"role": "assistant", "content": response.content})
-
-        if response.stop_reason == "pause_turn" and pauses < MAX_PAUSES:
-            # A server-side tool is still working: send the turn back to resume it.
-            pauses += 1
-            continue
-        if response.stop_reason != "tool_use":
-            break
-
-        # Answer every tool call from this reply in a single user message.
-        results = [
-            run_tool(tools, block)
-            for block in response.content
-            if block.type == "tool_use"
-        ]
-        messages.append({"role": "user", "content": results})
-
-    print()
-    if response.stop_reason == "refusal":
-        print("(the model declined to answer that)")
-    elif response.stop_reason == "max_tokens":
-        print("(reply cut off at the length limit)")
+        reply = console.ask()
+        if reply is INTERRUPTED or reply is None:
+            return ""
+        if reply == "":
+            if console.tty:
+                continue
+            return ""
+        if convo_end_word(reply):
+            return ""
+        return reply
 
 
-def main() -> None:
+def fold_in_unfinished_runs(datadir, console):
+    """Log the cost of earlier runs that were killed before they could."""
+    try:
+        logged = costs.progress_fold_in(
+            datadir.runs_dir, datadir.costlog_file, is_alive=costs.process_is_robot,
+            boot_id=costs.current_boot_id(), my_pid=os.getpid())
+    except OSError:
+        return
+    if logged:
+        console.activity(f"Logged the cost of {logged} earlier run(s) that did not finish.")
+
+
+def main(argv=None) -> int:
+    args = build_parser().parse_args(argv)
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(errors="replace")  # never die on a character we cannot show
+        except (AttributeError, ValueError):
+            pass
     load_dotenv(ENV_FILE)
-    client = anthropic.Anthropic()  # reads ANTHROPIC_API_KEY from the environment
-    tools = available_tools()
-    messages: list = []
 
-    print("Robot chat. Type 'exit' or press Ctrl-D to quit.")
-    tool_names = list(tools) + [tool["name"] for tool in SERVER_TOOLS]
-    print(f"Tools: {', '.join(tool_names) or 'none'}")
-    while True:
-        try:
-            user_text = input("\nyou> ").strip()
-        except (EOFError, KeyboardInterrupt):
-            print()
-            break
-        if not user_text:
-            continue
-        if user_text.lower() in EXIT_WORDS:
-            break
+    interrupts = Interrupts()
+    interrupts.install()
+    console = Console(
+        activity=not args.no_activity, show_thinking=args.thinking, tool_calls=args.tool_calls,
+        debug=args.debug, headless=args.headless, relay_dir=args.relay_dir,
+        interrupts=interrupts)
+    datadir = DataDir()
 
-        turn_start = len(messages)
-        messages.append({"role": "user", "content": user_text})
-        print("robot> ", end="", flush=True)
-        try:
-            reply(client, messages, tools)
-            continue
-        except KeyboardInterrupt:
-            print("\n(interrupted)")
-        except anthropic.RateLimitError:
-            print("\n(rate limited; wait a moment and try again)")
-        except anthropic.APIStatusError as err:
-            print(f"\n(API error {err.status_code}: {err.message})")
-        except anthropic.APIConnectionError:
-            print("\n(could not reach the API; check the Pi's network)")
-        # The turn failed: drop everything it added so the history stays valid.
-        del messages[turn_start:]
+    settings = default_settings()
+    apply_overrides(settings, args, console)
+
+    if not args.dry_run and not os.environ.get("ANTHROPIC_API_KEY"):
+        console.error(f"No ANTHROPIC_API_KEY found. It belongs in {ENV_FILE}.")
+        return EXIT_CANNOT_START
+
+    # Start the slow SDK import now; the person reads the banner and types
+    # their first message while it loads.
+    loader = ClientLoader()
+
+    try:
+        datadir.ensure()
+    except OSError as error:
+        console.error(f"Cannot use the data folder {datadir.root}: {error}")
+        return EXIT_CANNOT_START
+    fold_in_unfinished_runs(datadir, console)
+
+    show_banner(console, settings)
+    if not settings.text:
+        settings.text = first_message(console)
+        if not settings.text:
+            return EXIT_OK
+    settings.text = instructions.merge_prepend_text(
+        settings.text, _read_text_file(args.prepend_file, "prepend", console))
+    settings.text = instructions.merge_extra_text(
+        settings.text, _read_text_file(args.extra_file, "extra", console))
+
+    if not loader.is_ready():
+        console.activity("Starting up...")
+    from robot.agent import Agent  # waits here if the SDK is still loading
+
+    agent = Agent(
+        settings=settings, console=console, datadir=datadir, get_client=loader.get,
+        save_thinking=args.save_thinking, result_file=args.result_file, dry_run=args.dry_run)
+    status = agent.run()
+    return EXIT_RUN_ERROR if status == "error" else EXIT_OK
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

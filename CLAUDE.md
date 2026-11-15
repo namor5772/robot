@@ -65,12 +65,18 @@ show the user the output.
 - At the Pi's own console: `cd ~/robot` then `.venv/bin/python -m robot.main`.
 - It must be run from `~/robot` (so Python finds the `robot` package) and with
   the venv's Python (the system `python3` does not have `anthropic`).
-- The program cannot be run on the laptop: there is no API key here. Check
-  syntax locally with `py -m py_compile robot/main.py robot/tools.py`, then
-  test on the Pi.
+- Unit tests run on the laptop with no network and no cost:
+  `.venv/Scripts/python.exe -m unittest discover -s tests -t .` (Git Bash). A
+  fake client in `tests/fakes.py` scripts the model's replies.
+- The laptop DOES have an `ANTHROPIC_API_KEY` in its environment (found on
+  2026-11-16; an earlier note here said it did not). So `python -m robot.main`
+  on the laptop makes real, billed calls. Paid checks are done on the Pi; on
+  the laptop use the unit tests or `--dry-run`, and set `ROBOT_DATA_DIR` to a
+  temp folder so nothing is written to `~/robot-data` there.
 - To test the chat non-interactively, pipe lines into it:
   `ssh pi "cd ~/robot && printf 'first message\nsecond message\nexit\n' | .venv/bin/python -m robot.main"`
-  The piped lines are not echoed, so the output shows only `you>` and replies.
+  Piped lines are echoed after the `you>` prompt, and the end of input ends
+  the conversation. `--model claude-haiku-5-5` keeps such checks cheap.
 - To test a tool function directly, or probe an API response, feed a Python
   script to the Pi over stdin so nothing is written there (from Git Bash):
   `ssh pi "cd ~/robot && .venv/bin/python -" < script.py`
@@ -123,6 +129,26 @@ show the user the output.
   packages, for running tests locally with `.venv\Scripts\python.exe`. There is
   still no API key on the laptop.
 - `.gitattributes`: forces LF line endings on `*.sh` and `*.conf`.
+
+## Port in progress (started 2026-11-16)
+
+The program is being rebuilt as a terminal port of the owner's MyAgent harness
+(a tkinter app in a separate repo on the laptop): Anthropic only, no GUI, no
+safety-confirm system, the robot's own tools plus MyAgent's Meta tools and
+Convo mode. The owner approved the plan. Until this note is removed, the
+sections below this one describe the OLD single-file chatbot and are partly out
+of date. Phases:
+
+- P1 tmux launcher: done.
+- P2 engine: done. `robot/main.py` is now a thin command line over
+  `agent.py` (the loop), `api.py` (request builder, streaming, retry ladder;
+  the only module that imports the SDK), `console.py` (all terminal input and
+  output, Ctrl-C handling), `models.py` (model and price tables, capability
+  rules), `history.py`, `costs.py` (cost line, cost log, in-progress record),
+  `chats.py`, `datastore.py`, `prompts.py`, `relay.py`. Data lives in
+  `~/robot-data` on the Pi (`ROBOT_DATA_DIR` overrides it).
+- P3 saved instructions and skills, P4 Meta tools, P5 child runs, P6 documents:
+  not done yet.
 
 ## Current state of the agent (`robot/main.py`)
 

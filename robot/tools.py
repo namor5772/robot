@@ -18,6 +18,9 @@ class Tool:
     definition: dict  # what the model is told about the tool
     run: Callable[[dict], str]  # takes the model's input, returns the result text
     is_available: Callable[[], bool]  # checked once at startup
+    # Safe to run alongside other calls of the same turn: it only reads, and
+    # needs nothing from the person at the keyboard.
+    parallel_safe: bool = False
 
 
 def read_cpu_temperature() -> float:
@@ -152,6 +155,7 @@ ALL_TOOLS = [
         },
         run=lambda _input: read_current_datetime(),
         is_available=lambda: True,
+        parallel_safe=True,
     ),
     Tool(
         definition={
@@ -169,16 +173,13 @@ ALL_TOOLS = [
         },
         run=lambda _input: f"{read_cpu_temperature():.1f} degrees Celsius",
         is_available=_cpu_temperature_available,
+        parallel_safe=True,
     ),
 ]
 
-
-# Tools that run on Anthropic's servers, not on the Pi. There is nothing to
-# implement here: declaring one lets the model use it within a request.
-# max_uses caps the number of searches in one request (each search is billed).
-SERVER_TOOLS = [
-    {"type": "web_search_20260209", "name": "web_search", "max_uses": 5},
-]
+# Web search is not listed here: it runs on Anthropic's servers, so there is
+# nothing to implement. Its declaration depends on the model and comes from
+# models.web_search_tool.
 
 
 def available_tools() -> dict[str, Tool]:
