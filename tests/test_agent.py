@@ -9,7 +9,8 @@ from robot import agent as agent_module
 from robot.agent import NOT_RUN_TEXT, NUDGE_TEXT, Agent
 from robot.datastore import DataDir
 from robot.instructions import RunSettings
-from robot.tools import Tool
+from robot.skills import SkillStore, manage_skills
+from robot.tools import Tool, available_tools
 from tests.fakes import (INTERRUPTED, FakeClient, InterruptDuring, NoWaitInterrupts, Obj,
                          TerminalConsole, bad_request, piped_console, reply, server_search,
                          text_block, thinking_block, tool_use)
@@ -28,8 +29,9 @@ class ScriptedAgent(Agent):
     test_tools = {}
 
     def tool_registry(self):
+        machine = set(available_tools())  # differ between the laptop and the Pi
         registry = {name: tool for name, tool in super().tool_registry().items()
-                    if name == "user_prompt"}
+                    if name not in machine}
         registry.update(self.test_tools)
         return registry
 
@@ -486,6 +488,103 @@ class RunRecords(LoopCase):
         self.assertEqual(client.requests, [])
         self.assertIn('"model": "claude-opus-5-5"', self.shown())
         self.assertFalse(self.datadir.chats_dir.exists())
+
+
+class SkillsInARun(LoopCase):
+    def skill_store(self):
+        store = SkillStore(self.datadir.skills_dir)
+        store.load()
+        manage_skills(store, {"action": "create", "name": "check-battery",
+                              "content": "Read the voltage and report it.", "mode": "enabled",
+                              "description": "Reads the battery."})
+        manage_skills(store, {"action": "create", "name": "tidy-logs",
+                              "content": "Delete logs older than a week.",
+                              "mode": "on_demand", "description": "Clears old log files."})
+        manage_skills(store, {"action": "create", "name": "asleep", "content": "Not in use."})
+        return store
+
+    def make_with_skills(self, script, **settings):
+        made = self.make(script, **settings)
+        made.skills = self.skill_store()
+        return made
+
+    def test_enabled_skills_and_the_on_demand_list_are_in_the_system_prompt(self):
+        made = self.make_with_skills([reply(text_block("ok"))])
+        made.run()
+        system = self.client.requests[0]["system"][0]["text"]
+        self.assertIn("## Skill: check-battery\nRead the voltage and report it.", system)
+        self.assertIn("## On-Demand Skills", system)
+        self.assertIn("tidy-logs", system)
+        self.assertIn("Clears old log files.", system)
+        self.assertNotIn("Delete logs older than a week.", system)
+        self.assertNotIn("asleep", system)
+        self.assertTrue(system.startswith("You are the brain of a small robot."))
+
+    def test_get_skill_is_offered_for_exactly_the_on_demand_skills(self):
+        made = self.make_with_skills([reply(text_block("ok"))])
+        made.run()
+        tools = {tool["name"]: tool for tool in self.client.requests[0]["tools"]}
+        self.assertEqual(
+            tools["get_skill"]["input_schema"]["properties"]["skill_name"]["enum"],
+            ["tidy-logs"])
+
+    def test_get_skill_is_not_offered_without_on_demand_skills(self):
+        made = self.make([reply(text_block("ok"))])
+        made.skills = SkillStore(self.datadir.skills_dir)
+        made.skills.load()
+        made.run()
+        names = [tool["name"] for tool in self.client.requests[0]["tools"]]
+        self.assertNotIn("get_skill", names)
+
+    def test_get_skill_returns_the_skills_text(self):
+        script = [reply(tool_use("get_skill", {"skill_name": "tidy-logs"}, "s")),
+                  reply(text_block("Tidied."))]
+        made = self.make_with_skills(script)
+        made.run()
+        self.assertEqual(made.messages[2]["content"][0]["content"],
+                         "Delete logs older than a week.")
+
+    def test_a_skill_that_is_not_on_demand_cannot_be_fetched(self):
+        script = [reply(tool_use("get_skill", {"skill_name": "check-battery"}, "s")),
+                  reply(text_block("ok"))]
+        made = self.make_with_skills(script)
+        made.run()
+        self.assertEqual(made.messages[2]["content"][0]["content"],
+                         "Skill not found or not on-demand: check-battery")
+
+    def test_a_skill_with_bundled_files_says_where_they_are(self):
+        store = self.skill_store()
+        manage_skills(store, {"action": "write_file", "name": "tidy-logs",
+                              "file_path": "scripts/tidy.sh", "file_content": "echo tidy\n"})
+        script = [reply(tool_use("get_skill", {"skill_name": "tidy-logs"}, "s")),
+                  reply(text_block("ok"))]
+        made = self.make(script)
+        made.skills = store
+        made.run()
+        result = made.messages[2]["content"][0]["content"]
+        self.assertTrue(result.startswith("Delete logs older than a week."))
+        self.assertIn(f"bundled files are in: {store.folder('tidy-logs')}", result)
+
+    def test_a_skill_created_during_a_run_does_not_change_that_runs_prompt_or_tools(self):
+        made = None
+
+        def create_skill(_input):
+            manage_skills(made.skills, {"action": "create", "name": "late-skill",
+                                        "content": "New.", "mode": "on_demand"})
+            return "created"
+        script = [reply(tool_use("author", {}, "a")), reply(text_block("ok"))]
+        made = self.make(script, tools={"author": _tool("author", create_skill)})
+        made.skills = self.skill_store()
+        made.run()
+        first, second = self.client.requests
+        self.assertEqual(first["system"], second["system"])
+        self.assertEqual(first["tools"], second["tools"])
+
+    def test_get_skill_can_be_blocked(self):
+        made = self.make_with_skills([reply(text_block("ok"))], blocked_tools=["get_skill"])
+        made.run()
+        names = [tool["name"] for tool in self.client.requests[0]["tools"]]
+        self.assertNotIn("get_skill", names)
 
 
 class ModuleSurface(unittest.TestCase):

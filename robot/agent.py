@@ -49,6 +49,27 @@ USER_PROMPT_TOOL = {
 }
 
 
+def get_skill_tool(skill_names) -> dict:
+    """The get_skill tool, offering exactly the skills that are on demand."""
+    return {
+        "name": "get_skill",
+        "description": ("Retrieve the full content of an on-demand skill by name. Each "
+                        "skill's purpose is listed under '## On-Demand Skills' in the "
+                        "system prompt."),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "skill_name": {
+                    "type": "string",
+                    "description": "Name of the skill to retrieve.",
+                    "enum": list(skill_names),
+                }
+            },
+            "required": ["skill_name"],
+        },
+    }
+
+
 def _block_field(block, name, default=None):
     if isinstance(block, dict):
         return block.get(name, default)
@@ -58,12 +79,13 @@ def _block_field(block, name, default=None):
 class Agent:
     """One run. Create it, call run(), read status afterwards."""
 
-    def __init__(self, *, settings, console, datadir, get_client, learned=None,
+    def __init__(self, *, settings, console, datadir, get_client, skills=None, learned=None,
                  save_thinking=False, result_file=None, dry_run=False):
         self.settings = settings
         self.console = console
         self.datadir = datadir
         self.get_client = get_client
+        self.skills = skills  # a SkillStore with this run's modes applied, or None
         self.learned = learned if learned is not None else api.Learned()
         self.save_thinking = save_thinking
         self.result_file = result_file
@@ -98,14 +120,36 @@ class Agent:
     # -- set-up ------------------------------------------------------------
 
     def compose_system_prompt(self) -> str:
-        return prompts.base_system_prompt(self.settings.conversational)
+        """The base prompt, then every enabled skill, then the list of skills
+        the model can fetch on demand."""
+        base = prompts.base_system_prompt(self.settings.conversational)
+        if self.skills is None:
+            return base
+        return self.skills.compose_system_prompt(base)
 
     def tool_registry(self) -> dict:
         """Every tool this run could offer, before the blocklist is applied."""
         registry = dict(available_tools())
         registry["user_prompt"] = Tool(
             definition=USER_PROMPT_TOOL, run=self._do_user_prompt, is_available=lambda: True)
+        on_demand = self.skills.on_demand_names() if self.skills is not None else []
+        if on_demand:
+            registry["get_skill"] = Tool(
+                definition=get_skill_tool(on_demand), run=self._do_get_skill,
+                is_available=lambda: True, parallel_safe=True)
         return registry
+
+    def _do_get_skill(self, tool_input) -> str:
+        """The get_skill tool: the full text of an on-demand skill."""
+        name = str(tool_input.get("skill_name", ""))
+        body = self.skills.get_on_demand(name) if self.skills is not None else None
+        if body is None:
+            return f"Skill not found or not on-demand: {name}"
+        # A skill may come with scripts or reference files. The model can only
+        # use them through the shell, so say where they are.
+        if self.skills.resources(name):
+            body = f"{body.rstrip()}\n\n(This skill's bundled files are in: {self.skills.folder(name)})"
+        return body
 
     def _freeze_run(self):
         """Fix the system prompt and tool list for the whole run.

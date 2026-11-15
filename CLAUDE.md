@@ -147,7 +147,12 @@ of date. Phases:
   rules), `history.py`, `costs.py` (cost line, cost log, in-progress record),
   `chats.py`, `datastore.py`, `prompts.py`, `relay.py`. Data lives in
   `~/robot-data` on the Pi (`ROBOT_DATA_DIR` overrides it).
-- P3 saved instructions and skills, P4 Meta tools, P5 child runs, P6 documents:
+- P3 saved instructions and skills: done. `instructions.py` (the library in
+  `agent_instructions.json`, the `Default` entry that a plain chat borrows its
+  settings from, entry-to-settings with corrections) and `skills.py` (the
+  `skills/<name>/SKILL.md` tree, modes, prompt assembly, `get_skill`). New
+  options: `-l NAME`, `--list`, `--skills`.
+- P4 Meta tools, P5 child runs, P6 documents:
   not done yet.
 
 ## Current state of the agent (`robot/main.py`)

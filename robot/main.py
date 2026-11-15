@@ -1,13 +1,17 @@
 """Robot brain entry point: run the agent from the command line.
 
     python -m robot.main              chat: type the task at you>, then converse
+    python -m robot.main -l "Name"    run a saved instruction
+    python -m robot.main --list       show the saved instructions
     python -m robot.main --help       every option
 
 Nothing here imports the Anthropic SDK directly. It takes many seconds to load
-on the Pi, so it is loaded in the background while the person types.
+on the Pi, so it is loaded in the background while the person types, and the
+listing commands never load it at all.
 """
 
 import argparse
+import json
 import os
 import sys
 import threading
@@ -17,7 +21,8 @@ from dotenv import load_dotenv
 
 from robot import costs, instructions, models
 from robot.console import INTERRUPTED, Console, Interrupts, convo_end_word
-from robot.datastore import DataDir
+from robot.datastore import DataDir, StoreUnreadableError
+from robot.skills import SkillStore
 from robot.tools import available_tools
 
 ENV_FILE = Path(__file__).resolve().parent.parent / ".env"
@@ -25,6 +30,10 @@ ENV_FILE = Path(__file__).resolve().parent.parent / ".env"
 EXIT_OK = 0
 EXIT_RUN_ERROR = 1
 EXIT_CANNOT_START = 2
+
+
+class CannotStart(Exception):
+    """The run asked for cannot be started; the message says why."""
 
 
 class ClientLoader:
@@ -61,6 +70,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="python -m robot.main",
         description="The robot's agent. With no options it asks for a task and then chats.")
+    parser.add_argument("-l", "--load", metavar="NAME",
+                        help="run the saved instruction with this name")
+    parser.add_argument("--list", action="store_true",
+                        help="list the saved instructions and exit")
+    parser.add_argument("--skills", action="store_true", help="list the skills and exit")
     run = parser.add_argument_group("the run")
     run.add_argument("--model", metavar="ID", help="use this model for the run")
     run.add_argument("--mode", metavar="LEVEL", choices=models.THINKING_MODES,
@@ -98,10 +112,38 @@ def _read_text_file(path, what, console):
         return ""
 
 
-def default_settings() -> instructions.RunSettings:
-    """What a chat started without a saved instruction runs with."""
-    return instructions.RunSettings(
-        model=models.DEFAULT_MODEL, thinking_mode="low", conversational=True)
+def load_library(datadir, console) -> dict:
+    """The instruction library, with Default in it. Empty if it cannot be read."""
+    try:
+        return instructions.ensure_default(datadir)
+    except (StoreUnreadableError, OSError) as error:
+        console.warn(f"{error} Running with built-in settings.")
+        return {}
+
+
+def resolve_settings(args, library, console) -> instructions.RunSettings:
+    """The settings of this run: a named instruction's, or the Default ones."""
+    if args.load:
+        if args.load not in library:
+            available = ", ".join(sorted(library)) or "(none)"
+            raise CannotStart(
+                f"No saved instruction named '{args.load}'. Available: {available}")
+        name, entry = args.load, library[args.load]
+    else:
+        name = instructions.DEFAULT_NAME
+        entry = library.get(name) or instructions.default_entry()
+    try:
+        settings, warnings = instructions.settings_from_entry(name, entry)
+    except instructions.InstructionError as error:
+        raise CannotStart(str(error)) from None
+    for warning in warnings:
+        console.warn(warning)
+    if not args.load:
+        # A chat started without a name is not a run of "Default": it borrows
+        # that entry's settings, and its task is typed at the prompt.
+        settings.name = ""
+        settings.text = ""
+    return settings
 
 
 def apply_overrides(settings, args, console):
@@ -115,25 +157,53 @@ def apply_overrides(settings, args, console):
                      f"using '{settings.thinking_mode}'.")
 
 
-def offered_tool_names(settings) -> list:
+def load_skills(datadir, settings, console) -> SkillStore:
+    """The skills, with this run's modes applied."""
+    store = SkillStore(datadir.skills_dir)
+    try:
+        store.load()
+    except OSError as error:
+        console.warn(f"Could not read the skills in {datadir.skills_dir}: {error}")
+    for warning in store.apply_instruction_modes(settings.skill_modes):
+        console.warn(warning)
+    return store
+
+
+def offered_tool_names(settings, skills) -> list:
+    """The tools this run will offer, in the order the agent declares them."""
+    names = list(available_tools()) + ["user_prompt"]
+    if skills is not None and skills.on_demand_names():
+        names.append("get_skill")
+    names.append("web_search")
     blocked = set(settings.blocked_tools or ())
-    names = list(available_tools()) + ["user_prompt", "web_search"]
     return [name for name in names if name not in blocked]
 
 
-def show_banner(console, settings):
+def show_banner(console, settings, skills):
     mode = models.mode_label(settings.model, settings.thinking_mode,
                              thinking_budget=settings.thinking_budget)
     kind = "Conversation" if settings.conversational else "Single task"
     title = f"instruction '{settings.name}'" if settings.name else "chat"
     console.note(f"Robot agent: {title}. {kind} on {settings.model} ({mode}).")
-    console.note("Tools: " + ", ".join(offered_tool_names(settings)))
+    console.note("Tools: " + ", ".join(offered_tool_names(settings, skills)))
+    # Skills put text into the system prompt, so always say which are in use.
+    if skills is not None and skills.skills:
+        enabled = [name for name, entry in skills.skills.items()
+                   if entry.get("mode") == "enabled"]
+        on_demand = skills.on_demand_names()
+        parts = []
+        if enabled:
+            parts.append("enabled: " + ", ".join(enabled))
+        if on_demand:
+            parts.append("on demand: " + ", ".join(on_demand))
+        if parts:
+            console.note("Skills: " + "; ".join(parts))
     if settings.conversational and console.tty:
         console.note("Type quit, stop or exit to end. Ctrl-C stops a reply.")
 
 
 def first_message(console) -> str:
-    """Ask for the task of an ad-hoc chat. Empty when the person leaves instead."""
+    """Ask for the task. Empty when the person leaves instead."""
     while True:
         reply = console.ask()
         if reply is INTERRUPTED or reply is None:
@@ -159,6 +229,42 @@ def fold_in_unfinished_runs(datadir, console):
         console.activity(f"Logged the cost of {logged} earlier run(s) that did not finish.")
 
 
+def list_instructions(console, datadir) -> int:
+    library = load_library(datadir, console)
+    console.note(f"Saved instructions in {datadir.instructions_file}:")
+    for name in sorted(library):
+        console.note(instructions.describe(name, library[name]))
+    console.note('Run one with: python -m robot.main -l "Name"')
+    return EXIT_OK
+
+
+def list_skills(console, datadir) -> int:
+    store = SkillStore(datadir.skills_dir)
+    store.load()
+    console.note(f"Skills in {datadir.skills_dir}:")
+    if not store.skills:
+        console.note("(none yet: the agent can create them with its manage_skills tool)")
+    for name in sorted(store.skills):
+        entry = store.skills[name]
+        console.note(f"- {name}  [{entry.get('mode', 'disabled')}]")
+        description = " ".join(str(entry.get("description") or "").split())
+        if description:
+            console.note(f"  {description}")
+    return EXIT_OK
+
+
+def write_failed_result(result_file, name, message):
+    """Tell a waiting parent run why this one never started."""
+    if not result_file:
+        return
+    try:
+        with open(result_file, "w", encoding="utf-8", newline="\n") as handle:
+            json.dump({"instruction": name, "status": "error", "error": message,
+                       "final_text": ""}, handle, ensure_ascii=False, indent=1)
+    except OSError:
+        pass
+
+
 def main(argv=None) -> int:
     args = build_parser().parse_args(argv)
     for stream in (sys.stdout, sys.stderr):
@@ -175,34 +281,46 @@ def main(argv=None) -> int:
         debug=args.debug, headless=args.headless, relay_dir=args.relay_dir,
         interrupts=interrupts)
     datadir = DataDir()
-
-    settings = default_settings()
-    apply_overrides(settings, args, console)
-
-    if not args.dry_run and not os.environ.get("ANTHROPIC_API_KEY"):
-        console.error(f"No ANTHROPIC_API_KEY found. It belongs in {ENV_FILE}.")
-        return EXIT_CANNOT_START
-
-    # Start the slow SDK import now; the person reads the banner and types
-    # their first message while it loads.
-    loader = ClientLoader()
-
     try:
         datadir.ensure()
     except OSError as error:
         console.error(f"Cannot use the data folder {datadir.root}: {error}")
         return EXIT_CANNOT_START
-    fold_in_unfinished_runs(datadir, console)
 
-    show_banner(console, settings)
-    if not settings.text:
-        settings.text = first_message(console)
-        if not settings.text:
-            return EXIT_OK
-    settings.text = instructions.merge_prepend_text(
-        settings.text, _read_text_file(args.prepend_file, "prepend", console))
-    settings.text = instructions.merge_extra_text(
-        settings.text, _read_text_file(args.extra_file, "extra", console))
+    if args.list:
+        return list_instructions(console, datadir)
+    if args.skills:
+        return list_skills(console, datadir)
+
+    try:
+        settings = resolve_settings(args, load_library(datadir, console), console)
+        apply_overrides(settings, args, console)
+        if not args.dry_run and not os.environ.get("ANTHROPIC_API_KEY"):
+            raise CannotStart(f"No ANTHROPIC_API_KEY found. It belongs in {ENV_FILE}.")
+
+        # Start the slow SDK import now; the person reads the banner and types
+        # their first message while it loads.
+        loader = ClientLoader()
+        fold_in_unfinished_runs(datadir, console)
+        skills = load_skills(datadir, settings, console)
+        show_banner(console, settings, skills)
+
+        if not settings.text.strip():
+            # No saved task: the person types it. An unattended run cannot ask.
+            unattended = args.headless or args.result_file
+            if args.load and unattended:
+                raise CannotStart(f"The saved instruction '{args.load}' has no text.")
+            settings.text = first_message(console)
+            if not settings.text:
+                return EXIT_OK
+        settings.text = instructions.merge_prepend_text(
+            settings.text, _read_text_file(args.prepend_file, "prepend", console))
+        settings.text = instructions.merge_extra_text(
+            settings.text, _read_text_file(args.extra_file, "extra", console))
+    except CannotStart as error:
+        console.error(str(error))
+        write_failed_result(args.result_file, args.load or "", str(error))
+        return EXIT_CANNOT_START
 
     if not loader.is_ready():
         console.activity("Starting up...")
@@ -210,7 +328,8 @@ def main(argv=None) -> int:
 
     agent = Agent(
         settings=settings, console=console, datadir=datadir, get_client=loader.get,
-        save_thinking=args.save_thinking, result_file=args.result_file, dry_run=args.dry_run)
+        skills=skills, save_thinking=args.save_thinking, result_file=args.result_file,
+        dry_run=args.dry_run)
     status = agent.run()
     return EXIT_RUN_ERROR if status == "error" else EXIT_OK
 
