@@ -51,6 +51,7 @@ Keep README.md and this file up to date when features or scripts are added.
 ## Layout
 
 - `robot/main.py`: entry point, an interactive chat loop (details below).
+- `robot/tools.py`: the tools the model can call, each run locally on the Pi.
 - `robot/__init__.py`: empty; makes `robot` a package so `-m robot.main` works.
 - `scripts/deploy.sh`: runs on the Pi. `git pull --ff-only`, then
   `pip install -r requirements.txt` into `.venv`.
@@ -64,9 +65,17 @@ Keep README.md and this file up to date when features or scripts are added.
   `exit`, `quit`, `bye` or Ctrl-D quits; Ctrl-C during a reply cancels that reply.
 - Model: `claude-opus-5-5`, set by the `MODEL` constant, at `effort: "low"`.
 - No system prompt. The model does not know it is a robot.
-- No tools. It cannot read sensors, move anything, run commands or search the
-  web. Adding tools is the expected next step; `reply()` makes one request per
-  turn and would need to become a loop (or use the SDK tool runner).
+- One tool: `get_cpu_temperature`, which reads
+  `/sys/class/thermal/thermal_zone0/temp` on the Pi. It cannot move anything,
+  run commands or search the web.
+- Tools live in `robot/tools.py` as `Tool` entries in `ALL_TOOLS` (definition,
+  `run` function, `is_available` probe). `available_tools()` probes each one at
+  startup and only working tools are sent to the model, so on a machine without
+  the sensor the chatbot runs with no tools. To add a tool, add an entry there.
+- `reply()` is a manual tool loop: it keeps requesting while `stop_reason` is
+  `tool_use`, runs the requested tools, and sends all results back in one user
+  message. A tool that raises is reported to the model as an `is_error` result.
+  Each tool call prints a `[tool: name]` line.
 - Conversation history is kept in memory for the session and resent each turn.
   Nothing is saved between runs.
 - Replies are streamed with `client.beta.messages.stream(...)`.
@@ -75,8 +84,8 @@ Keep README.md and this file up to date when features or scripts are added.
 - Server-side refusal fallbacks are on (`betas=["server-side-fallback-2026-07-01"]`,
   `fallbacks="default"`), which is why the beta endpoint is used.
 - Top-level `cache_control` enables automatic prompt caching.
-- On an API error the just-added user message is removed from the history and
-  the loop continues.
+- On an API error everything the failed turn added is removed from the history
+  and the loop continues.
 - `.env` is located relative to `main.py`, not the working directory.
 
 ## Conventions
@@ -87,6 +96,6 @@ Keep README.md and this file up to date when features or scripts are added.
   so far).
 - Use the official `anthropic` SDK. For any API change, load the `claude-api`
   skill first; model IDs and request shapes change often.
-- No hardware (motors, sensors, camera, speaker) is wired into the code yet,
+- No external hardware (motors, sensors, camera, speaker) is wired into the code yet,
   and what is physically attached to the robot has not been recorded here. Ask
   before assuming any.
