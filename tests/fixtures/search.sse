@@ -1,0 +1,378 @@
+event: message_start
+data: {"type":"message_start","message":{"model":"claude-haiku-5-5","id":"msg_fixture","type":"message","role":"assistant","content":[],"container":null,"stop_reason":null,"stop_sequence":null,"stop_details":null,"usage":{"input_tokens":4,"cache_creation_input_tokens":6015,"cache_read_input_tokens":0,"cache_creation":{"ephemeral_5m_input_tokens":6015,"ephemeral_1h_input_tokens":0},"output_tokens":16,"service_tier":"standard","inference_geo":"global","speed":"standard"},"input_transformations":[],"diagnostics":null}}
+
+event: content_block_start
+data: {"type":"content_block_start","index":0,"content_block":{"type":"server_tool_use","id":"srvtoolu_018rq1kstytgJ8Dvi2a7GcAQ","name":"code_execution","input":{}}}
+
+event: ping
+data: {"type":"ping"}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":""}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"{\"code\": \"print"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"(\\\""}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"search"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"\\\")"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"\"}"}}
+
+event: content_block_stop
+data: {"type":"content_block_stop","index":0}
+
+event: content_block_start
+data: {"type":"content_block_start","index":1,"content_block":{"type":"code_execution_tool_result","tool_use_id":"srvtoolu_018rq1kstytgJ8Dvi2a7GcAQ","content":{"type":"code_execution_result","stdout":"search\n","stderr":"","return_code":0,"content":[],"abort_reason":null}}}
+
+event: content_block_stop
+data: {"type":"content_block_stop","index":1}
+
+event: content_block_start
+data: {"type":"content_block_start","index":2,"content_block":{"type":"thinking","thinking":"","signature":"SIGNATURE_PLACEHOLDER"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":2,"delta":{"type":"thinking_delta","thinking":"I"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":2,"delta":{"type":"thinking_delta","thinking":" got"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":2,"delta":{"type":"thinking_delta","thinking":" that"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":2,"delta":{"type":"thinking_delta","thinking":" search"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":2,"delta":{"type":"thinking_delta","thinking":" call wrong, so I'"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":2,"delta":{"type":"thinking_delta","thinking":"ll make"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":2,"delta":{"type":"thinking_delta","thinking":" it again"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":2,"delta":{"type":"thinking_delta","thinking":" proper"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":2,"delta":{"type":"thinking_delta","thinking":"ly and run web_search."}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":2,"delta":{"type":"thinking_delta","thinking":"\n\n"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":2,"delta":{"type":"signature_delta","signature":"SIGNATURE_PLACEHOLDER"}}
+
+event: content_block_stop
+data: {"type":"content_block_stop","index":2}
+
+event: content_block_start
+data: {"type":"content_block_start","index":3,"content_block":{"type":"server_tool_use","id":"srvtoolu_0195L6dr9o4uEWMrh2XC6sUV","name":"code_execution","input":{}}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":3,"delta":{"type":"input_json_delta","partial_json":""}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":3,"delta":{"type":"input_json_delta","partial_json":"{\"code\": \"import json\\nr"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":3,"delta":{"type":"input_json_delta","partial_json":" = await web_search({\\\"query"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":3,"delta":{"type":"input_json_delta","partial_json":"\\\": \\\"capital of Australia"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":3,"delta":{"type":"input_json_delta","partial_json":"\\\"})\\nfor"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":3,"delta":{"type":"input_json_delta","partial_json":" x in r[:3"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":3,"delta":{"type":"input_json_delta","partial_json":"]:\\n    print(x."}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":3,"delta":{"type":"input_json_delta","partial_json":"get(\\\"title\\\"), \\\""}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":3,"delta":{"type":"input_json_delta","partial_json":"|\\\", x.get(\\\"url\\\""}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":3,"delta":{"type":"input_json_delta","partial_json":"), \\\"|\\\", x"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":3,"delta":{"type":"input_json_delta","partial_json":".get(\\\"content\\\","}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":3,"delta":{"type":"input_json_delta","partial_json":" \\\"\\\")[:300])"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":3,"delta":{"type":"input_json_delta","partial_json":"\"}"}}
+
+event: content_block_stop
+data: {"type":"content_block_stop","index":3}
+
+event: content_block_start
+data: {"type":"content_block_start","index":4,"content_block":{"type":"server_tool_use","id":"srvtoolu_01JxyaxyT1cBjGKwFBUzy7Cs","name":"web_search","input":{"query":"capital of Australia"},"caller":{"type":"code_execution_20260120","tool_id":"srvtoolu_0195L6dr9o4uEWMrh2XC6sUV"}}}
+
+event: content_block_stop
+data: {"type":"content_block_stop","index":4}
+
+event: content_block_start
+data: {"type":"content_block_start","index":5,"content_block":{"type":"web_search_tool_result","tool_use_id":"srvtoolu_01JxyaxyT1cBjGKwFBUzy7Cs","content":[{"type":"web_search_result","title":"What is the capital of Australia?","url":"https://www.britannica.com/question/What-is-the-capital-of-Australia","encrypted_content":"ENCRYPTED_PLACEHOLDER","page_age":"145 days ago"},{"type":"web_search_result","title":"What Is The Capital Of Australia?","url":"https://www.worldatlas.com/articles/what-is-the-capital-of-australia.html","encrypted_content":"ENCRYPTED_PLACEHOLDER","page_age":"3063 days ago"},{"type":"web_search_result","title":"What's the Capital of Australia? Not Sydney or Melbourne!","url":"https://ovolohotels.com/ovolo/blog/sydney-isnt-the-capital-of-australia/","encrypted_content":"ENCRYPTED_PLACEHOLDER","page_age":"794 days ago"},{"type":"web_search_result","title":"Canberra, Australia","url":"https://www.ebsco.com/research-starters/geography-and-cartography/canberra-australia/","encrypted_content":"ENCRYPTED_PLACEHOLDER","page_age":null},{"type":"web_search_result","title":"Canberra: Capital City of Australia - YouTube","url":"https://www.youtube.com/watch?v=0P3MNjyVyRE","encrypted_content":"ENCRYPTED_PLACEHOLDER","page_age":"1014 days ago"},{"type":"web_search_result","title":"Canberra Australias Surprising Capital City","url":"https://www.adventures-abroad.com/blog/2026/10/canberra-australias-surprising-capital-city","encrypted_content":"ENCRYPTED_PLACEHOLDER","page_age":"27 days ago"},{"type":"web_search_result","title":"Canberra: Australia’s Capital City Icons - AAT Kings","url":"https://www.aatkings.com/storybook/canberra-australias-capital-city-icons/","encrypted_content":"ENCRYPTED_PLACEHOLDER","page_age":"361 days ago"},{"type":"web_search_result","title":"What is the capital of Australia? If you thought it was Sydney, keep on reading","url":"https://youtooproject.com/en/blog/australia-en/capital-of-australia-canberra/","encrypted_content":"ENCRYPTED_PLACEHOLDER","page_age":"784 days ago"},{"type":"web_search_result","title":"What Is the Capital City of Australia?","url":"https://www.insideaustraliatravel.com/faqs/australia-capital-city","encrypted_content":"ENCRYPTED_PLACEHOLDER","page_age":"159 days ago"},{"type":"web_search_result","title":"キャンベラ - Wiktionary, the free dictionary","url":"https://en.wiktionary.org/wiki/%E3%82%AD%E3%83%A3%E3%83%B3%E3%83%99%E3%83%A9","encrypted_content":"ENCRYPTED_PLACEHOLDER","page_age":null}],"caller":{"type":"code_execution_20260120","tool_id":"srvtoolu_0195L6dr9o4uEWMrh2XC6sUV"}}}
+
+event: content_block_stop
+data: {"type":"content_block_stop","index":5}
+
+event: content_block_start
+data: {"type":"content_block_start","index":6,"content_block":{"type":"code_execution_tool_result","tool_use_id":"srvtoolu_0195L6dr9o4uEWMrh2XC6sUV","content":{"type":"encrypted_code_execution_result","encrypted_stdout":"ENCRYPTED_PLACEHOLDER","stderr":"Traceback (most recent call last):\n  File \"/usr/local/lib/python3.11/asyncio/runners.py\", line 190, in run\n    return runner.run(main)\n           ^^^^^^^^^^^^^^^^\n  File \"/usr/local/lib/python3.11/asyncio/runners.py\", line 118, in run\n    return self._loop.run_until_complete(task)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/usr/local/lib/python3.11/asyncio/base_events.py\", line 654, in run_until_complete\n    return future.result()\n           ^^^^^^^^^^^^^^^\n  File \"/tmp/srvtoolu_0195L6dr9o4uEWMrh2XC6sUV/cell.py\", line 11, in <module>\n    print(x.get(\"title\"), \"|\", x.get(\"url\"), \"|\", x.get(\"content\", \"\")[:300])\n          ^^^^^\nAttributeError: 'str' object has no attribute 'get'\n","return_code":1,"content":[]}}}
+
+event: content_block_stop
+data: {"type":"content_block_stop","index":6}
+
+event: content_block_start
+data: {"type":"content_block_start","index":7,"content_block":{"type":"server_tool_use","id":"srvtoolu_01MXnBfQPhjFU4UngjkeGnDe","name":"code_execution","input":{}}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":7,"delta":{"type":"input_json_delta","partial_json":""}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":7,"delta":{"type":"input_json_delta","partial_json":"{\"code\": \"r = await web"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":7,"delta":{"type":"input_json_delta","partial_json":"_search({\\\"query\\\": \\\"cap"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":7,"delta":{"type":"input_json_delta","partial_json":"ital of Australia\\\"})"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":7,"delta":{"type":"input_json_delta","partial_json":"\\nprint(type(r), str"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":7,"delta":{"type":"input_json_delta","partial_json":"(r)[:1"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":7,"delta":{"type":"input_json_delta","partial_json":"500"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":7,"delta":{"type":"input_json_delta","partial_json":"])"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":7,"delta":{"type":"input_json_delta","partial_json":"\"}"}}
+
+event: content_block_stop
+data: {"type":"content_block_stop","index":7}
+
+event: content_block_start
+data: {"type":"content_block_start","index":8,"content_block":{"type":"server_tool_use","id":"srvtoolu_01MKVzoDR6ifTJYzVQDQG1hY","name":"web_search","input":{"query":"capital of Australia"},"caller":{"type":"code_execution_20260120","tool_id":"srvtoolu_01MXnBfQPhjFU4UngjkeGnDe"}}}
+
+event: content_block_stop
+data: {"type":"content_block_stop","index":8}
+
+event: content_block_start
+data: {"type":"content_block_start","index":9,"content_block":{"type":"web_search_tool_result","tool_use_id":"srvtoolu_01MKVzoDR6ifTJYzVQDQG1hY","content":[{"type":"web_search_result","title":"What is the capital of Australia?","url":"https://www.britannica.com/question/What-is-the-capital-of-Australia","encrypted_content":"ENCRYPTED_PLACEHOLDER","page_age":"145 days ago"},{"type":"web_search_result","title":"What Is The Capital Of Australia?","url":"https://www.worldatlas.com/articles/what-is-the-capital-of-australia.html","encrypted_content":"ENCRYPTED_PLACEHOLDER","page_age":"3063 days ago"},{"type":"web_search_result","title":"Canberra, Australia","url":"https://www.ebsco.com/research-starters/geography-and-cartography/canberra-australia/","encrypted_content":"ENCRYPTED_PLACEHOLDER","page_age":null},{"type":"web_search_result","title":"What's the Capital of Australia? Not Sydney or Melbourne!","url":"https://ovolohotels.com/ovolo/blog/sydney-isnt-the-capital-of-australia/","encrypted_content":"ENCRYPTED_PLACEHOLDER","page_age":"794 days ago"},{"type":"web_search_result","title":"Canberra: Capital City of Australia - YouTube","url":"https://www.youtube.com/watch?v=0P3MNjyVyRE","encrypted_content":"ENCRYPTED_PLACEHOLDER","page_age":"1014 days ago"},{"type":"web_search_result","title":"Canberra Australias Surprising Capital City","url":"https://www.adventures-abroad.com/blog/2026/10/canberra-australias-surprising-capital-city","encrypted_content":"ENCRYPTED_PLACEHOLDER","page_age":"27 days ago"},{"type":"web_search_result","title":"Canberra: Australia’s Capital City Icons - AAT Kings","url":"https://www.aatkings.com/storybook/canberra-australias-capital-city-icons/","encrypted_content":"ENCRYPTED_PLACEHOLDER","page_age":"361 days ago"},{"type":"web_search_result","title":"What is the capital of Australia? If you thought it was Sydney, keep on reading","url":"https://youtooproject.com/en/blog/australia-en/capital-of-australia-canberra/","encrypted_content":"ENCRYPTED_PLACEHOLDER","page_age":"784 days ago"},{"type":"web_search_result","title":"What Is the Capital City of Australia?","url":"https://www.insideaustraliatravel.com/faqs/australia-capital-city","encrypted_content":"ENCRYPTED_PLACEHOLDER","page_age":"159 days ago"},{"type":"web_search_result","title":"キャンベラ - Wiktionary, the free dictionary","url":"https://en.wiktionary.org/wiki/%E3%82%AD%E3%83%A3%E3%83%B3%E3%83%99%E3%83%A9","encrypted_content":"ENCRYPTED_PLACEHOLDER","page_age":null}],"caller":{"type":"code_execution_20260120","tool_id":"srvtoolu_01MXnBfQPhjFU4UngjkeGnDe"}}}
+
+event: content_block_stop
+data: {"type":"content_block_stop","index":9}
+
+event: content_block_start
+data: {"type":"content_block_start","index":10,"content_block":{"type":"code_execution_tool_result","tool_use_id":"srvtoolu_01MXnBfQPhjFU4UngjkeGnDe","content":{"type":"encrypted_code_execution_result","encrypted_stdout":"ENCRYPTED_PLACEHOLDER","stderr":"","return_code":0,"content":[]}}}
+
+event: content_block_stop
+data: {"type":"content_block_stop","index":10}
+
+event: content_block_start
+data: {"type":"content_block_start","index":11,"content_block":{"type":"thinking","thinking":"","signature":"SIGNATURE_PLACEHOLDER"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":11,"delta":{"type":"thinking_delta","thinking":"I'm sett"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":11,"delta":{"type":"thinking_delta","thinking":"ling on a short"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":11,"delta":{"type":"thinking_delta","thinking":", cited sentence that"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":11,"delta":{"type":"thinking_delta","thinking":" reads in"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":11,"delta":{"type":"thinking_delta","thinking":" my"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":11,"delta":{"type":"thinking_delta","thinking":" own words r"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":11,"delta":{"type":"thinking_delta","thinking":"ather than copying the source clau"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":11,"delta":{"type":"thinking_delta","thinking":"ses."}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":11,"delta":{"type":"thinking_delta","thinking":" I'm we"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":11,"delta":{"type":"thinking_delta","thinking":"ighing a r"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":11,"delta":{"type":"thinking_delta","thinking":"ephrasing around"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":11,"delta":{"type":"thinking_delta","thinking":" the seat of government and"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":11,"delta":{"type":"thinking_delta","thinking":" the Australian Capital"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":11,"delta":{"type":"thinking_delta","thinking":" Territory, then chec"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":11,"delta":{"type":"thinking_delta","thinking":"king whether the worldatl"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":11,"delta":{"type":"thinking_delta","thinking":"as line"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":11,"delta":{"type":"thinking_delta","thinking":" about Canberra being"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":11,"delta":{"type":"thinking_delta","thinking":" the cap"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":11,"delta":{"type":"thinking_delta","thinking":"ital and largest inland city f"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":11,"delta":{"type":"thinking_delta","thinking":"its as"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":11,"delta":{"type":"thinking_delta","thinking":" the citation."}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":11,"delta":{"type":"thinking_delta","thinking":"\n\n"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":11,"delta":{"type":"thinking_delta","thinking":"I'm dr"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":11,"delta":{"type":"thinking_delta","thinking":"afting the sentence to"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":11,"delta":{"type":"thinking_delta","thinking":" cite the"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":11,"delta":{"type":"thinking_delta","thinking":" Britannica result, though"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":11,"delta":{"type":"thinking_delta","thinking":" I want"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":11,"delta":{"type":"thinking_delta","thinking":" to keep the w"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":11,"delta":{"type":"thinking_delta","thinking":"ording distinct and"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":11,"delta":{"type":"thinking_delta","thinking":" check which"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":11,"delta":{"type":"thinking_delta","thinking":" s"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":11,"delta":{"type":"thinking_delta","thinking":"entence in"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":11,"delta":{"type":"thinking_delta","thinking":" the result"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":11,"delta":{"type":"thinking_delta","thinking":" I"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":11,"delta":{"type":"thinking_delta","thinking":"'"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":11,"delta":{"type":"thinking_delta","thinking":"m actually p"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":11,"delta":{"type":"thinking_delta","thinking":"ointing to"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":11,"delta":{"type":"thinking_delta","thinking":"."}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":11,"delta":{"type":"thinking_delta","thinking":"\n\n"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":11,"delta":{"type":"signature_delta","signature":"SIGNATURE_PLACEHOLDER"}}
+
+event: content_block_stop
+data: {"type":"content_block_stop","index":11}
+
+event: content_block_start
+data: {"type":"content_block_start","index":12,"content_block":{"type":"text","text":""}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":12,"delta":{"type":"text_delta","text":"Can"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":12,"delta":{"type":"text_delta","text":"berra,"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":12,"delta":{"type":"text_delta","text":" which sits within"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":12,"delta":{"type":"text_delta","text":" the Australian Capital"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":12,"delta":{"type":"text_delta","text":" Territory, serves as the n"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":12,"delta":{"type":"text_delta","text":"ation's seat of government "}}
+
+event: content_block_stop
+data: {"type":"content_block_stop","index":12}
+
+event: content_block_start
+data: {"type":"content_block_start","index":13,"content_block":{"citations":[],"type":"text","text":""}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":13,"delta":{"type":"text_delta","text":"The"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":13,"delta":{"type":"text_delta","text":" capital of Australia is"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":13,"delta":{"type":"text_delta","text":" Canberra, located in the south"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":13,"delta":{"type":"text_delta","text":"east between the larger cities"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":13,"delta":{"type":"text_delta","text":" of Sydney and Mel"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":13,"delta":{"type":"text_delta","text":"bourne."}}
+
+event: content_block_stop
+data: {"type":"content_block_stop","index":13}
+
+event: content_block_start
+data: {"type":"content_block_start","index":14,"content_block":{"type":"text","text":""}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":14,"delta":{"type":"text_delta","text":"."}}
+
+event: content_block_stop
+data: {"type":"content_block_stop","index":14}
+
+event: message_delta
+data: {"type":"message_delta","delta":{"stop_reason":"end_turn","stop_sequence":null,"stop_details":null,"container":{"id":"container_fixture","expires_at":"2026-11-16T00:30:35.294524Z"}},"usage":{"input_tokens":10,"cache_creation_input_tokens":7275,"cache_read_input_tokens":18699,"output_tokens":617,"output_tokens_details":{"thinking_tokens":278},"server_tool_use":{"web_search_requests":2,"web_fetch_requests":0}}}
+
+event: message_stop
+data: {"type":"message_stop"}
+
