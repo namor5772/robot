@@ -64,7 +64,12 @@ Keep README.md and this file up to date when features or scripts are added.
 - A plain text chatbot. Prompts `you>`, prints the reply after `robot>`.
   `exit`, `quit`, `bye` or Ctrl-D quits; Ctrl-C during a reply cancels that reply.
 - Model: `claude-opus-5-5`, set by the `MODEL` constant, at `effort: "low"`.
-- No system prompt. The model does not know it is a robot.
+- System prompt: the `SYSTEM_PROMPT` constant in `main.py`. It tells the model
+  it is the robot's brain running on the Pi, to speak in the first person, to
+  claim only abilities it has tools for, never to invent sensor readings, and
+  to reply briefly in plain text (the Pi console does not render Markdown).
+  It names no hardware, personality or user name. The user approved its wording;
+  show any proposed change to it before implementing.
 - One tool: `get_cpu_temperature`, which reads
   `/sys/class/thermal/thermal_zone0/temp` on the Pi. It cannot move anything,
   run commands or search the web.

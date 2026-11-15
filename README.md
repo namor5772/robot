@@ -3,8 +3,9 @@
 Anthropic-API agent "brain" for a small robot running on a Raspberry Pi Zero 2 W.
 
 Right now it is a text chatbot: it talks to Claude (`claude-opus-5-5`) and
-remembers the conversation for the session. It has no system prompt and one
-tool: it can read the Pi's CPU temperature (ask "how hot are you?"). The tool
+remembers the conversation for the session. A system prompt (in
+`robot/main.py`) tells it that it is the robot and to answer briefly in plain
+text. It has one tool: it can read the Pi's CPU temperature (ask "how hot are you?"). The tool
 is only offered to the model when the sensor can actually be read. It cannot
 control hardware yet.
 
