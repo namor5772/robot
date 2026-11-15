@@ -19,7 +19,9 @@ main() {
     fi
   fi
 
-  if pgrep -f "python -m robot.main" >/dev/null 2>&1; then
+  # Anchored at the start of the command line, so a shell whose own command
+  # merely mentions the program is not mistaken for a running chat.
+  if pgrep -f "^[^ ]*python[^ ]* -m robot\.main" >/dev/null 2>&1; then
     echo "note: a robot chat is running and keeps the old code until it is restarted"
   fi
 }

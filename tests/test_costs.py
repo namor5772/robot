@@ -1679,6 +1679,11 @@ class ProcessIsRobotTests(FakeProc):
                                       "robot.main"])
             other = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"])
             try:
+                # A process's command line is not always readable in the very
+                # instant after it starts, so give it a moment to appear.
+                deadline = time.monotonic() + 5
+                while not process_is_robot(named.pid) and time.monotonic() < deadline:
+                    time.sleep(0.05)
                 self.assertIs(process_is_robot(named.pid), True)
                 self.assertIs(process_is_robot(other.pid), False)
             finally:
