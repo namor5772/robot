@@ -27,25 +27,31 @@ There is no tool yet for motors or other attached hardware.
 
 ## Running it
 
+From the laptop:
+
+```powershell
+ssh -t pi "bash ~/robot/scripts/chat.sh"
+```
+
 At the Pi's console:
 
 ```bash
-cd ~/robot
-.venv/bin/python -m robot.main
-```
-
-Or from the laptop:
-
-```powershell
-ssh -t pi "cd ~/robot && .venv/bin/python -m robot.main"
+bash ~/robot/scripts/chat.sh
 ```
 
 The banner lists the active tools. Type a message at `you>`. Type `exit` or
 press Ctrl-D to quit; Ctrl-C stops a reply or a running command.
 
-Over SSH the chat lives inside the connection. If the laptop sleeps or the
-connection drops, the chat ends and its conversation is lost; reconnect and
-start it again.
+`chat.sh` runs the chat inside tmux, so it belongs to the Pi and not to your
+SSH connection. If the laptop sleeps or the connection drops, the chat keeps
+running, and the same command brings you back to it.
+
+- To leave a chat running on purpose, press Ctrl-B, then D.
+- The mouse wheel scrolls back. To select text, hold Shift while dragging.
+- When the chat ends, press Enter to close the window.
+
+Without tmux, the chat can be started directly with
+`cd ~/robot && .venv/bin/python -m robot.main`. It then ends if the connection drops.
 
 ## Workflow
 
@@ -63,8 +69,9 @@ address. If it times out, the address has changed; see `CLAUDE.md`.
 
 - `robot/main.py`: loads `~/robot/.env` and runs the chat loop, streaming each reply and running the tools the model asks for.
 - `robot/tools.py`: the tool definitions. The Pi tools are probed at startup and skipped if they do not work on this machine.
-- `scripts/deploy.sh`: run on the Pi; `git pull --ff-only` and `pip install -r requirements.txt` into `.venv`.
-- `requirements.txt`: `anthropic`, `python-dotenv`.
+- `scripts/chat.sh`: starts the chat inside tmux, or rejoins one that is still running. `scripts/tmux.conf` holds its tmux settings.
+- `scripts/deploy.sh`: run on the Pi; `git pull --ff-only`, `pip install -r requirements.txt` into `.venv`, and installs tmux if it is missing.
+- `requirements.txt`: `anthropic` and `python-dotenv`, pinned to exact versions.
 - `CLAUDE.md`: detailed notes for Claude Code sessions.
 
 ## Setup on the Pi

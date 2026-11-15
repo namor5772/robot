@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+# Start the robot chat inside tmux, or rejoin one that is still running.
+#
+# Inside tmux the chat belongs to the Pi, not to your SSH connection: if the
+# laptop sleeps or the connection drops, the chat keeps running, and this same
+# command brings you back to it.
+#
+#   From the laptop:  ssh -t pi "bash ~/robot/scripts/chat.sh"
+#   At the Pi:        bash ~/robot/scripts/chat.sh
+#
+# Any arguments are passed to the program, for example: chat.sh -l "Name"
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+SOCKET=robot
+SESSION=robot
+
+# Called by tmux as the session's command: run the program, then keep the
+# window open until Enter so the last lines can be read.
+if [ "${1:-}" = "--inside-tmux" ]; then
+  shift
+  status=0
+  .venv/bin/python -m robot.main "$@" || status=$?
+  echo
+  read -r -p "Chat ended (exit code $status). Press Enter to close. " _ || true
+  exit 0
+fi
+
+if ! command -v tmux >/dev/null 2>&1; then
+  echo "tmux is not installed, so this chat will end if the connection drops." >&2
+  exec .venv/bin/python -m robot.main "$@"
+fi
+
+if tmux -L "$SOCKET" has-session -t "$SESSION" 2>/dev/null; then
+  if [ "$#" -gt 0 ]; then
+    echo "A chat is already running. Rejoining it; the arguments are ignored." >&2
+    sleep 2
+  fi
+  exec tmux -L "$SOCKET" attach-session -t "$SESSION"
+fi
+
+# Quote the arguments so they survive tmux handing the command to a shell.
+inner="bash $(printf '%q' "$PWD/scripts/chat.sh") --inside-tmux"
+for arg in "$@"; do
+  inner+=" $(printf '%q' "$arg")"
+done
+
+# ROBOT_TMUX_DETACHED=1 starts the session without attaching (used for tests).
+detached=()
+if [ "${ROBOT_TMUX_DETACHED:-}" = "1" ]; then
+  detached=(-d)
+fi
+
+exec tmux -L "$SOCKET" -f scripts/tmux.conf new-session "${detached[@]}" -s "$SESSION" "$inner"

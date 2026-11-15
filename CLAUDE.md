@@ -38,8 +38,9 @@ on a Windows laptop and runs on a Raspberry Pi.
 2. Commit and push to GitHub (`origin`, branch `main`). The laptop remote is
    HTTPS; the Pi's remote is SSH (`git@github.com:namor5772/robot.git`).
 3. Deploy: `ssh pi "bash ~/robot/scripts/deploy.sh"`
-4. Run on the Pi: `ssh -t pi "cd ~/robot && .venv/bin/python -m robot.main"`
-   (`-t` gives the chat a proper terminal).
+4. Run on the Pi: `ssh -t pi "bash ~/robot/scripts/chat.sh"` (inside tmux; `-t`
+   gives it a proper terminal). Without tmux:
+   `ssh -t pi "cd ~/robot && .venv/bin/python -m robot.main"`.
 
 Never edit files on the Pi directly. Every change goes through git; the Pi only
 ever receives code via `git pull --ff-only`, which refuses to run if the Pi's
@@ -89,9 +90,14 @@ show the user the output.
   session and the robot process ends with it, so that conversation is lost.
   Nothing else is affected: reconnect and start the chat again. First seen on
   2026-11-16, caused by laptop standby.
-- `tmux` and `screen` are not installed on the Pi. Running the chat inside
-  `tmux` would let it survive a dropped connection. As of 2026-11-16 this has
-  been suggested to the user but not set up.
+- `scripts/chat.sh` avoids this by running the chat inside tmux (the user asked
+  for it on 2026-11-16). It uses its own tmux socket and session, both named
+  `robot`, with `scripts/tmux.conf`, so drive it with `tmux -L robot ...`.
+  Run again, it reattaches to a live session and ignores its arguments.
+  Detach is Ctrl-B then D. `ROBOT_TMUX_DETACHED=1` starts the session without
+  attaching, which is how to test it without a terminal:
+  `tmux -L robot send-keys -t robot 'text' Enter` types into it and
+  `tmux -L robot capture-pane -p -t robot` reads the screen.
 - To see why a session ended, run `sudo journalctl -t sshd-session --since today`
   on the Pi. The close and error lines are not under `-u ssh`: after login the
   session process is moved into its own login scope. On the laptop, standby
@@ -105,10 +111,18 @@ show the user the output.
   `SERVER_TOOLS` run on Anthropic's servers.
 - `robot/__init__.py`: empty; makes `robot` a package so `-m robot.main` works.
 - `scripts/deploy.sh`: runs on the Pi. `git pull --ff-only`, then
-  `pip install -r requirements.txt` into `.venv`.
-- `requirements.txt`: `anthropic`, `python-dotenv` (unpinned; the Pi currently
-  has `anthropic` 2.8.0, which is built on `httpx2`).
-- `.gitattributes`: forces LF line endings on `*.sh`.
+  `pip install -r requirements.txt` into `.venv`, then installs tmux if it is
+  missing. Its body is inside a `main` function so the pull can replace the
+  file safely. A change to `deploy.sh` itself only takes effect on the deploy
+  after the one that pulls it.
+- `scripts/chat.sh`, `scripts/tmux.conf`: the tmux launcher and its settings.
+- `requirements.txt`: `anthropic==2.8.0`, `python-dotenv==1.2.4`. Pinned on
+  purpose: the engine depends on exact SDK behaviour (2.8.0 sends API version
+  2026-10-21, has no `temperature` parameter, and is built on `httpx2`).
+- `.venv/` on the laptop (gitignored): Python 3.12 with the same pinned
+  packages, for running tests locally with `.venv\Scripts\python.exe`. There is
+  still no API key on the laptop.
+- `.gitattributes`: forces LF line endings on `*.sh` and `*.conf`.
 
 ## Current state of the agent (`robot/main.py`)
 
