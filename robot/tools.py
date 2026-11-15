@@ -100,7 +100,9 @@ ALL_TOOLS = [
             "description": (
                 "Run a bash command on the Raspberry Pi this program is running on "
                 "and get back its exit code, stdout and stderr. The command runs as "
-                "the robot's own user with full access, and sudo is available. Use "
+                "the robot's own user with that user's full access. sudo only works "
+                "if passwordless sudo is set up on this Pi, because a password "
+                "cannot be typed; check with 'sudo -n true'. Use "
                 "it for anything on the Pi that no other tool covers: inspecting "
                 "the system, reading and writing files, installing software, "
                 "running scripts, controlling hardware. Each call starts a fresh "
