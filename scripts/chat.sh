@@ -22,6 +22,9 @@ if [ "${1:-}" = "--inside-tmux" ]; then
   shift
   status=0
   .venv/bin/python -m robot.main "$@" || status=$?
+  # A program that was killed outright cannot put the terminal back the way it
+  # found it, and then Enter would not be recognised below.
+  stty sane 2>/dev/null || true
   echo
   read -r -p "Chat ended (exit code $status). Press Enter to close. " _ || true
   exit 0
@@ -33,6 +36,10 @@ if ! command -v tmux >/dev/null 2>&1; then
 fi
 
 if tmux -L "$SOCKET" has-session -t "$SESSION" 2>/dev/null; then
+  if [ "${ROBOT_TMUX_DETACHED:-}" = "1" ]; then
+    echo "A chat is already running in tmux; not starting another." >&2
+    exit 0
+  fi
   if [ "$#" -gt 0 ]; then
     echo "A chat is already running. Rejoining it; the arguments are ignored." >&2
     sleep 2

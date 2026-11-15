@@ -316,6 +316,15 @@ class Ladder(unittest.TestCase):
         self.assertEqual(result.content, [{"type": "text", "text": "The answer"}])
         self.assertEqual(result.usage["input_tokens"], 100)
 
+    def test_an_interrupted_reply_is_costed_by_what_had_streamed(self):
+        long_text = "word " * 2000
+        cut = reply(text_block(long_text), usage_=usage(input_tokens=50, output_tokens=1))
+        result = self.call([InterruptDuring(cut, self.interrupts)])
+        self.assertTrue(result.interrupted)
+        # The final count never arrived; the estimate stands in for it.
+        self.assertGreater(result.usage["output_tokens"], 1000)
+        self.assertEqual(result.usage["input_tokens"], 50)
+
     def test_ctrl_c_during_a_backoff_wait_ends_the_call(self):
         def interrupting_wait(seconds):
             self.interrupts.waits.append(seconds)

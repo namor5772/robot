@@ -322,8 +322,13 @@ def call_model(client, console, interrupts, *, model, system_prompt, messages, c
 
     def interrupted_result(text="", usage=None, fast=False):
         content = [{"type": "text", "text": text}] if text else []
-        return CallResult("end_turn", content, text, _usage_dict(usage, model, fast),
-                          interrupted=True)
+        counted = _usage_dict(usage, model, fast)
+        if counted and text:
+            # The stream was cut before its final count arrived. What had
+            # streamed was still generated and billed, so estimate it.
+            counted["output_tokens"] = max(counted["output_tokens"],
+                                           history.estimate_content_tokens(text))
+        return CallResult("end_turn", content, text, counted, interrupted=True)
 
     def pause(seconds, what, attempt):
         console.activity(f"{what} - retrying in {seconds}s (attempt {attempt + 1}/{max_retries})...")
