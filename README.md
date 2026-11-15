@@ -5,10 +5,11 @@ Anthropic-API agent "brain" for a small robot running on a Raspberry Pi Zero 2 W
 Right now it is a text chatbot: it talks to Claude (`claude-opus-5-5`) and
 remembers the conversation for the session. A system prompt (in
 `robot/main.py`) tells it that it is the robot and to answer briefly in plain
-text. It has three tools: it can search the web, and it can read the Pi's CPU temperature (ask "how hot are you?")
+text. It has four tools: it can run any shell command on the Pi (unrestricted,
+including sudo, with no confirmation), search the web, and read the Pi's CPU temperature (ask "how hot are you?")
 and the current date and time from the Pi's clock. The temperature tool
 is only offered to the model when the sensor can actually be read. It cannot
-control hardware yet.
+control motors or other attached hardware yet.
 
 ## Running it
 
@@ -41,7 +42,7 @@ ssh pi "bash ~/robot/scripts/deploy.sh"
 ## Files
 
 - `robot/main.py`: loads `~/robot/.env` and runs an interactive chat loop with the Anthropic API, streaming each reply.
-- `robot/tools.py`: tools the model can call (`get_cpu_temperature` and `get_current_datetime` run on the Pi; `web_search` runs on Anthropic's servers). The Pi tools are probed at startup and skipped if they do not work on this machine.
+- `robot/tools.py`: tools the model can call (`run_shell_command`, `get_cpu_temperature` and `get_current_datetime` run on the Pi; `web_search` runs on Anthropic's servers). The Pi tools are probed at startup and skipped if they do not work on this machine.
 - `scripts/deploy.sh`: run on the Pi; `git pull --ff-only` and `pip install -r requirements.txt` into `.venv`.
 - `requirements.txt`: `anthropic`, `python-dotenv`.
 - `CLAUDE.md`: detailed notes for Claude Code sessions.

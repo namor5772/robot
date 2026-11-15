@@ -1,5 +1,6 @@
 """Robot brain entry point: an interactive chat loop with the Anthropic API."""
 
+import json
 from pathlib import Path
 
 import anthropic
@@ -39,7 +40,8 @@ shown in a plain terminal.
 
 def run_tool(tools: dict[str, Tool], block) -> dict:
     """Run one tool the model asked for and build the result to send back."""
-    print(f"\n[tool: {block.name}]", flush=True)
+    detail = f": {json.dumps(block.input, ensure_ascii=False)}" if block.input else ""
+    print(f"\n[tool: {block.name}{detail}]", flush=True)
     result = {"type": "tool_result", "tool_use_id": block.id}
     try:
         result["content"] = tools[block.name].run(block.input)

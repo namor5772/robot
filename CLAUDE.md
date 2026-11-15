@@ -80,7 +80,20 @@ Keep README.md and this file up to date when features or scripts are added.
 - Two tools: `get_cpu_temperature`, which reads
   `/sys/class/thermal/thermal_zone0/temp` on the Pi, and `get_current_datetime`,
   which returns the Pi's local date, time and timezone from its system clock
-  (always available). It cannot move anything or run commands.
+  (always available).
+- Shell tool: `run_shell_command` runs any bash command on the Pi as user
+  `grobliro`, with sudo. The user explicitly asked (2026-11-15) for NO
+  guardrails: no confirmation prompt, no allowlist, no blocked commands. Do not
+  add any without being asked. What it does have is plumbing only: a
+  model-chosen timeout (default 60 s, no cap; the whole process group is killed
+  on timeout or Ctrl-C), stdin from `/dev/null` so commands cannot read the
+  chat's keyboard, and output trimmed to `MAX_OUTPUT_CHARS` per stream. Each
+  call is a fresh shell in the home directory. Offered only on POSIX machines
+  with bash, so never on the laptop. Tool calls with inputs print them, e.g.
+  `[tool: run_shell_command: {"command": "uptime"}]`.
+- Consequence to keep in mind: with the shell tool the model can read
+  `~/robot/.env`, edit the checkout (which would break `git pull --ff-only`),
+  and act on text it reads from web search results.
 - Web search: `SERVER_TOOLS` in `robot/tools.py` declares Anthropic's
   server-side `web_search_20260209` tool (`max_uses: 5` per request; searches
   are billed per use). It runs on Anthropic's servers, so there is no code for
