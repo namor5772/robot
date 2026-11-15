@@ -77,9 +77,10 @@ Keep README.md and this file up to date when features or scripts are added.
   to reply briefly in plain text (the Pi console does not render Markdown).
   It names no hardware, personality or user name. The user approved its wording;
   show any proposed change to it before implementing.
-- One tool: `get_cpu_temperature`, which reads
-  `/sys/class/thermal/thermal_zone0/temp` on the Pi. It cannot move anything,
-  run commands or search the web.
+- Two tools: `get_cpu_temperature`, which reads
+  `/sys/class/thermal/thermal_zone0/temp` on the Pi, and `get_current_datetime`,
+  which returns the Pi's local date, time and timezone from its system clock
+  (always available). It cannot move anything, run commands or search the web.
 - Tools live in `robot/tools.py` as `Tool` entries in `ALL_TOOLS` (definition,
   `run` function, `is_available` probe). `available_tools()` probes each one at
   startup and only working tools are sent to the model, so on a machine without

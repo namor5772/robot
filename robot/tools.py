@@ -1,6 +1,7 @@
 """Tools the model can call. Each one runs here on the Pi."""
 
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import Callable
 
@@ -28,7 +29,31 @@ def _cpu_temperature_available() -> bool:
     return True
 
 
+def read_current_datetime() -> str:
+    """Return the Pi's local date and time, with its timezone."""
+    now = datetime.now().astimezone()
+    return now.strftime("%A %d %B %Y, %H:%M:%S %Z (UTC%z)")
+
+
 ALL_TOOLS = [
+    Tool(
+        definition={
+            "name": "get_current_datetime",
+            "description": (
+                "Get the current date, day of the week and local time from the "
+                "clock of the Raspberry Pi this program is running on, including "
+                "the timezone. Call this whenever the answer depends on the "
+                "current date or time; never guess them."
+            ),
+            "input_schema": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": False,
+            },
+        },
+        run=lambda _input: read_current_datetime(),
+        is_available=lambda: True,
+    ),
     Tool(
         definition={
             "name": "get_cpu_temperature",
