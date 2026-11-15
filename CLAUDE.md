@@ -1,256 +1,304 @@
 # CLAUDE.md
 
 This repo is the Anthropic-API agent "brain" for a small robot. It is developed
-on a Windows laptop and runs on a Raspberry Pi.
+on a Windows laptop and runs on a Raspberry Pi. Since 2026-11-16 the program is
+a terminal port of the owner's MyAgent harness (see "Where it comes from").
 
 ## Target device
 
-- Raspberry Pi Zero 2 W, 512 MB RAM
-- 64-bit Raspberry Pi OS Lite (Trixie)
-- Python 3.13.5
+- Raspberry Pi Zero 2 W, 512 MB RAM (about 415 MB usable), 4 cores
+- 64-bit Raspberry Pi OS Lite (Trixie), Python 3.13.5, no tkinter
 - Hostname `robot.local`, user `grobliro`, repo checkout at `~/robot`
 - Virtual environment: `~/robot/.venv` (created with `--system-site-packages`)
-- API key: `~/robot/.env` (`ANTHROPIC_API_KEY=...`). It exists only on the Pi.
-  Never commit it; `.env` is in `.gitignore`.
+- API key: `~/robot/.env` (`ANTHROPIC_API_KEY=...`). Never commit it; `.env`
+  is in `.gitignore`.
+- The program's data: `~/robot-data` (outside the checkout on purpose).
 - Passwordless sudo is enabled for `grobliro` (the user set it up on
   2026-11-15 in `/etc/sudoers.d/010_grobliro-nopasswd`).
-- The Pi also has a keyboard and screen attached, so the user can run things at
-  its console directly.
+- `/tmp` is a RAM disk. Importing the Anthropic SDK takes about 15 s and one
+  process uses about 77 MB.
+- The Pi also has a keyboard and screen attached.
 
 ## Reaching the Pi
 
-- `ssh pi` (no password). Since 2026-11-15 the `pi` alias in the laptop's
-  `~/.ssh/config` points at the Pi's IP address, `10.42.199.40`, with
-  `HostKeyAlias robot.local` so the existing host key still verifies. It works
-  from both PowerShell and Git Bash.
-- That address is assigned by DHCP and can change. If `ssh pi` times out, the
-  address has probably changed: use `ssh pi-local` (same Pi via `robot.local`,
-  PowerShell only), read the new address with `hostname -I`, and update
-  `HostName` under `Host pi`.
+- `ssh pi` (no password). The `pi` alias in the laptop's `~/.ssh/config` points
+  at the Pi's IP address, `10.42.199.40`, with `HostKeyAlias robot.local`. It
+  works from both PowerShell and Git Bash.
+- That address is assigned by DHCP and can change. If `ssh pi` times out, use
+  `ssh pi-local` (same Pi via `robot.local`, PowerShell only), read the new
+  address with `hostname -I`, and update `HostName` under `Host pi`.
 - `pi-local` uses mDNS, which Git Bash's ssh cannot resolve and which fails
-  intermittently from PowerShell with `Could not resolve hostname robot.local`;
-  retrying usually works.
+  intermittently from PowerShell; retrying usually works.
 - For scripted commands add `-o BatchMode=yes -o ConnectTimeout=15`.
 
 ## Workflow
 
-1. Develop here on Windows.
+1. Develop here on Windows. Run the tests (below).
 2. Commit and push to GitHub (`origin`, branch `main`). The laptop remote is
-   HTTPS; the Pi's remote is SSH (`git@github.com:namor5772/robot.git`).
+   HTTPS; the Pi's remote is SSH.
 3. Deploy: `ssh pi "bash ~/robot/scripts/deploy.sh"`
-4. Run on the Pi: `ssh -t pi "bash ~/robot/scripts/chat.sh"` (inside tmux; `-t`
-   gives it a proper terminal). Without tmux:
-   `ssh -t pi "cd ~/robot && .venv/bin/python -m robot.main"`.
+4. Run on the Pi: `ssh -t pi "bash ~/robot/scripts/chat.sh"` (inside tmux).
 
 Never edit files on the Pi directly. Every change goes through git; the Pi only
-ever receives code via `git pull --ff-only`, which refuses to run if the Pi's
-checkout has local edits.
+receives code via `git pull --ff-only`, which refuses to run if its checkout
+has local edits. `~/robot-data` is the program's own data, not code: the
+program and its checks may write there.
 
 Keep README.md and this file up to date when features or scripts are added.
-The pattern for every change so far: commit, push, deploy, test on the Pi, and
-show the user the output.
+The pattern for every change: tests, commit, push, deploy, check on the Pi,
+show the user the output. The user does not want to be asked to test things.
 
 ## The GitHub repo is public
 
-- The repo has been public since 2026-11-15. Everything committed is
-  world-readable, including this file and commit messages. Never commit
-  secrets, and do not add new personal, account or network details to
-  committed files.
+- Everything committed is world-readable, including this file, commit
+  messages and test fixtures. Never commit secrets, and do not add new
+  personal, account or network details to committed files.
 - An audit on 2026-11-15 found no secrets in any commit, and only the owner has
   write access. The user reviewed the findings and chose to keep the setup as
   it is. Do not change access, keys or security settings unasked.
+- Code adapted from MyAgent gets freshly written comments. MyAgent's own
+  comments carry personal and incident details that must not be copied here.
 
 ## Running and testing
 
-- At the Pi's own console: `cd ~/robot` then `.venv/bin/python -m robot.main`.
-- It must be run from `~/robot` (so Python finds the `robot` package) and with
-  the venv's Python (the system `python3` does not have `anthropic`).
-- Unit tests run on the laptop with no network and no cost:
-  `.venv/Scripts/python.exe -m unittest discover -s tests -t .` (Git Bash). A
-  fake client in `tests/fakes.py` scripts the model's replies.
-- The laptop DOES have an `ANTHROPIC_API_KEY` in its environment (found on
-  2026-11-16; an earlier note here said it did not). So `python -m robot.main`
-  on the laptop makes real, billed calls. Paid checks are done on the Pi; on
-  the laptop use the unit tests or `--dry-run`, and set `ROBOT_DATA_DIR` to a
-  temp folder so nothing is written to `~/robot-data` there.
-- To test the chat non-interactively, pipe lines into it:
-  `ssh pi "cd ~/robot && printf 'first message\nsecond message\nexit\n' | .venv/bin/python -m robot.main"`
-  Piped lines are echoed after the `you>` prompt, and the end of input ends
-  the conversation. `--model claude-haiku-5-5` keeps such checks cheap.
-- To test a tool function directly, or probe an API response, feed a Python
-  script to the Pi over stdin so nothing is written there (from Git Bash):
-  `ssh pi "cd ~/robot && .venv/bin/python -" < script.py`
-  The same works for shell scripts with `bash -s`, but an `ssh` command inside
-  such a script needs `-n`, or it reads the rest of the script as its input.
-- To simulate a missing temperature sensor, set `robot.tools.CPU_TEMP_FILE` to
-  a path that does not exist before calling `robot.main.main()`.
-- Chat tests cost API credit, and web search tests also cost per search.
+- Unit tests, no network and no cost, on the laptop (Git Bash):
+  `.venv/Scripts/python.exe -m unittest discover -s tests -t .`
+  and on the Pi: `.venv/bin/python -m unittest discover -s tests -t .`
+  Run both: the Pi has a different Python and real process groups.
+- `tests/fakes.py` has a fake client that scripts the model's replies
+  (`FakeClient`, `reply`, `tool_use`, ...), a piped console and a terminal
+  console. `tests/test_wire.py` drives the real SDK over a mock network with
+  recorded replies in `tests/fixtures/*.sse`; `tests/record_fixtures.py`
+  re-records them (paid, a few cents; it scrubs signatures and ids).
+- Tests write only into temp folders, never into the repo or `~/robot-data`.
+- The laptop DOES have an `ANTHROPIC_API_KEY` in its environment. So
+  `python -m robot.main` on the laptop makes real, billed calls. Paid checks
+  are done on the Pi; on the laptop use the unit tests or `--dry-run`, and set
+  `ROBOT_DATA_DIR` to a temp folder so nothing lands in `~/robot-data` there.
+- A paid check on the Pi without a terminal: pipe lines in.
+  `ssh pi "cd ~/robot && printf 'first\nsecond\n' | .venv/bin/python -m robot.main --model claude-haiku-5-5"`
+  Piped lines are echoed, and the end of input ends the conversation.
+  `--model claude-haiku-5-5` keeps checks cheap (a whole chat for well under a
+  cent); the default Opus chat costs about 5 cents to start.
+- A check that needs a real terminal (Ctrl-C, prompts): start the chat in tmux
+  detached and drive it. `ROBOT_TMUX_DETACHED=1 bash scripts/chat.sh ...`, then
+  `tmux -L robot send-keys -t robot -l -- 'text'`, `send-keys -t robot Enter`,
+  `send-keys -t robot C-c`, and `tmux -L robot capture-pane -p -t robot` to
+  read the screen. Wait for the last line to be `you>` before typing.
+- To run a script on the Pi without writing a file there, feed it over stdin:
+  `ssh pi "cd ~/robot && .venv/bin/python -" < script.py` or `bash -s`. An
+  `ssh` command inside such a script needs `-n`.
+- `--dry-run` prints the exact first request; `--debug` prints every request.
 - On this laptop, long heredocs with quotes passed to the Bash tool have
-  broken twice. Use the Write and Edit tools for file content instead.
+  broken several times. Use the Write and Edit tools for file content.
 
 ## When the SSH connection drops
 
-- The chat runs inside the SSH session. If the laptop goes into standby or its
-  Wi-Fi drops, Windows resets the connection and the client prints
-  `client_loop: send disconnect: Connection reset`. The Pi then closes the
-  session and the robot process ends with it, so that conversation is lost.
-  Nothing else is affected: reconnect and start the chat again. First seen on
-  2026-11-16, caused by laptop standby.
-- `scripts/chat.sh` avoids this by running the chat inside tmux (the user asked
-  for it on 2026-11-16). It uses its own tmux socket and session, both named
-  `robot`, with `scripts/tmux.conf`, so drive it with `tmux -L robot ...`.
-  Run again, it reattaches to a live session and ignores its arguments.
-  Detach is Ctrl-B then D. `ROBOT_TMUX_DETACHED=1` starts the session without
-  attaching, which is how to test it without a terminal:
-  `tmux -L robot send-keys -t robot 'text' Enter` types into it and
-  `tmux -L robot capture-pane -p -t robot` reads the screen.
-- To see why a session ended, run `sudo journalctl -t sshd-session --since today`
-  on the Pi. The close and error lines are not under `-u ssh`: after login the
-  session process is moved into its own login scope. On the laptop, standby
-  shows as Kernel-Power events 506 (enter) and 507 (leave) in the System log.
-- The Pi's Wi-Fi has power saving on by default, and `iw` is not installed.
+- Without tmux the chat belongs to the SSH session: if the laptop sleeps or
+  its Wi-Fi drops, the session is reset and the chat dies with it. `chat.sh`
+  avoids that by running the chat inside tmux, on its own socket and session,
+  both named `robot` (`tmux -L robot ...`), with `scripts/tmux.conf`. Run
+  again, it reattaches and ignores its arguments. Detach is Ctrl-B then D.
+- To see why an SSH session ended: `sudo journalctl -t sshd-session --since today`
+  on the Pi (not `-u ssh`). On the laptop, standby shows as Kernel-Power events
+  506 and 507 in the System log.
+- A hang-up or SIGTERM winds the run down properly (cost logged, chat saved).
 
 ## Layout
 
-- `robot/main.py`: entry point, the interactive chat loop (details below).
-- `robot/tools.py`: the tools the model can call. `ALL_TOOLS` run on the Pi;
-  `SERVER_TOOLS` run on Anthropic's servers.
-- `robot/__init__.py`: empty; makes `robot` a package so `-m robot.main` works.
-- `scripts/deploy.sh`: runs on the Pi. `git pull --ff-only`, then
-  `pip install -r requirements.txt` into `.venv`, then installs tmux if it is
-  missing. Its body is inside a `main` function so the pull can replace the
-  file safely. A change to `deploy.sh` itself only takes effect on the deploy
-  after the one that pulls it.
-- `scripts/chat.sh`, `scripts/tmux.conf`: the tmux launcher and its settings.
+- `robot/main.py`: command line. Chooses the run's settings, shows the banner,
+  asks for the task, starts the agent. Imports nothing heavy, so `--list`,
+  `--skills` and `--help` are instant; the SDK is loaded on a background
+  thread (`ClientLoader`) while the person types.
+- `robot/agent.py`: `Agent`, one run from first message to end.
+- `robot/api.py`: `build_request` (the one place a request is shaped),
+  streaming, and the retry ladder. The only module that imports `anthropic`.
+- `robot/console.py`: `Console` (all output and input) and `Interrupts`.
+- `robot/tools.py`: the Pi's own tools as `Tool` entries in `ALL_TOOLS`.
+- `robot/meta.py`: Meta tool schemas, `manage_instructions`, `meta_tools`.
+- `robot/spawn.py`: `run_instruction` (child runs).
+- `robot/instructions.py`: `RunSettings`, the library, `settings_from_entry`.
+- `robot/skills.py`: `SkillStore`, SKILL.md format, `manage_skills`.
+- `robot/models.py`: model lists, capability rules, output caps, price tables.
+- `robot/costs.py`: per-call cost, the cost log, the in-progress record.
+- `robot/history.py`: trimming and repairing the message history.
+- `robot/chats.py`, `robot/datastore.py`, `robot/relay.py`, `robot/prompts.py`.
+- `scripts/deploy.sh` (runs on the Pi: pull, pip install, install tmux; its
+  body is in a `main` function so the pull can replace the file safely),
+  `scripts/chat.sh`, `scripts/tmux.conf`.
 - `requirements.txt`: `anthropic==2.8.0`, `python-dotenv==1.2.4`. Pinned on
-  purpose: the engine depends on exact SDK behaviour (2.8.0 sends API version
-  2026-10-21, has no `temperature` parameter, and is built on `httpx2`).
-- `.venv/` on the laptop (gitignored): Python 3.12 with the same pinned
-  packages, for running tests locally with `.venv\Scripts\python.exe`. There is
-  still no API key on the laptop.
-- `.gitattributes`: forces LF line endings on `*.sh` and `*.conf`.
+  purpose: 2.8.0 sends API version 2026-10-21, has no `temperature`
+  parameter, sends the key as a Bearer token, and is built on `httpx2`.
+- `.venv/` on the laptop (gitignored): Python 3.12 with the same packages.
+- `.gitattributes`: LF line endings for `*.sh`, `*.conf`, `*.sse`.
 
-## Port in progress (started 2026-11-16)
+## How the agent works
 
-The program is being rebuilt as a terminal port of the owner's MyAgent harness
-(a tkinter app in a separate repo on the laptop): Anthropic only, no GUI, no
-safety-confirm system, the robot's own tools plus MyAgent's Meta tools and
-Convo mode. The owner approved the plan. Until this note is removed, the
-sections below this one describe the OLD single-file chatbot and are partly out
-of date. Phases:
+### A run
 
-- P1 tmux launcher: done.
-- P2 engine: done. `robot/main.py` is now a thin command line over
-  `agent.py` (the loop), `api.py` (request builder, streaming, retry ladder;
-  the only module that imports the SDK), `console.py` (all terminal input and
-  output, Ctrl-C handling), `models.py` (model and price tables, capability
-  rules), `history.py`, `costs.py` (cost line, cost log, in-progress record),
-  `chats.py`, `datastore.py`, `prompts.py`, `relay.py`. Data lives in
-  `~/robot-data` on the Pi (`ROBOT_DATA_DIR` overrides it).
-- P3 saved instructions and skills: done. `instructions.py` (the library in
-  `agent_instructions.json`, the `Default` entry that a plain chat borrows its
-  settings from, entry-to-settings with corrections) and `skills.py` (the
-  `skills/<name>/SKILL.md` tree, modes, prompt assembly, `get_skill`). New
-  options: `-l NAME`, `--list`, `--skills`.
-- P4 Meta tools: done. `meta.py` has the tool schemas and `manage_instructions`;
-  `manage_skills` is in `skills.py`; `upgrade_model` is `Agent.do_upgrade_model`.
-  Offered only when the instruction has Meta on.
-- P5 child runs: done. `spawn.py` runs `run_instruction` children as separate
-  processes (`python -m robot.main -l NAME --headless ...`), at most two at
-  once, with a result file and a relay folder for their questions.
-- P6 documents (README and this file rewritten for the new program):
-  not done yet.
+- A run has `RunSettings`: name, text, model, thinking_mode, thinking_budget,
+  fast_mode, meta, conversational, blocked_tools, skill_modes, upgrade_target.
+- With `-l NAME` they come from that entry of `agent_instructions.json`.
+  Without it, from the entry named `Default` (created on first use; model
+  `claude-opus-5-5`, level Low, Meta on, Convo on), and the task is typed at
+  `you>`. `--model` and `--mode` override one run.
+- `settings_from_entry` corrects values the model cannot honour (a thinking
+  level it lacks) and warns. An entry for another provider is refused.
+- The task is the first user message. The system prompt and the tool list are
+  built once (`Agent._freeze_run`) and do not change during the run: the
+  prompt cache and the model's saved reasoning are both tied to them. So a
+  skill or instruction created mid-run takes effect from the next run.
+- The loop (`Agent._loop`) has no step limit. Tool calls run and their results
+  go back; `pause_turn` is resumed; a cut-off reply warns. When the model ends
+  its turn: with Convo on the person is asked for the next message; otherwise
+  the run ends (after up to three nudges if the model had been asking through
+  `user_prompt` and stopped).
+- Tools marked `parallel_safe` run together on a thread pool first; the rest
+  run in order on the main thread. Every call gets a result, run or not.
+- At the end (`_end_run`, every step best-effort): cost-log line, in-progress
+  record removed, result file, chat saved.
 
-## Current state of the agent (`robot/main.py`)
+### The system prompt
 
-A text chat agent with four tools. It prompts `you>` and prints the reply after
-`robot>`. `exit`, `quit`, `bye` or Ctrl-D quits; Ctrl-C during a reply cancels
-that reply. The startup banner prints a `Tools:` line listing what is active.
-
-### Model and prompt
-
-- Model: `claude-opus-5-5`, set by the `MODEL` constant, at `effort: "low"`.
-- System prompt: the `SYSTEM_PROMPT` constant in `main.py`. It tells the model
-  it is the robot's brain running on the Pi, to speak in the first person, to
-  claim only abilities it has tools for, never to invent sensor readings, and
-  to reply briefly in plain text (the Pi console does not render Markdown).
-  It names no hardware, personality or user name. The user approved its wording;
-  show any proposed change to it before implementing.
+- `robot/prompts.py`. The owner approved its wording on 2026-11-16: show any
+  proposed change before implementing it. It has the robot's identity, a task
+  paragraph, one paragraph that depends on Convo (in a conversation: just
+  reply; in a single task: you must ask through `user_prompt`), and a
+  plain-text rule. Enabled skills and the on-demand skill list are appended by
+  `SkillStore.compose_system_prompt`. Nothing dynamic goes into it, so the
+  model does not know which model it is.
+- Tool descriptions are in `agent.py` (`user_prompt`, `get_skill`), `meta.py`
+  and `tools.py`. They are model-facing text too: treat changes with care.
 
 ### Tools
 
-Three run on the Pi and are `Tool` entries in `ALL_TOOLS` in `robot/tools.py`
-(a definition for the model, a `run` function, and an `is_available` probe).
-`available_tools()` probes each at startup and only working ones are sent to
-the model. To add a Pi tool, add an entry there; `main.py` needs no change.
+- Always: `run_shell_command`, `get_current_datetime`, `get_cpu_temperature`
+  (only if the sensor reads at start), `user_prompt`, server-side `web_search`
+  (`models.web_search_tool`: `web_search_20260209`, `max_uses` 5; its
+  definition alone is about 6,000 tokens of every request).
+- `get_skill` when a skill is on demand. Its result adds the skill's folder
+  path when the skill has bundled files, so they can be run with the shell.
+- With Meta on: `manage_instructions`, `manage_skills`, `run_instruction`,
+  `upgrade_model` (about 3,000 more tokens).
+- `blocked_tools` removes tools from the offer and refuses them at dispatch.
+- The shell tool has NO guardrails by the owner's explicit choice (2026-11-15):
+  no confirmation, no allowlist, no blocked commands, and MyAgent's
+  blocked-command list is not ported either. Do not add any unasked. Its
+  timeout, `/dev/null` stdin and output trimming are plumbing.
+- Consequence: the model can read `~/robot/.env`, edit the checkout (which
+  would make `git pull --ff-only` refuse), act as root on text from a web
+  search, and write skills that later runs load. The banner lists the skills
+  in use for that reason.
 
-- `run_shell_command` (inputs: `command`, optional `timeout_seconds`): runs any
-  bash command on the Pi as user `grobliro`, and with passwordless sudo that
-  means root. The user explicitly asked (2026-11-15) for NO guardrails: no
-  confirmation prompt, no allowlist, no blocked commands. Do not add any
-  without being asked. What it does have is plumbing only: a model-chosen
-  timeout (default 60 s, no cap; the whole process group is killed on timeout
-  or Ctrl-C), stdin from `/dev/null` so commands cannot read the chat's
-  keyboard, and output trimmed to `MAX_OUTPUT_CHARS` (20,000) per stream. Each
-  call is a fresh shell in the home directory. Offered only on POSIX machines
-  with bash, so never on the laptop.
-- `get_current_datetime` (no inputs): the Pi's local date, weekday, time and
-  timezone (Australia/Sydney) from its system clock. Always available. The Pi
-  has no battery-backed clock, so the time is wrong if it boots without network.
-- `get_cpu_temperature` (no inputs): reads
-  `/sys/class/thermal/thermal_zone0/temp`. Offered only if that read succeeds
-  at startup.
+### Input, output and Ctrl-C
 
-One runs on Anthropic's servers and is declared in `SERVER_TOOLS` in
-`robot/tools.py`:
+- `Console` prints: `robot>` before each stretch of reply text, `[tool: ...]`
+  lines, indented activity and `call N: <cost>` lines (hidden by
+  `--no-activity`), `warning:` and `error:` lines (always shown), thinking
+  with `--thinking`. Everything shown also goes to the chat's `.txt`.
+- Input modes: a terminal (readline `input()`), piped stdin (lines are replies,
+  end of input means nobody is there), `--headless` (never reads stdin: a relay
+  folder answers, or nobody does).
+- At a terminal the chat is forgiving, unlike MyAgent's dialog: an empty line is
+  ignored, Ctrl-C cancels the reply or command and returns to `you>`, an API
+  error returns to `you>`. Everywhere else MyAgent's rules hold: an empty reply
+  ends a conversation, and an empty reply or `exit` to `user_prompt` stops the
+  run (`quit` and `stop` there go to the model).
+- `Interrupts`: the loop runs on the main thread. The SIGINT handler sets a
+  flag and raises `KeyboardInterrupt` only inside `raisable()` regions (the
+  stream, backoff waits, `input()`, sequential tools), so bookkeeping is never
+  cut in half. SIGTERM and SIGHUP set the stop flag. Three Ctrl-Cs in three
+  seconds exit at once.
+- Only the main thread reads the terminal. A tool on a pool thread that needs
+  the person (a waited child's question) uses `Agent.ask_from_pool`.
+- `history.repair_tool_pairs` runs before every request, so a tool call is
+  never sent without its result.
 
-- `web_search` (`web_search_20260209`, `max_uses: 5` per request; searches are
-  billed per use). There is no code for it on the Pi and no availability probe.
-  This variant makes the model run internal `code_execution` steps to filter
-  results; `main.py` hides those and prints one `[tool: web_search: <query>]`
-  line per search. In this mode text blocks carry no citations (`citations` is
-  `None`), so sources are not listed; the basic `web_search_20250305` variant
-  would be the way to get citations.
+### The request
 
-Consequences of this combination to keep in mind: the model can read
-`~/robot/.env`, can edit the checkout (which would make `git pull --ff-only`
-refuse to run), and can act with root on text it reads from web search results.
+- `api.build_request`: model, system as one cached block, messages with cache
+  markers on the two newest user turns, tools, `max_tokens` at the model's
+  ceiling (128,000), `thinking {adaptive, display summarized, block_binding
+  drop_block}`, `output_config.effort` from the thinking level, `fallbacks
+  "default"`, `speed "fast"` when fast mode applies, and the matching betas.
+  No temperature anywhere.
+- A finished reply is kept in the history whole (thinking and search results
+  included); a reply that was cut off, refused or interrupted is kept as text.
+  MyAgent keeps text only in every case.
+- Retry ladder (`api.call_model`, 10 attempts): rate limits, overload and
+  connection errors back off; a feature the API refuses (fast mode, fallbacks,
+  binding, the newer search tool, a too-high output cap) is recorded in
+  `Learned` and no longer sent; a context overflow trims the oldest rounds in
+  place and retries. The rungs match on the API's error wording.
 
-There is still no purpose-built tool for motors, a camera, a microphone or a
-speaker. The shell tool is the catch-all.
+### Cost, chats, records
 
-### How the loop works
+- `models.PRICING` and friends price each call by the model and speed that
+  served it, plus the web search fee. The cost log is
+  `~/robot-data/APICostLog_<host>.txt`, one line per run in MyAgent's format.
+- `~/robot-data/runs/agent_run_<pid>.json` is rewritten after every call and
+  removed at the end. A leftover from a killed run is logged at the next start
+  with `unfinished@call<N>`.
+- Every run saves `saved_chats/<Instruction or Agent>_<timestamp>.json` and a
+  live `.txt`. Chats are never loaded back.
+- An interrupted call is costed from what had streamed (an estimate).
 
-- `reply()` is a manual tool loop: it keeps requesting while `stop_reason` is
-  `tool_use`, runs the requested Pi tools, and sends all results back in one
-  user message. A tool that raises is reported to the model as an `is_error`
-  result. A `pause_turn` stop reason (a server tool still working) is resumed
-  by resending, up to `MAX_PAUSES` times.
-- Each Pi tool call prints `[tool: name]`, followed by its inputs as JSON when
-  it has any, e.g. `[tool: run_shell_command: {"command": "uptime"}]`.
-- Replies are streamed with `client.beta.messages.stream(...)`, iterating
-  events: `text` events are printed, and `content_block_stop` events are
-  checked for web searches.
-- Conversation history is kept in memory for the session and resent each turn.
-  Nothing is saved between runs.
-- The whole `response.content` is appended to the history, not just the text,
-  because thinking, tool-use and search-result blocks must be passed back
-  unchanged on later requests.
-- Server-side refusal fallbacks are on (`betas=["server-side-fallback-2026-07-01"]`,
-  `fallbacks="default"`), which is why the beta endpoint is used.
-- Top-level `cache_control` enables automatic prompt caching.
-- On an API error everything the failed turn added is removed from the history
-  and the loop continues.
-- `.env` is located relative to `main.py`, not the working directory.
+### Meta tools and child runs
+
+- `manage_instructions` (in `meta.py`): `create` takes model settings it is not
+  given from the calling run, and writes no `skill_modes` unless asked (a map
+  switches off every skill it does not name). Keys of other programs in an
+  entry are preserved.
+- `manage_skills` (in `skills.py`) works on the run's `SkillStore`. Saving
+  writes global modes only, never a run's session modes, and only the skills
+  this run changed.
+- `upgrade_model` (`Agent.do_upgrade_model`): once per run, to the
+  instruction's `upgrade_target` or the default `claude-fable-5-2` at Max. The
+  cost log gets `upgraded-from=<model>@call<N>` and a per-model split.
+- `run_instruction` (`spawn.py`): a child is `python -m robot.main -l NAME
+  --headless ...` in its own session. At most two alive per parent, none when
+  free memory is under 110 MB, and a child of a child cannot start children.
+  A waited child reports through a result file; its questions go through a
+  relay folder and are answered from `answers`, or put to the person at the
+  parent's terminal. A child nobody waits for and nobody answers stops at its
+  first question. Temp files are in `~/robot-data/tmp`.
+
+## Where it comes from
+
+- MyAgent is the owner's tkinter agent app, in the folder
+  `Claude_Python_Testbed` next to this one on the laptop. Its package cannot
+  be imported on the Pi (every module imports tkinter), so its engine logic
+  was copied and adapted here. That repo documents itself in its `CLAUDE.md`
+  and `docs/claude/myagent/`.
+- Mapping: `streaming_mixin.py` (loop, cost) -> `agent.py`, `costs.py`;
+  `anthropic_mixin.py` -> `api.py`; `ui_mixin.py` capability helpers and the
+  tables in `constants.py` -> `models.py`; `helpers.py` -> `history.py`;
+  `instructions_mixin.py` -> `instructions.py`, `meta.py`; `skills_mixin.py`
+  and `datapaths.py` -> `skills.py`, `spawn.py`, `datastore.py`;
+  `chat_mixin.py` -> `chats.py`; `relay.py` -> `relay.py`.
+- Left out on purpose: all GUI, the safety confirm system, other providers,
+  MyAgent's file, document, desktop, browser, mail and MCP tools, OneDrive
+  sharing, images, voice, the live model listing. MyAgent runs on SDK 0.84.0;
+  this runs on 2.8.0, which is why temperature and several of MyAgent's
+  workarounds are gone.
+- File formats match MyAgent's (`agent_instructions.json`, `SKILL.md`, the
+  cost log, the relay files), so data can be copied across. MyAgent skills
+  name tools the robot lacks (`run_command`, not `run_shell_command`).
+- When Anthropic releases a model, update `robot/models.py`: `FALLBACK_MODELS`,
+  `MAX_OUTPUT_TOKENS`, the capability rules if the family behaves differently,
+  and `PRICING` (plus `FAST_PRICING` and `LONG_CONTEXT_PRICING` where they
+  apply). A model with no price row is warned about at run start and its runs
+  are not written to the cost log. MyAgent and SelfBot hold the other two
+  copies of these tables.
 
 ## Conventions
 
-- Shell scripts must keep LF line endings; they run under bash on the Pi.
-- The Pi has only 512 MB RAM (about 415 MB usable): keep dependencies light and
-  avoid packages that need compiling on-device (piwheels and aarch64 wheels
-  have covered everything so far).
-- Use the official `anthropic` SDK. For any API change, load the `claude-api`
-  skill first; model IDs and request shapes change often.
-- No external hardware (motors, sensors, camera, speaker) is wired into the
-  code yet, and what is physically attached to the robot has not been recorded
-  here. Ask before assuming any.
+- Shell scripts and tmux config keep LF line endings.
+- Keep dependencies light: 512 MB RAM, and nothing that needs compiling on the
+  Pi. The program itself uses the standard library plus the two pinned packages.
+- For any Anthropic API change, load the `claude-api` skill first; model IDs
+  and request shapes change often. Test what the API accepts with a paid check
+  on Haiku before relying on it.
+- No hardware beyond the Pi itself (motors, sensors, camera, speaker) is wired
+  into the code, and what is attached to the robot has not been recorded here.
+  Ask before assuming any.
