@@ -23,10 +23,10 @@ on a Windows laptop and runs on a Raspberry Pi.
   `~/.ssh/config` points at the Pi's IP address, `10.42.199.40`, with
   `HostKeyAlias robot.local` so the existing host key still verifies. It works
   from both PowerShell and Git Bash.
-- That address comes from the router and is not known to be reserved. If
-  `ssh pi` times out, the address has probably changed: use `ssh pi-local`
-  (same Pi via `robot.local`, PowerShell only), read the new address with
-  `hostname -I`, and update `HostName` under `Host pi`.
+- That address is assigned by DHCP and can change. If `ssh pi` times out, the
+  address has probably changed: use `ssh pi-local` (same Pi via `robot.local`,
+  PowerShell only), read the new address with `hostname -I`, and update
+  `HostName` under `Host pi`.
 - `pi-local` uses mDNS, which Git Bash's ssh cannot resolve and which fails
   intermittently from PowerShell with `Could not resolve hostname robot.local`;
   retrying usually works.
@@ -73,11 +73,30 @@ show the user the output.
 - To test a tool function directly, or probe an API response, feed a Python
   script to the Pi over stdin so nothing is written there (from Git Bash):
   `ssh pi "cd ~/robot && .venv/bin/python -" < script.py`
+  The same works for shell scripts with `bash -s`, but an `ssh` command inside
+  such a script needs `-n`, or it reads the rest of the script as its input.
 - To simulate a missing temperature sensor, set `robot.tools.CPU_TEMP_FILE` to
   a path that does not exist before calling `robot.main.main()`.
 - Chat tests cost API credit, and web search tests also cost per search.
 - On this laptop, long heredocs with quotes passed to the Bash tool have
   broken twice. Use the Write and Edit tools for file content instead.
+
+## When the SSH connection drops
+
+- The chat runs inside the SSH session. If the laptop goes into standby or its
+  Wi-Fi drops, Windows resets the connection and the client prints
+  `client_loop: send disconnect: Connection reset`. The Pi then closes the
+  session and the robot process ends with it, so that conversation is lost.
+  Nothing else is affected: reconnect and start the chat again. First seen on
+  2026-11-16, caused by laptop standby.
+- `tmux` and `screen` are not installed on the Pi. Running the chat inside
+  `tmux` would let it survive a dropped connection. As of 2026-11-16 this has
+  been suggested to the user but not set up.
+- To see why a session ended, run `sudo journalctl -t sshd-session --since today`
+  on the Pi. The close and error lines are not under `-u ssh`: after login the
+  session process is moved into its own login scope. On the laptop, standby
+  shows as Kernel-Power events 506 (enter) and 507 (leave) in the System log.
+- The Pi's Wi-Fi has power saving on by default, and `iw` is not installed.
 
 ## Layout
 

@@ -43,6 +43,10 @@ ssh -t pi "cd ~/robot && .venv/bin/python -m robot.main"
 The banner lists the active tools. Type a message at `you>`. Type `exit` or
 press Ctrl-D to quit; Ctrl-C stops a reply or a running command.
 
+Over SSH the chat lives inside the connection. If the laptop sleeps or the
+connection drops, the chat ends and its conversation is lost; reconnect and
+start it again.
+
 ## Workflow
 
 Develop on the laptop, push to GitHub, deploy to the Pi. Never edit files on the Pi.
