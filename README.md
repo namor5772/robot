@@ -41,7 +41,7 @@ ssh pi "bash ~/robot/scripts/deploy.sh"
 ## Files
 
 - `robot/main.py`: loads `~/robot/.env` and runs an interactive chat loop with the Anthropic API, streaming each reply.
-- `robot/tools.py`: tools the model can call (`get_cpu_temperature` and `get_current_datetime` run on the Pi; `web_search` runs on Anthropic's servers); each is probed at startup and skipped if it does not work on this machine.
+- `robot/tools.py`: tools the model can call (`get_cpu_temperature` and `get_current_datetime` run on the Pi; `web_search` runs on Anthropic's servers). The Pi tools are probed at startup and skipped if they do not work on this machine.
 - `scripts/deploy.sh`: run on the Pi; `git pull --ff-only` and `pip install -r requirements.txt` into `.venv`.
 - `requirements.txt`: `anthropic`, `python-dotenv`.
 - `CLAUDE.md`: detailed notes for Claude Code sessions.
