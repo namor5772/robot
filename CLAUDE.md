@@ -10,8 +10,10 @@ This repo is the Anthropic-API agent "brain" for a small robot.
 - Repo checkout on the Pi: `~/robot`
 - Virtual environment: `~/robot/.venv` (created with `--system-site-packages`)
 - API key: `~/robot/.env` (`ANTHROPIC_API_KEY=...`). Never commit it; `.env` is in `.gitignore`.
-- Reached with `ssh pi` (no password). The first attempt sometimes fails with
-  `Could not resolve hostname robot.local`; just retry.
+- Reached with `ssh pi` (no password), which resolves to `robot.local` (mDNS).
+  Run it from PowerShell (Windows OpenSSH). From Git Bash it failed with
+  `Could not resolve hostname robot.local` on both attempts on 2026-11-15, while
+  PowerShell worked every time; if PowerShell fails with that error too, retry.
 
 ## Workflow
 
