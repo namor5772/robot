@@ -6,7 +6,7 @@ Right now it is a text chatbot: it talks to Claude (`claude-opus-5-5`) and
 remembers the conversation for the session. A system prompt (in
 `robot/main.py`) tells it that it is the robot and to answer briefly in plain
 text. It has four tools: it can run any shell command on the Pi as its own user (unrestricted,
-with no confirmation; sudo works only if passwordless sudo is set up), search the web, and read the Pi's CPU temperature (ask "how hot are you?")
+with no confirmation, and with passwordless sudo, so it has root), search the web, and read the Pi's CPU temperature (ask "how hot are you?")
 and the current date and time from the Pi's clock. The temperature tool
 is only offered to the model when the sensor can actually be read. It cannot
 control motors or other attached hardware yet.

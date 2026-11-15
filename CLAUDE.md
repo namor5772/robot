@@ -82,9 +82,9 @@ Keep README.md and this file up to date when features or scripts are added.
   which returns the Pi's local date, time and timezone from its system clock
   (always available).
 - Shell tool: `run_shell_command` runs any bash command on the Pi as user
-  `grobliro`. As of 2026-11-15 sudo on the Pi needs a password, so sudo fails
-  inside the tool (and over `ssh pi`) unless the user sets up passwordless
-  sudo; that is their decision to make at the Pi. The user explicitly asked (2026-11-15) for NO
+  `grobliro`. The user enabled passwordless sudo on the Pi on 2026-11-15
+  (`/etc/sudoers.d/010_grobliro-nopasswd`), so the tool, and `ssh pi`, can run
+  anything as root with `sudo`. The user explicitly asked (2026-11-15) for NO
   guardrails: no confirmation prompt, no allowlist, no blocked commands. Do not
   add any without being asked. What it does have is plumbing only: a
   model-chosen timeout (default 60 s, no cap; the whole process group is killed
