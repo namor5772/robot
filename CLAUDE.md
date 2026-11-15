@@ -80,7 +80,16 @@ Keep README.md and this file up to date when features or scripts are added.
 - Two tools: `get_cpu_temperature`, which reads
   `/sys/class/thermal/thermal_zone0/temp` on the Pi, and `get_current_datetime`,
   which returns the Pi's local date, time and timezone from its system clock
-  (always available). It cannot move anything, run commands or search the web.
+  (always available). It cannot move anything or run commands.
+- Web search: `SERVER_TOOLS` in `robot/tools.py` declares Anthropic's
+  server-side `web_search_20260209` tool (`max_uses: 5` per request; searches
+  are billed per use). It runs on Anthropic's servers, so there is no code for
+  it on the Pi and no availability probe. This variant makes the model run
+  internal `code_execution` steps to filter results; `main.py` hides those and
+  prints one `[tool: web_search: <query>]` line per search. In this mode text
+  blocks carry no citations (`citations` is `None`), so sources are not listed;
+  the basic `web_search_20250305` variant would be the way to get citations.
+  A `pause_turn` stop reason is resumed by resending, up to `MAX_PAUSES` times.
 - Tools live in `robot/tools.py` as `Tool` entries in `ALL_TOOLS` (definition,
   `run` function, `is_available` probe). `available_tools()` probes each one at
   startup and only working tools are sent to the model, so on a machine without

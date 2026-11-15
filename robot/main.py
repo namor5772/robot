@@ -62,30 +62,23 @@ def reply(client: anthropic.Anthropic, messages: list, tools: dict[str, Tool]) -
     }
     request["tools"] = [tool.definition for tool in tools.values()] + SERVER_TOOLS
 
-    sources: dict[str, str] = {}  # url -> title, for web search citations
     pauses = 0
     while True:
         with client.beta.messages.stream(messages=messages, **request) as stream:
             for event in stream:
                 if event.type == "text":
                     print(event.text, end="", flush=True)
-                elif (
-                    event.type == "content_block_start"
-                    and event.content_block.type == "server_tool_use"
-                ):
-                    print(f"\n[tool: {event.content_block.name}]", flush=True)
+                elif event.type == "content_block_stop":
+                    # Show each web search and its query. The search tool also
+                    # runs internal code_execution steps; those stay hidden.
+                    block = event.content_block
+                    if block.type == "server_tool_use" and block.name == "web_search":
+                        print(f"\n[tool: web_search: {block.input.get('query', '')}]", flush=True)
             response = stream.get_final_message()
 
         # Keep the whole content list, not just the text: thinking, tool-use and
         # search-result blocks must be passed back unchanged on later requests.
         messages.append({"role": "assistant", "content": response.content})
-
-        for block in response.content:
-            if block.type == "text":
-                for citation in block.citations or []:
-                    url = getattr(citation, "url", None)
-                    if url:
-                        sources.setdefault(url, getattr(citation, "title", None) or url)
 
         if response.stop_reason == "pause_turn" and pauses < MAX_PAUSES:
             # A server-side tool is still working: send the turn back to resume it.
@@ -103,10 +96,6 @@ def reply(client: anthropic.Anthropic, messages: list, tools: dict[str, Tool]) -
         messages.append({"role": "user", "content": results})
 
     print()
-    if sources:
-        print("Sources:")
-        for url, title in sources.items():
-            print(f"  {title} - {url}")
     if response.stop_reason == "refusal":
         print("(the model declined to answer that)")
     elif response.stop_reason == "max_tokens":
