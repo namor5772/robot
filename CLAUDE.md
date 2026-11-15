@@ -152,7 +152,13 @@ of date. Phases:
   settings from, entry-to-settings with corrections) and `skills.py` (the
   `skills/<name>/SKILL.md` tree, modes, prompt assembly, `get_skill`). New
   options: `-l NAME`, `--list`, `--skills`.
-- P4 Meta tools, P5 child runs, P6 documents:
+- P4 Meta tools: done. `meta.py` has the tool schemas and `manage_instructions`;
+  `manage_skills` is in `skills.py`; `upgrade_model` is `Agent.do_upgrade_model`.
+  Offered only when the instruction has Meta on.
+- P5 child runs: done. `spawn.py` runs `run_instruction` children as separate
+  processes (`python -m robot.main -l NAME --headless ...`), at most two at
+  once, with a result file and a relay folder for their questions.
+- P6 documents (README and this file rewritten for the new program):
   not done yet.
 
 ## Current state of the agent (`robot/main.py`)

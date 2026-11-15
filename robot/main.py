@@ -174,6 +174,8 @@ def offered_tool_names(settings, skills) -> list:
     names = list(available_tools()) + ["user_prompt"]
     if skills is not None and skills.on_demand_names():
         names.append("get_skill")
+    if settings.meta:
+        names += ["manage_instructions", "manage_skills", "run_instruction", "upgrade_model"]
     names.append("web_search")
     blocked = set(settings.blocked_tools or ())
     return [name for name in names if name not in blocked]

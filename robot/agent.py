@@ -9,9 +9,11 @@ ending. There is no limit on the number of steps.
 import concurrent.futures
 import json
 import os
+import queue
+import threading
 import time
 
-from robot import api, chats, costs, history, models, prompts
+from robot import api, chats, costs, history, meta, models, prompts
 from robot.console import INTERRUPTED, convo_end_word
 from robot.tools import Tool, available_tools
 
@@ -116,6 +118,7 @@ class Agent:
         self._last_chat_save = 0.0
         self._started = time.monotonic()
         self._client = None
+        self._pool_requests = queue.Queue()  # questions from tools on pool threads
 
     # -- set-up ------------------------------------------------------------
 
@@ -137,7 +140,43 @@ class Agent:
             registry["get_skill"] = Tool(
                 definition=get_skill_tool(on_demand), run=self._do_get_skill,
                 is_available=lambda: True, parallel_safe=True)
+        if self.settings.meta:
+            registry.update(meta.meta_tools(self))
         return registry
+
+    def do_upgrade_model(self, tool_input=None) -> str:
+        """The upgrade_model tool: move the rest of this run to a stronger model.
+
+        Only the run changes. The instruction's own settings stay as they are,
+        so its next run starts on its own model again.
+        """
+        target = self.settings.upgrade_target
+        if target is None:
+            target = dict(models.UPGRADE_DEFAULT_TARGET)
+        if self.upgraded_from is not None:
+            return f"Nothing changed - this run was already upgraded to {self.model}."
+        if not target.get("model"):
+            return "Nothing changed - no upgrade model is set for this instruction."
+        if target["model"] == self.model:
+            return f"Nothing changed - this run is already on {self.model}."
+
+        before = self.model
+        new_model = target["model"]
+        level = models.upgrade_level_for(new_model, target.get("level"))
+        fast = bool(target.get("fast")) and models.supports_fast_mode(new_model)
+        self.upgraded_from = before
+        self.upgraded_call = self.run_cost.calls
+        self.model = new_model
+        self.thinking_mode = models.upgrade_params_for(new_model, target.get("level"))[
+            "thinking_mode"]
+        self.fast_mode = fast
+        detail = ", ".join(part for part in (level, "fast" if fast else "") if part)
+        shown = f" ({detail})" if detail else ""
+        self.console.note(f"Model upgraded for the rest of this run: {before} -> {new_model}"
+                          f"{shown}, from call #{self.upgraded_call + 1} on.")
+        self._startup_warnings()  # the new model's pricing may need a warning too
+        return (f"Upgraded: {before} -> {new_model}{shown} for the rest of this run, from "
+                "your next call on. The saved instruction is unchanged.")
 
     def _do_get_skill(self, tool_input) -> str:
         """The get_skill tool: the full text of an on-demand skill."""
@@ -475,10 +514,56 @@ class Agent:
                 self._serve_pool_requests()
         finally:
             executor.shutdown(wait=False)
+            self._drop_pool_requests()
         return interrupted
 
+    def stop_requested(self) -> bool:
+        """Whether this run has been told to end (not merely interrupted)."""
+        return self._stop_run or self.console.interrupts.stop.is_set()
+
+    def ask_from_pool(self, question):
+        """Have the person asked a question on behalf of a tool on a pool thread.
+
+        Only the main thread may read the terminal, so the question is queued
+        for it and this waits for the reply. Returns the reply, or None when
+        nobody answered.
+        """
+        box = {"done": threading.Event(), "reply": None}
+        self._pool_requests.put((question, box))
+        while not box["done"].wait(0.2):
+            if self.stop_requested():
+                return None
+        return box["reply"]
+
     def _serve_pool_requests(self):
-        """Hook for tools on pool threads that need the person (child runs)."""
+        """Main thread: ask the person whatever pool-thread tools have queued."""
+        console = self.console
+        while True:
+            try:
+                question, box = self._pool_requests.get_nowait()
+            except queue.Empty:
+                return
+            reply = None
+            try:
+                while True:
+                    reply = console.ask(question=question)
+                    if reply is INTERRUPTED:
+                        reply = None
+                    if reply == "" and console.tty:
+                        continue  # a stray Enter at a terminal is not an answer
+                    break
+            finally:
+                box["reply"] = reply or None
+                box["done"].set()
+
+    def _drop_pool_requests(self):
+        """Answer any question still queued with 'nobody answered'."""
+        while True:
+            try:
+                _, box = self._pool_requests.get_nowait()
+            except queue.Empty:
+                return
+            box["done"].set()
 
     def _do_user_prompt(self, tool_input) -> str:
         """The user_prompt tool: ask the person and return their reply."""
