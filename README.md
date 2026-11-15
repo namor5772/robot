@@ -2,14 +2,28 @@
 
 Anthropic-API agent "brain" for a small robot running on a Raspberry Pi Zero 2 W.
 
-Right now it is a text chatbot: it talks to Claude (`claude-opus-5-5`) and
-remembers the conversation for the session. A system prompt (in
-`robot/main.py`) tells it that it is the robot and to answer briefly in plain
-text. It has four tools: it can run any shell command on the Pi as its own user (unrestricted,
-with no confirmation, and with passwordless sudo, so it has root), search the web, and read the Pi's CPU temperature (ask "how hot are you?")
-and the current date and time from the Pi's clock. The temperature tool
-is only offered to the model when the sensor can actually be read. It cannot
-control motors or other attached hardware yet.
+It is a text chat agent: it talks to Claude (`claude-opus-5-5`) and remembers
+the conversation for the session. A system prompt (in `robot/main.py`) tells it
+that it is the robot and to answer briefly in plain text.
+
+## Tools
+
+| Tool | Runs on | What it does |
+|---|---|---|
+| `run_shell_command` | The Pi | Runs any bash command as the Pi's user and returns the output. |
+| `get_current_datetime` | The Pi | Reads the date, time and timezone from the Pi's clock. |
+| `get_cpu_temperature` | The Pi | Reads the CPU temperature. Offered only if the sensor can be read. |
+| `web_search` | Anthropic's servers | Searches the web, up to 5 searches per request. Billed per search. |
+
+The shell tool is deliberately unrestricted: no confirmation, no allowlist, no
+blocked commands, and the Pi has passwordless sudo, so the agent has root. It
+can read `~/robot/.env`, change any file, and act on what it reads from the web.
+To take root away, run `sudo rm /etc/sudoers.d/010_grobliro-nopasswd` on the Pi.
+
+Each tool call is shown as it happens, for example
+`[tool: run_shell_command: {"command": "uptime"}]`.
+
+There is no tool yet for motors or other attached hardware.
 
 ## Running it
 
@@ -20,13 +34,14 @@ cd ~/robot
 .venv/bin/python -m robot.main
 ```
 
-Or from the laptop (PowerShell):
+Or from the laptop:
 
 ```powershell
 ssh -t pi "cd ~/robot && .venv/bin/python -m robot.main"
 ```
 
-Type a message at `you>`. Type `exit` or press Ctrl-D to quit.
+The banner lists the active tools. Type a message at `you>`. Type `exit` or
+press Ctrl-D to quit; Ctrl-C stops a reply or a running command.
 
 ## Workflow
 
@@ -37,12 +52,13 @@ git push
 ssh pi "bash ~/robot/scripts/deploy.sh"
 ```
 
-`ssh pi` is an alias in the laptop's `~/.ssh/config` pointing at the Pi's IP address. If it times out, the address has changed; see `CLAUDE.md`.
+`ssh pi` is an alias in the laptop's `~/.ssh/config` pointing at the Pi's IP
+address. If it times out, the address has changed; see `CLAUDE.md`.
 
 ## Files
 
-- `robot/main.py`: loads `~/robot/.env` and runs an interactive chat loop with the Anthropic API, streaming each reply.
-- `robot/tools.py`: tools the model can call (`run_shell_command`, `get_cpu_temperature` and `get_current_datetime` run on the Pi; `web_search` runs on Anthropic's servers). The Pi tools are probed at startup and skipped if they do not work on this machine.
+- `robot/main.py`: loads `~/robot/.env` and runs the chat loop, streaming each reply and running the tools the model asks for.
+- `robot/tools.py`: the tool definitions. The Pi tools are probed at startup and skipped if they do not work on this machine.
 - `scripts/deploy.sh`: run on the Pi; `git pull --ff-only` and `pip install -r requirements.txt` into `.venv`.
 - `requirements.txt`: `anthropic`, `python-dotenv`.
 - `CLAUDE.md`: detailed notes for Claude Code sessions.
@@ -51,3 +67,4 @@ ssh pi "bash ~/robot/scripts/deploy.sh"
 
 - Checkout at `~/robot`, venv at `~/robot/.venv` (created with `--system-site-packages`).
 - `~/robot/.env` contains `ANTHROPIC_API_KEY=...` and is never committed.
+- Passwordless sudo for the Pi's user, if the agent should have root.
