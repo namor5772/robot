@@ -49,6 +49,16 @@ Keep README.md and this file up to date when features or scripts are added.
 The pattern for every change so far: commit, push, deploy, test on the Pi, and
 show the user the output.
 
+## The GitHub repo is public
+
+- The repo has been public since 2026-11-15. Everything committed is
+  world-readable, including this file and commit messages. Never commit
+  secrets, and do not add new personal, account or network details to
+  committed files.
+- An audit on 2026-11-15 found no secrets in any commit, and only the owner has
+  write access. The user reviewed the findings and chose to keep the setup as
+  it is. Do not change access, keys or security settings unasked.
+
 ## Running and testing
 
 - At the Pi's own console: `cd ~/robot` then `.venv/bin/python -m robot.main`.
