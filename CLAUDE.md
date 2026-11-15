@@ -1,37 +1,92 @@
 # CLAUDE.md
 
-This repo is the Anthropic-API agent "brain" for a small robot.
+This repo is the Anthropic-API agent "brain" for a small robot. It is developed
+on a Windows laptop and runs on a Raspberry Pi.
 
 ## Target device
 
 - Raspberry Pi Zero 2 W, 512 MB RAM
 - 64-bit Raspberry Pi OS Lite (Trixie)
 - Python 3.13.5
-- Repo checkout on the Pi: `~/robot`
+- Hostname `robot.local`, user `grobliro`, repo checkout at `~/robot`
 - Virtual environment: `~/robot/.venv` (created with `--system-site-packages`)
-- API key: `~/robot/.env` (`ANTHROPIC_API_KEY=...`). Never commit it; `.env` is in `.gitignore`.
-- Reached with `ssh pi` (no password), which resolves to `robot.local` (mDNS).
-  Run it from PowerShell (Windows OpenSSH). From Git Bash it failed with
-  `Could not resolve hostname robot.local` on both attempts on 2026-11-15, while
-  PowerShell worked every time; if PowerShell fails with that error too, retry.
+- API key: `~/robot/.env` (`ANTHROPIC_API_KEY=...`). It exists only on the Pi.
+  Never commit it; `.env` is in `.gitignore`.
+- The Pi also has a keyboard and screen attached, so the user can run things at
+  its console directly.
+
+## Reaching the Pi
+
+- `ssh pi` (no password). Use the PowerShell tool (Windows OpenSSH), not Git Bash.
+- Git Bash's ssh has never resolved `robot.local` (mDNS). PowerShell usually
+  does, but it fails intermittently with `Could not resolve hostname
+  robot.local`. When that happens, run the same command again.
+- For scripted commands add `-o BatchMode=yes -o ConnectTimeout=15`.
 
 ## Workflow
 
 1. Develop here on Windows.
-2. Commit and push to GitHub (`origin`, branch `main`).
+2. Commit and push to GitHub (`origin`, branch `main`). The laptop remote is
+   HTTPS; the Pi's remote is SSH (`git@github.com:namor5772/robot.git`).
 3. Deploy: `ssh pi "bash ~/robot/scripts/deploy.sh"`
-4. Run on the Pi (`-t` gives the chat a proper terminal): `ssh -t pi "cd ~/robot && .venv/bin/python -m robot.main"`
+4. Run on the Pi: `ssh -t pi "cd ~/robot && .venv/bin/python -m robot.main"`
+   (`-t` gives the chat a proper terminal).
 
-Never edit files on the Pi directly. Every change goes through git.
+Never edit files on the Pi directly. Every change goes through git; the Pi only
+ever receives code via `git pull --ff-only`, which refuses to run if the Pi's
+checkout has local edits.
+
+Keep README.md and this file up to date when features or scripts are added.
+
+## Running and testing
+
+- At the Pi's own console: `cd ~/robot` then `.venv/bin/python -m robot.main`.
+- It must be run from `~/robot` (so Python finds the `robot` package) and with
+  the venv's Python (the system `python3` does not have `anthropic`).
+- The program cannot be run on the laptop: there is no API key here. Check
+  syntax locally with `py -m py_compile robot/main.py`, then test on the Pi.
+- To test the chat non-interactively, pipe lines into it:
+  `ssh pi "cd ~/robot && printf 'first message\nsecond message\nexit\n' | .venv/bin/python -m robot.main"`
 
 ## Layout
 
-- `robot/main.py`: entry point. Loads `.env` and runs an interactive chat loop with the Anthropic API, streaming each reply. Type `exit` or press Ctrl-D to quit.
-- `scripts/deploy.sh`: runs on the Pi. `git pull --ff-only`, then `pip install -r requirements.txt` into `.venv`.
-- `requirements.txt`: `anthropic`, `python-dotenv`.
+- `robot/main.py`: entry point, an interactive chat loop (details below).
+- `robot/__init__.py`: empty; makes `robot` a package so `-m robot.main` works.
+- `scripts/deploy.sh`: runs on the Pi. `git pull --ff-only`, then
+  `pip install -r requirements.txt` into `.venv`.
+- `requirements.txt`: `anthropic`, `python-dotenv` (unpinned; the Pi currently
+  has `anthropic` 2.8.0, which is built on `httpx2`).
+- `.gitattributes`: forces LF line endings on `*.sh`.
+
+## Current state of the chatbot (`robot/main.py`)
+
+- A plain text chatbot. Prompts `you>`, prints the reply after `robot>`.
+  `exit`, `quit`, `bye` or Ctrl-D quits; Ctrl-C during a reply cancels that reply.
+- Model: `claude-opus-5-5`, set by the `MODEL` constant, at `effort: "low"`.
+- No system prompt. The model does not know it is a robot.
+- No tools. It cannot read sensors, move anything, run commands or search the
+  web. Adding tools is the expected next step; `reply()` makes one request per
+  turn and would need to become a loop (or use the SDK tool runner).
+- Conversation history is kept in memory for the session and resent each turn.
+  Nothing is saved between runs.
+- Replies are streamed with `client.beta.messages.stream(...)`.
+- The whole `response.content` is appended to the history, not just the text,
+  because thinking blocks must be passed back unchanged on later turns.
+- Server-side refusal fallbacks are on (`betas=["server-side-fallback-2026-07-01"]`,
+  `fallbacks="default"`), which is why the beta endpoint is used.
+- Top-level `cache_control` enables automatic prompt caching.
+- On an API error the just-added user message is removed from the history and
+  the loop continues.
+- `.env` is located relative to `main.py`, not the working directory.
 
 ## Conventions
 
-- Shell scripts must keep LF line endings (enforced by `.gitattributes`); they run under bash on the Pi.
-- The Pi has only 512 MB RAM: keep dependencies light and avoid packages that need compiling on-device.
-- Model: `claude-opus-5-5` via the official `anthropic` SDK, with server-side refusal fallbacks enabled.
+- Shell scripts must keep LF line endings; they run under bash on the Pi.
+- The Pi has only 512 MB RAM: keep dependencies light and avoid packages that
+  need compiling on-device (piwheels and aarch64 wheels have covered everything
+  so far).
+- Use the official `anthropic` SDK. For any API change, load the `claude-api`
+  skill first; model IDs and request shapes change often.
+- No hardware (motors, sensors, camera, speaker) is wired into the code yet,
+  and what is physically attached to the robot has not been recorded here. Ask
+  before assuming any.

@@ -2,21 +2,44 @@
 
 Anthropic-API agent "brain" for a small robot running on a Raspberry Pi Zero 2 W.
 
-## Workflow
+Right now it is a text chatbot: it talks to Claude (`claude-opus-5-5`) and
+remembers the conversation for the session. It has no system prompt and no
+tools yet, so it cannot control hardware.
 
-Develop on the laptop, push to GitHub, deploy to the Pi:
+## Running it
+
+At the Pi's console:
 
 ```bash
-git push
-ssh pi "bash ~/robot/scripts/deploy.sh"
+cd ~/robot
+.venv/bin/python -m robot.main
+```
+
+Or from the laptop (PowerShell):
+
+```powershell
 ssh -t pi "cd ~/robot && .venv/bin/python -m robot.main"
 ```
 
+Type a message at `you>`. Type `exit` or press Ctrl-D to quit.
+
+## Workflow
+
+Develop on the laptop, push to GitHub, deploy to the Pi. Never edit files on the Pi.
+
+```powershell
+git push
+ssh pi "bash ~/robot/scripts/deploy.sh"
+```
+
+If `ssh pi` fails with `Could not resolve hostname robot.local`, run it again.
+
 ## Files
 
-- `robot/main.py`: loads `~/robot/.env` and runs an interactive chat loop with the Anthropic API, streaming each reply. Type `exit` or press Ctrl-D to quit.
+- `robot/main.py`: loads `~/robot/.env` and runs an interactive chat loop with the Anthropic API, streaming each reply.
 - `scripts/deploy.sh`: run on the Pi; `git pull --ff-only` and `pip install -r requirements.txt` into `.venv`.
 - `requirements.txt`: `anthropic`, `python-dotenv`.
+- `CLAUDE.md`: detailed notes for Claude Code sessions.
 
 ## Setup on the Pi
 
