@@ -20,13 +20,13 @@ This repo is the Anthropic-API agent "brain" for a small robot.
 1. Develop here on Windows.
 2. Commit and push to GitHub (`origin`, branch `main`).
 3. Deploy: `ssh pi "bash ~/robot/scripts/deploy.sh"`
-4. Run on the Pi: `ssh pi "cd ~/robot && .venv/bin/python -m robot.main"`
+4. Run on the Pi (`-t` gives the chat a proper terminal): `ssh -t pi "cd ~/robot && .venv/bin/python -m robot.main"`
 
 Never edit files on the Pi directly. Every change goes through git.
 
 ## Layout
 
-- `robot/main.py`: entry point. Loads `.env` and sends one short test message to the Anthropic API, printing the reply.
+- `robot/main.py`: entry point. Loads `.env` and runs an interactive chat loop with the Anthropic API, streaming each reply. Type `exit` or press Ctrl-D to quit.
 - `scripts/deploy.sh`: runs on the Pi. `git pull --ff-only`, then `pip install -r requirements.txt` into `.venv`.
 - `requirements.txt`: `anthropic`, `python-dotenv`.
 

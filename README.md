@@ -9,12 +9,12 @@ Develop on the laptop, push to GitHub, deploy to the Pi:
 ```bash
 git push
 ssh pi "bash ~/robot/scripts/deploy.sh"
-ssh pi "cd ~/robot && .venv/bin/python -m robot.main"
+ssh -t pi "cd ~/robot && .venv/bin/python -m robot.main"
 ```
 
 ## Files
 
-- `robot/main.py`: loads `~/robot/.env` and sends one short test message to the Anthropic API, printing the reply.
+- `robot/main.py`: loads `~/robot/.env` and runs an interactive chat loop with the Anthropic API, streaming each reply. Type `exit` or press Ctrl-D to quit.
 - `scripts/deploy.sh`: run on the Pi; `git pull --ff-only` and `pip install -r requirements.txt` into `.venv`.
 - `requirements.txt`: `anthropic`, `python-dotenv`.
 
