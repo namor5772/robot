@@ -17,10 +17,17 @@ on a Windows laptop and runs on a Raspberry Pi.
 
 ## Reaching the Pi
 
-- `ssh pi` (no password). Use the PowerShell tool (Windows OpenSSH), not Git Bash.
-- Git Bash's ssh has never resolved `robot.local` (mDNS). PowerShell usually
-  does, but it fails intermittently with `Could not resolve hostname
-  robot.local`. When that happens, run the same command again.
+- `ssh pi` (no password). Since 2026-11-15 the `pi` alias in the laptop's
+  `~/.ssh/config` points at the Pi's IP address, `10.42.199.40`, with
+  `HostKeyAlias robot.local` so the existing host key still verifies. It works
+  from both PowerShell and Git Bash.
+- That address comes from the router and is not known to be reserved. If
+  `ssh pi` times out, the address has probably changed: use `ssh pi-local`
+  (same Pi via `robot.local`, PowerShell only), read the new address with
+  `hostname -I`, and update `HostName` under `Host pi`.
+- `pi-local` uses mDNS, which Git Bash's ssh cannot resolve and which fails
+  intermittently from PowerShell with `Could not resolve hostname robot.local`;
+  retrying usually works.
 - For scripted commands add `-o BatchMode=yes -o ConnectTimeout=15`.
 
 ## Workflow

@@ -35,7 +35,7 @@ git push
 ssh pi "bash ~/robot/scripts/deploy.sh"
 ```
 
-If `ssh pi` fails with `Could not resolve hostname robot.local`, run it again.
+`ssh pi` is an alias in the laptop's `~/.ssh/config` pointing at the Pi's IP address. If it times out, the address has changed; see `CLAUDE.md`.
 
 ## Files
 
