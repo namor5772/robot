@@ -5,7 +5,7 @@ from pathlib import Path
 import anthropic
 from dotenv import load_dotenv
 
-from robot.tools import Tool, available_tools
+from robot.tools import SERVER_TOOLS, Tool, available_tools
 
 try:
     import readline  # noqa: F401  (line editing and history for input() on the Pi)
@@ -15,6 +15,7 @@ except ImportError:
 MODEL = "claude-opus-5-5"
 ENV_FILE = Path(__file__).resolve().parent.parent / ".env"
 EXIT_WORDS = {"exit", "quit", "bye"}
+MAX_PAUSES = 5  # how many times one reply may resume a paused server-side tool
 
 SYSTEM_PROMPT = """\
 You are the brain of a small robot. You run as a program on a Raspberry Pi
@@ -59,19 +60,37 @@ def reply(client: anthropic.Anthropic, messages: list, tools: dict[str, Tool]) -
         "fallbacks": "default",
         "cache_control": {"type": "ephemeral"},
     }
-    if tools:
-        request["tools"] = [tool.definition for tool in tools.values()]
+    request["tools"] = [tool.definition for tool in tools.values()] + SERVER_TOOLS
 
+    sources: dict[str, str] = {}  # url -> title, for web search citations
+    pauses = 0
     while True:
         with client.beta.messages.stream(messages=messages, **request) as stream:
-            for text in stream.text_stream:
-                print(text, end="", flush=True)
+            for event in stream:
+                if event.type == "text":
+                    print(event.text, end="", flush=True)
+                elif (
+                    event.type == "content_block_start"
+                    and event.content_block.type == "server_tool_use"
+                ):
+                    print(f"\n[tool: {event.content_block.name}]", flush=True)
             response = stream.get_final_message()
 
-        # Keep the whole content list, not just the text: thinking and tool-use
-        # blocks must be passed back unchanged on later requests.
+        # Keep the whole content list, not just the text: thinking, tool-use and
+        # search-result blocks must be passed back unchanged on later requests.
         messages.append({"role": "assistant", "content": response.content})
 
+        for block in response.content:
+            if block.type == "text":
+                for citation in block.citations or []:
+                    url = getattr(citation, "url", None)
+                    if url:
+                        sources.setdefault(url, getattr(citation, "title", None) or url)
+
+        if response.stop_reason == "pause_turn" and pauses < MAX_PAUSES:
+            # A server-side tool is still working: send the turn back to resume it.
+            pauses += 1
+            continue
         if response.stop_reason != "tool_use":
             break
 
@@ -84,6 +103,10 @@ def reply(client: anthropic.Anthropic, messages: list, tools: dict[str, Tool]) -
         messages.append({"role": "user", "content": results})
 
     print()
+    if sources:
+        print("Sources:")
+        for url, title in sources.items():
+            print(f"  {title} - {url}")
     if response.stop_reason == "refusal":
         print("(the model declined to answer that)")
     elif response.stop_reason == "max_tokens":
@@ -97,7 +120,8 @@ def main() -> None:
     messages: list = []
 
     print("Robot chat. Type 'exit' or press Ctrl-D to quit.")
-    print(f"Tools: {', '.join(tools) or 'none'}")
+    tool_names = list(tools) + [tool["name"] for tool in SERVER_TOOLS]
+    print(f"Tools: {', '.join(tool_names) or 'none'}")
     while True:
         try:
             user_text = input("\nyou> ").strip()

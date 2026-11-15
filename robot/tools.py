@@ -74,6 +74,14 @@ ALL_TOOLS = [
 ]
 
 
+# Tools that run on Anthropic's servers, not on the Pi. There is nothing to
+# implement here: declaring one lets the model use it within a request.
+# max_uses caps the number of searches in one request (each search is billed).
+SERVER_TOOLS = [
+    {"type": "web_search_20260209", "name": "web_search", "max_uses": 5},
+]
+
+
 def available_tools() -> dict[str, Tool]:
     """Return the tools that work on this machine, keyed by name."""
     return {t.definition["name"]: t for t in ALL_TOOLS if t.is_available()}
