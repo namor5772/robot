@@ -105,6 +105,7 @@ class Agent:
         self.error = ""
         self.messages = []
         self.system_prompt = ""
+        self.run_facts = ""
         self.tools = {}
         self.client_tool_defs = []
         self.web_search = True
@@ -202,6 +203,11 @@ class Agent:
                       if name not in blocked}
         self.client_tool_defs = [tool.definition for tool in self.tools.values()]
         self.web_search = "web_search" not in blocked
+        # Which instruction and which model: sent as a block of its own after
+        # the shared prompt. It names the model the run starts on and, like
+        # the rest, stays as it is even if the run is upgraded later.
+        self.run_facts = prompts.run_paragraph(
+            self.settings.name, self.model, can_upgrade="upgrade_model" in self.tools)
 
     def _mode_label(self) -> str:
         return models.mode_label(self.model, self.thinking_mode,
@@ -216,7 +222,7 @@ class Agent:
             model=self.model, system_prompt=self.system_prompt, messages=self.messages,
             client_tools=self.client_tool_defs, web_search=self.web_search,
             thinking_mode=self.thinking_mode, thinking_budget=self.settings.thinking_budget,
-            fast_mode=self.fast_mode, learned=self.learned)
+            fast_mode=self.fast_mode, learned=self.learned, run_facts=self.run_facts)
 
     def describe_request(self) -> str:
         kwargs, betas, _ = api.build_request(**self._request_args())
@@ -648,9 +654,11 @@ class Agent:
             tools = list(self.client_tool_defs)
             if self.web_search:
                 tools.append(models.web_search_tool(self.model, self.learned.unsupported)[0])
+            system_prompt = "\n\n".join(part for part in (self.system_prompt, self.run_facts)
+                                        if part)
             payload = chats.chat_payload(
                 name=self.chat_stem, messages=self.messages, tools=tools,
-                system_prompt=self.system_prompt, instruction=self.settings.name,
+                system_prompt=system_prompt, instruction=self.settings.name,
                 model=self.model, thinking_mode=self.thinking_mode,
                 save_thinking=self.save_thinking)
             chats.save_chat_json(self.datadir.chats_dir / f"{self.chat_stem}.json", payload)

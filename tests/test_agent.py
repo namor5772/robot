@@ -587,6 +587,59 @@ class SkillsInARun(LoopCase):
         self.assertNotIn("get_skill", names)
 
 
+class WhatTheModelKnowsAboutItsRun(LoopCase):
+    def facts(self, request):
+        return " ".join(request["system"][1]["text"].split())
+
+    def test_a_saved_instruction_is_told_its_name_and_model(self):
+        made = self.make([reply(text_block("ok"))], name="Morning check",
+                         model="claude-haiku-5-5")
+        made.run()
+        system = self.client.requests[0]["system"]
+        self.assertEqual(len(system), 2)
+        self.assertEqual(self.facts(self.client.requests[0]),
+                         'About this run: you are running as the saved instruction named '
+                         '"Morning check", on the model claude-haiku-5-5.')
+        # Only the shared part in front carries the cache marker.
+        self.assertIn("cache_control", system[0])
+        self.assertNotIn("cache_control", system[1])
+
+    def test_a_plain_chat_is_told_it_runs_on_the_default_settings(self):
+        made = self.make([reply(text_block("ok"))], lines="", conversational=True)
+        made.run()
+        self.assertEqual(self.facts(self.client.requests[0]),
+                         "About this run: this is a chat started without a saved "
+                         'instruction. Its settings come from the instruction named '
+                         '"Default". You are running on the model claude-opus-5-5.')
+
+    def test_different_instructions_share_everything_but_that_paragraph(self):
+        first = self.make([reply(text_block("ok"))], name="One")
+        first.run()
+        one = self.client.requests[0]
+        second = self.make([reply(text_block("ok"))], name="Two")
+        second.run()
+        two = self.client.requests[0]
+        self.assertEqual(one["system"][0], two["system"][0])
+        self.assertEqual(one["tools"], two["tools"])
+        self.assertNotEqual(one["system"][1], two["system"][1])
+
+    def test_the_paragraph_does_not_change_during_a_run(self):
+        script = [reply(tool_use("echo", {}, "e")), reply(text_block("ok"))]
+        made = self.make(script, name="Check", tools={"echo": self.recorder("echo")})
+        made.run()
+        first, second = self.client.requests
+        self.assertEqual(first["system"], second["system"])
+
+    def test_the_saved_chat_records_the_whole_prompt(self):
+        made = self.make([reply(text_block("ok"))], name="Check")
+        made.run()
+        saved = json.loads((self.datadir.chats_dir / f"{made.chat_stem}.json")
+                           .read_text(encoding="utf-8"))
+        self.assertIn("You are the brain of a small robot.", saved["system_prompt"])
+        self.assertIn('the saved instruction named "Check"',
+                      " ".join(saved["system_prompt"].split()))
+
+
 class ModuleSurface(unittest.TestCase):
     def test_the_user_prompt_tool_requires_a_message(self):
         self.assertEqual(agent_module.USER_PROMPT_TOOL["input_schema"]["required"], ["message"])

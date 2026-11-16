@@ -56,15 +56,21 @@ def connection_error_backoff(attempt: int) -> int:
     return min(2 ** attempt * 5, 60)
 
 
-def cache_system(system_text):
-    """The system prompt as one cached block.
+def cache_system(system_text, run_facts=""):
+    """The system prompt as a cached block, plus the run's own facts after it.
 
     The cache prefix is built tools, then system, then messages, and a marker
-    caches everything before it, so this one marker covers the tool list too.
+    caches everything before it, so the one marker covers the tool list too.
+    `run_facts` (which instruction, which model) differs between runs, so it
+    goes in a second block with no marker: runs of different instructions can
+    then still share the cached part in front of it.
     """
     if not system_text:
-        return system_text
-    return [{"type": "text", "text": system_text, "cache_control": dict(_CACHE_CONTROL)}]
+        return run_facts or system_text
+    blocks = [{"type": "text", "text": system_text, "cache_control": dict(_CACHE_CONTROL)}]
+    if run_facts:
+        blocks.append({"type": "text", "text": run_facts})
+    return blocks
 
 
 def cache_messages(messages, max_breakpoints=2):
@@ -100,7 +106,7 @@ def cache_messages(messages, max_breakpoints=2):
 
 def build_request(*, model, system_prompt, messages, client_tools, web_search=True,
                   thinking_mode="adaptive", thinking_budget=models.DEFAULT_THINKING_BUDGET,
-                  fast_mode=False, learned=None, standard_speed=False):
+                  fast_mode=False, learned=None, standard_speed=False, run_facts=""):
     """Everything one call sends: (kwargs, betas, info).
 
     The live call, --debug and --dry-run all use this one function, so what
@@ -116,7 +122,7 @@ def build_request(*, model, system_prompt, messages, client_tools, web_search=Tr
 
     kwargs = {
         "model": model,
-        "system": cache_system(system_prompt),
+        "system": cache_system(system_prompt, run_facts),
         "messages": cache_messages(messages),
         "tools": tools,
         # The model's own ceiling: nothing else bounds adaptive thinking, and a
@@ -303,7 +309,7 @@ def _stream_once(client, console, interrupts, kwargs, betas):
 def call_model(client, console, interrupts, *, model, system_prompt, messages, client_tools,
                web_search=True, thinking_mode="adaptive",
                thinking_budget=models.DEFAULT_THINKING_BUDGET, fast_mode=False,
-               learned=None, max_retries=MAX_RETRIES) -> CallResult:
+               learned=None, max_retries=MAX_RETRIES, run_facts="") -> CallResult:
     """One call to the model, with the retry ladder.
 
     `messages` is trimmed in place if the context overflows. Raises when the
@@ -318,7 +324,7 @@ def call_model(client, console, interrupts, *, model, system_prompt, messages, c
             model=model, system_prompt=system_prompt, messages=messages,
             client_tools=client_tools, web_search=web_search, thinking_mode=thinking_mode,
             thinking_budget=thinking_budget, fast_mode=fast_mode, learned=learned,
-            standard_speed=standard_speed)
+            standard_speed=standard_speed, run_facts=run_facts)
 
     def interrupted_result(text="", usage=None, fast=False):
         content = [{"type": "text", "text": text}] if text else []

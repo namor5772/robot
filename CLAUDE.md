@@ -165,8 +165,17 @@ show the user the output. The user does not want to be asked to test things.
   paragraph, one paragraph that depends on Convo (in a conversation: just
   reply; in a single task: you must ask through `user_prompt`), and a
   plain-text rule. Enabled skills and the on-demand skill list are appended by
-  `SkillStore.compose_system_prompt`. Nothing dynamic goes into it, so the
-  model does not know which model it is.
+  `SkillStore.compose_system_prompt`.
+- The last thing in the system prompt is the "About this run" paragraph
+  (`prompts.run_paragraph`, wording also approved on 2026-11-16): the
+  instruction's name, or that it is a plain chat on the `Default` settings, and
+  the model the run started on. It is sent as a second system block with no
+  cache marker (`api.cache_system`), so runs of different instructions still
+  share the cached prompt in front of it. It is fixed like the rest: after an
+  `upgrade_model` it still names the starting model, and its last sentence
+  (present only when the run has that tool) tells the model to trust the
+  tool's result instead.
+- Apart from that paragraph nothing dynamic goes into the system prompt.
 - Tool descriptions are in `agent.py` (`user_prompt`, `get_skill`), `meta.py`
   and `tools.py`. They are model-facing text too: treat changes with care.
 

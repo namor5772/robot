@@ -229,6 +229,18 @@ class MetaInARun(unittest.TestCase):
         self.assertEqual(self.tool_names(self.client.requests[0]),
                          ["user_prompt", "web_search"])
 
+    def test_only_a_run_that_can_upgrade_is_told_about_upgrading(self):
+        made = self.make([reply(text_block("ok"))])
+        made.run()
+        self.assertIn("If you have used the upgrade_model tool",
+                      " ".join(self.client.requests[0]["system"][1]["text"].split()))
+        made = self.make([reply(text_block("ok"))], meta=False)
+        made.run()
+        self.assertNotIn("upgrade_model", self.client.requests[0]["system"][1]["text"])
+        made = self.make([reply(text_block("ok"))], blocked_tools=["upgrade_model"])
+        made.run()
+        self.assertNotIn("upgrade_model", self.client.requests[0]["system"][1]["text"])
+
     def test_the_model_can_create_an_instruction_and_a_skill(self):
         script = [
             reply(tool_use("manage_instructions",
@@ -264,6 +276,12 @@ class MetaInARun(unittest.TestCase):
         self.assertEqual(second["model"], "claude-fable-5-2")
         self.assertEqual(second["output_config"], {"effort": "max"})
         self.assertEqual(first["tools"], second["tools"])
+        # The prompt is fixed for the run: it still names the starting model,
+        # and tells the model to trust the tool's result over it.
+        self.assertEqual(first["system"], second["system"])
+        facts = " ".join(second["system"][1]["text"].split())
+        self.assertIn('the saved instruction named "Hard", on the model claude-opus-5-5.', facts)
+        self.assertIn("you are now on the model its result named instead", facts)
         result = made.messages[2]["content"][0]["content"]
         self.assertEqual(result, "Upgraded: claude-opus-5-5 -> claude-fable-5-2 (Max) for the "
                                  "rest of this run, from your next call on. The saved "

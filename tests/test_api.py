@@ -27,6 +27,20 @@ class CacheMarkers(unittest.TestCase):
     def test_an_empty_system_prompt_stays_a_plain_string(self):
         self.assertEqual(cache_system(""), "")
 
+    def test_the_runs_own_facts_follow_in_a_block_without_a_marker(self):
+        self.assertEqual(cache_system("be brief", "About this run: a chat."), [
+            {"type": "text", "text": "be brief", "cache_control": {"type": "ephemeral"}},
+            {"type": "text", "text": "About this run: a chat."}])
+        self.assertEqual(cache_system("", "About this run: a chat."), "About this run: a chat.")
+
+    def test_a_request_carries_the_runs_facts_after_the_cached_prompt(self):
+        kwargs, _, _ = build(run_facts="About this run: a chat.")
+        self.assertEqual(len(kwargs["system"]), 2)
+        self.assertIn("cache_control", kwargs["system"][0])
+        self.assertEqual(kwargs["system"][1], {"type": "text", "text": "About this run: a chat."})
+        kwargs, _, _ = build()
+        self.assertEqual(len(kwargs["system"]), 1)
+
     def test_the_two_newest_user_turns_are_marked(self):
         messages = [{"role": "user", "content": "one"},
                     {"role": "assistant", "content": [text_block("a")]},

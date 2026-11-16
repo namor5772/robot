@@ -173,7 +173,14 @@ class StartingAndFailing(MainCase):
         self.assertIn("you> How hot are you?", shown)
         self.assertIn('"model": "claude-opus-5-5"', shown)
         self.assertIn("This is a conversation", shown)
+        self.assertIn("About this run: this is a chat started without a saved instruction.",
+                      shown)
         self.assertEqual(list(self.datadir.chats_dir.glob("*")), [])
+
+    def test_a_model_override_is_what_the_run_is_told(self):
+        _, shown = self.run_main("--dry-run", "--model", "claude-haiku-5-5",
+                                 stdin="How hot are you?\n")
+        self.assertIn("You are running on the\\nmodel claude-haiku-5-5.", shown)
 
     def test_leaving_at_the_first_prompt_ends_quietly(self):
         code, shown = self.run_main("--dry-run", stdin="exit\n")
@@ -187,6 +194,8 @@ class StartingAndFailing(MainCase):
         self.assertIn("Robot agent: instruction 'Patrol'. Single task on claude-haiku-5-5", shown)
         self.assertIn("Walk the hall.", shown)
         self.assertIn("single task run", shown)
+        self.assertIn("About this run: you are running as the saved instruction named", shown)
+        self.assertIn('\\"Patrol\\"', shown)
 
     def test_prepend_and_extra_files_wrap_the_task(self):
         self.save(Patrol={"text": "Walk the hall."})

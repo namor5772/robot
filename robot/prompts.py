@@ -1,5 +1,7 @@
 """The base system prompt. Its wording was approved by the owner: show changes first."""
 
+import textwrap
+
 _IDENTITY = """\
 You are the brain of a small robot. You run as a program on a Raspberry Pi
 Zero 2 W, which is your body's onboard computer. The person talking to you is
@@ -44,3 +46,27 @@ def base_system_prompt(conversational: bool) -> str:
     """The prompt before any skills are appended. Fixed for the whole run."""
     mode = _CONVERSATION if conversational else _SINGLE_TASK
     return "\n\n".join((_IDENTITY, mode, _FORMAT))
+
+
+def run_paragraph(name: str, model: str, can_upgrade: bool = False) -> str:
+    """What the model is told about the run it is in: which instruction, which model.
+
+    This is the one part of the system prompt that differs from run to run.
+    It is sent as a separate block after everything else, so the large part
+    that runs have in common can still be reused from the prompt cache.
+
+    The system prompt cannot change during a run, so after an upgrade this
+    still names the model the run started on. The last sentence covers that.
+    """
+    if name:
+        text = (f'About this run: you are running as the saved instruction named "{name}", '
+                f"on the model {model}.")
+    else:
+        text = ("About this run: this is a chat started without a saved instruction. Its "
+                'settings come from the instruction named "Default". You are running on the '
+                f"model {model}.")
+    if can_upgrade:
+        text += (" If you have used the upgrade_model tool during this run, you are now on "
+                 "the model its result named instead.")
+    # Wrapped like the rest of the prompt, but never inside a model id or a name.
+    return textwrap.fill(text, width=78, break_long_words=False, break_on_hyphens=False)
