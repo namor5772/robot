@@ -89,8 +89,27 @@ show the user the output. The user does not want to be asked to test things.
   `ssh pi "cd ~/robot && .venv/bin/python -" < script.py` or `bash -s`. An
   `ssh` command inside such a script needs `-n`.
 - `--dry-run` prints the exact first request; `--debug` prints every request.
+- Paid checks that need saved instructions or skills create them in
+  `~/robot-data` with names starting `ZZ ` (instructions) and `zz-` (skills),
+  through a small script fed over stdin that uses `robot.instructions` and
+  `robot.skills`, and remove them afterwards. The chats and cost-log lines of
+  those checks are left in place: they are a true record of what was spent.
+- To check that two runs share the prompt cache, start them within five
+  minutes of each other: the second one's first `call 1:` line should show a
+  large `cache_read` and a small `cache_write`.
+- Some tests start real processes (`test_spawn`, `test_costs`). One such test
+  was timing-dependent on a busy Pi and was fixed on 2026-11-16; if a test
+  fails once and then passes, find the race instead of rerunning until green
+  (running the suite with all four cores loaded brought that one out).
 - On this laptop, long heredocs with quotes passed to the Bash tool have
   broken several times. Use the Write and Edit tools for file content.
+
+## State on 2026-11-16
+
+- The instruction library on the Pi holds only `Default`, and there are no
+  skills. The user has been shown how to create both by asking in a chat.
+- 878 tests pass on the laptop and on the Pi.
+- No hardware tools exist yet beyond the CPU temperature reading.
 
 ## When the SSH connection drops
 
@@ -99,6 +118,11 @@ show the user the output. The user does not want to be asked to test things.
   avoids that by running the chat inside tmux, on its own socket and session,
   both named `robot` (`tmux -L robot ...`), with `scripts/tmux.conf`. Run
   again, it reattaches and ignores its arguments. Detach is Ctrl-B then D.
+- When the program ends, `chat.sh` runs `stty sane` and then waits for Enter
+  so the last lines can be read. The `stty sane` matters: a program killed
+  outright leaves the terminal in raw mode, and Enter was not recognised.
+- tmux keeps a chat alive across a dropped connection, not across a reboot of
+  the Pi. Nothing starts tmux at boot.
 - To see why an SSH session ended: `sudo journalctl -t sshd-session --since today`
   on the Pi (not `-u ssh`). On the laptop, standby shows as Kernel-Power events
   506 and 507 in the System log.
@@ -142,6 +166,15 @@ show the user the output. The user does not want to be asked to test things.
   Without it, from the entry named `Default` (created on first use; model
   `claude-opus-5-5`, level Low, Meta on, Convo on), and the task is typed at
   `you>`. `--model` and `--mode` override one run.
+- A plain chat borrows only `Default`'s settings: its run has no name (chat
+  files are `Agent_<time>`, the cost log's instruction field is empty) and any
+  text saved in `Default` is ignored. `-l Default` runs it as a named
+  instruction, text included.
+- An instruction with no text asks for the task when someone is there
+  (`first_message`); with `--headless` or `--result-file` it cannot start.
+- An entry needs only `text`. Missing settings default to `claude-opus-5-5`,
+  Meta off, Convo off, and no stated thinking level, which on that model
+  becomes Adaptive (the API's default effort, costlier than Low).
 - `settings_from_entry` corrects values the model cannot honour (a thinking
   level it lacks) and warns. An entry for another provider is refused.
 - The task is the first user message. The system prompt and the tool list are

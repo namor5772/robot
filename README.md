@@ -57,22 +57,118 @@ bash scripts/chat.sh -l "Name"                   # run one inside tmux
 - The entry named **Default** holds the settings of a chat started without a
   name. Change it to change the everyday chat. It is re-created if deleted.
 
+### A chat and an instruction compared
+
+A chat is not a separate mode. It is an ordinary run with no saved task,
+using `Default`'s settings, and `Default` has Convo on.
+
+| | Plain chat (no `-l`) | Instruction (`-l "Name"`) |
+|---|---|---|
+| First message | You type it at `you>` | The instruction's saved text |
+| Settings | Borrowed from `Default` | The instruction's own |
+| Convo | On, because `Default` has it on | What the instruction says (off unless set) |
+| Name in the cost log and saved chat | None (`Agent_<time>`) | The instruction's name |
+
+A plain chat uses only `Default`'s settings: any text saved in `Default` is
+ignored unless you run it by name with `-l Default`. An instruction with no
+text asks you for the task when run at a terminal.
+
+The robot is told which instruction and which model it is running as, so you
+can ask it ("which model are you on?").
+
+### Creating and changing instructions
+
 There is no editor. Ask the agent: with Meta on it creates, changes and
 deletes instructions and skills itself ("save this as an instruction called
-Night watch", "make the default model Haiku").
+Night watch", "make the default model Haiku"). Changes apply from the next
+run, not the one you are in.
+
+The library is one JSON file, `~/robot-data/agent_instructions.json`, so it can
+also be edited by hand. Each instruction is a named block, for example:
+
+```json
+{
+  "Default": {
+    "text": "",
+    "model": "claude-opus-5-5",
+    "thinking_mode": "low",
+    "meta": true,
+    "conversational": true
+  },
+  "Health check": {
+    "text": "Report your CPU temperature, free memory and disk space in three short lines.",
+    "model": "claude-haiku-5-5",
+    "thinking_mode": "low",
+    "meta": false,
+    "conversational": false
+  }
+}
+```
+
+Only `text` is needed; anything left out takes a default (Opus 5.5 at its
+Adaptive thinking level, Meta off, Convo off). `thinking_mode` is one of
+`off`, `adaptive`, `low`, `medium`, `high`, `xhigh`, `max`; a level the model
+lacks is replaced by the nearest it has, with a warning. Other fields: `notes`
+(for you, never sent to the model), `fast_mode`, `blocked_tools`,
+`skill_modes`, `upgrade_target`.
+
+- After a hand edit, check the file:
+  `python3 -m json.tool ~/robot-data/agent_instructions.json`. If it cannot be
+  read, the robot leaves it alone, warns, and runs with built-in settings.
+- Meta is what lets a chat manage instructions. If you turn Meta off in
+  `Default`, the plain chat can no longer change anything, including turning
+  it back on: edit the file, or delete the `Default` block so it is re-created.
+- Entries copied from MyAgent's library work. Settings the robot does not have
+  are ignored, and an entry for another provider is refused when run.
 
 ## Skills
 
-A skill is a piece of know-how in its own folder: `SKILL.md` plus any scripts
-or reference files. Each has a mode:
+An instruction is something to do; a skill is something to know. A skill is a
+piece of know-how in its own folder, which any run can draw on:
+
+```
+~/robot-data/skills/
+  check-power/
+    SKILL.md
+    scripts/report.sh        (optional: any files and sub-folders)
+```
+
+`SKILL.md` is a short header followed by the skill's text:
+
+```
+---
+name: check-power
+description: How to check the robot's power supply. Use when asked about power.
+mode: on_demand
+---
+
+To check the power supply, run `vcgencmd get_throttled` with the shell tool.
+throttled=0x0 means the supply has been fine since boot.
+```
+
+Each skill has a mode:
 
 - **enabled**: its text is part of every system prompt.
 - **on_demand**: only its description is listed; the agent fetches the text
-  with `get_skill` when it applies.
-- **disabled**: not used.
+  with `get_skill` when it applies. Write the description as what the skill
+  does and when to use it, because that line is how the model decides.
+- **disabled**: not used. This is what a new skill gets unless you say otherwise.
 
-`.venv/bin/python -m robot.main --skills` lists them. An instruction may carry
-its own skill modes; then every skill it does not name is off for its runs.
+`.venv/bin/python -m robot.main --skills` lists them.
+
+- **Creating one:** ask in a chat, naming the skill, its mode, its description
+  and its content. A good way is to have the robot do the job once and then
+  say "save what you just did as a skill". It applies from the next chat.
+- **Bundled files:** the robot can list, read, write and delete files inside a
+  skill's folder. When it fetches a skill that has such files it is told where
+  the folder is, so it can run a bundled script with the shell.
+- **Per instruction:** an instruction may carry its own `skill_modes`, a list of
+  skills with the mode each has for its runs. Then every skill it does not
+  name is off for those runs. Without one, the instruction follows each
+  skill's own mode. Only the run is affected; the skills are not changed.
+- **Copying skills in:** the format is MyAgent's, so a skill folder copied from
+  there works as it is. A plain Anthropic-format skill has no `mode` line and
+  comes in as disabled until you set one.
 
 ## Tools
 
@@ -159,7 +255,8 @@ address. If it times out, the address has changed; see `CLAUDE.md`.
 - `robot/console.py`: everything printed and typed, and Ctrl-C handling.
 - `robot/tools.py`: the Pi's own tools. `robot/meta.py`, `robot/spawn.py`: the Meta tools and child runs.
 - `robot/instructions.py`, `robot/skills.py`: the library and the skills.
-- `robot/models.py`: model and price tables. `robot/costs.py`, `robot/chats.py`, `robot/history.py`, `robot/datastore.py`, `robot/relay.py`, `robot/prompts.py`: supporting parts.
+- `robot/prompts.py`: the system prompt's wording.
+- `robot/models.py`: model and price tables. `robot/costs.py`, `robot/chats.py`, `robot/history.py`, `robot/datastore.py`, `robot/relay.py`: supporting parts.
 - `scripts/chat.sh`, `scripts/tmux.conf`: the tmux launcher. `scripts/deploy.sh`: run on the Pi to update it.
 - `tests/`: the test suite. `CLAUDE.md`: detailed notes for Claude Code sessions.
 
