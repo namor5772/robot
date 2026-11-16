@@ -34,6 +34,9 @@ running, and the same command brings you back to it.
 - To leave a chat running on purpose, press Ctrl-B, then D.
 - The mouse wheel scrolls back. To select text, hold Shift while dragging.
 - When the chat ends, press Enter to close the window.
+- If a line such as `11;rgb:0c0c/0c0c/0c0c` shows up at `you>` without you
+  typing it, it is your terminal's answer to a question from tmux that slipped
+  through on a slow connection. Press Enter: it is ignored, not sent.
 
 Without tmux: `cd ~/robot && .venv/bin/python -m robot.main`.
 

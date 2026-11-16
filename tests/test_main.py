@@ -166,6 +166,17 @@ class Listings(MainCase):
         self.assertIn("- check-battery  [on_demand]\n  Reads the battery.", shown)
 
 
+class AskingForTheTask(MainCase):
+    def test_a_line_from_the_terminal_itself_is_not_taken_as_the_task(self):
+        # What a terminal's answer to tmux left at the prompt on 2026-11-16,
+        # followed by Enter. It was sent to the model as the first message.
+        self.console.tty = True
+        typed = ["11;rgb:0c0c/0c0c/0c0c", "", "how hot are you?"]
+        with mock.patch("builtins.input", side_effect=typed):
+            self.assertEqual(main.first_message(self.console), "how hot are you?")
+        self.assertEqual(self.out.getvalue().count("(ignored: that line came from"), 1)
+
+
 class StartingAndFailing(MainCase):
     def test_a_dry_run_prints_the_request_and_spends_nothing(self):
         code, shown = self.run_main("--dry-run", stdin="How hot are you?\n")

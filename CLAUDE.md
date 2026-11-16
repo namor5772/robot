@@ -108,7 +108,7 @@ show the user the output. The user does not want to be asked to test things.
 
 - The instruction library on the Pi holds only `Default`, and there are no
   skills. The user has been shown how to create both by asking in a chat.
-- 878 tests pass on the laptop and on the Pi.
+- 886 tests pass on the laptop and on the Pi.
 - No hardware tools exist yet beyond the CPU temperature reading.
 
 ## When the SSH connection drops
@@ -127,6 +127,33 @@ show the user the output. The user does not want to be asked to test things.
   on the Pi (not `-u ssh`). On the laptop, standby shows as Kernel-Power events
   506 and 507 in the System log.
 - A hang-up or SIGTERM winds the run down properly (cost logged, chat saved).
+
+## Terminal answers that reach the prompt
+
+- Every time tmux attaches it asks the outer terminal for its type and colours,
+  and the terminal answers as if typing (`ESC ] 11 ; rgb:... ESC \`). tmux keeps
+  a whole answer to itself. One that arrives in two pieces further apart than
+  tmux's `escape-time` is passed into the pane as key presses: readline drops
+  the escape characters and leaves the text (`11;rgb:0c0c/0c0c/0c0c`) at `you>`,
+  and Enter sends it. That happened on 2026-11-16 and cost one call.
+- `scripts/tmux.conf` therefore sets `escape-time 500`. tmux 3.5's own default
+  is 10 ms; a 100 ms gap reproduced the leak with 10 and not with 500. The
+  Pi's Wi-Fi has power saving on, which delivers packets in bunches. A gap of
+  more than half a second still gets through.
+- For that case `Console._ask_terminal` treats a line that is nothing but such
+  answers as a bare Enter (`console.only_terminal_replies`): it says so and
+  the prompt comes back. Whole lines only: the same characters inside a
+  sentence are sent as typed, so the person can ask about them.
+- tmux reads its config when its server starts. A chat that is already running
+  keeps the old value until it ends, unless it is set by hand:
+  `tmux -L robot set -sg escape-time 500`.
+- To reproduce a leak without the real terminal, play the terminal from a
+  script on the Pi: `pty.fork()`, run `tmux -L <own socket> -f <conf>
+  new-session ...` in the child, and from the parent answer `ESC ] 11 ; ? ESC \`
+  in two writes with a pause between them. A pane program that reads the
+  keyboard (`stty raw -echo; timeout --foreground 4 cat > file`) shows what
+  got through. Without `--foreground`, `timeout` stops its command from
+  reading the terminal.
 
 ## Layout
 
@@ -242,8 +269,9 @@ show the user the output. The user does not want to be asked to test things.
   end of input means nobody is there), `--headless` (never reads stdin: a relay
   folder answers, or nobody does).
 - At a terminal the chat is forgiving, unlike MyAgent's dialog: an empty line is
-  ignored, Ctrl-C cancels the reply or command and returns to `you>`, an API
-  error returns to `you>`. Everywhere else MyAgent's rules hold: an empty reply
+  ignored (and so is a line that came from the terminal itself, see "Terminal
+  answers that reach the prompt"), Ctrl-C cancels the reply or command and
+  returns to `you>`, an API error returns to `you>`. Everywhere else MyAgent's rules hold: an empty reply
   ends a conversation, and an empty reply or `exit` to `user_prompt` stops the
   run (`quit` and `stop` there go to the model).
 - `Interrupts`: the loop runs on the main thread. The SIGINT handler sets a

@@ -2,6 +2,7 @@
 
 import contextlib
 import os
+import re
 import signal
 import sys
 import threading
@@ -32,6 +33,31 @@ def convo_end_word(text):
     """
     word = (text or "").strip().rstrip(_END_PUNCTUATION).strip().lower()
     return word if word in CONVO_END_WORDS else None
+
+
+# A terminal answers questions from the program that draws on it by sending
+# the answer as if it were typed. tmux asks for the terminal's colours and
+# type every time it attaches, and normally keeps the answers to itself. When
+# one reaches our prompt instead, readline takes its escape characters as key
+# presses and keeps the rest as text. What is left, measured with readline 8.2:
+#     colours  ESC ] 11 ; rgb:0c0c/0c0c/0c0c ESC \   leaves  11;rgb:0c0c/0c0c/0c0c
+#     type     ESC [ ? 61 ; 4 ; 6 c                  leaves  61;4;6c
+#     type     ESC [ > 0 ; 10 ; 1 c                  leaves  0;10;1c
+_HEX = "[0-9a-fA-F]"
+_COLOUR_REPLY = f"1[0-9];rgb:{_HEX}{{1,4}}/{_HEX}{{1,4}}/{_HEX}{{1,4}}"
+_TYPE_REPLY = r"[0-9]{1,5}(?:;[0-9]{1,5})+c"
+_ONLY_TERMINAL_REPLIES = re.compile(f"(?:{_COLOUR_REPLY}|{_TYPE_REPLY})+")
+
+
+def only_terminal_replies(line) -> bool:
+    """True when a line holds nothing but answers from the terminal itself.
+
+    Only a whole line counts. The same characters inside a sentence are left
+    alone: there they are something the person typed, such as a question
+    about them.
+    """
+    return bool(_ONLY_TERMINAL_REPLIES.fullmatch((line or "").strip()))
+
 
 _DIM = "\033[2m"
 _RESET = "\033[0m"
@@ -298,6 +324,10 @@ class Console:
         finally:
             self._relay_answered(seq)
         self._after_terminal_line(prompt, line)
+        if only_terminal_replies(line):
+            # Nobody typed this, so it is no more an answer than a bare Enter.
+            self._line("(ignored: that line came from your terminal, not from the keyboard)")
+            return ""
         return line.strip()
 
     def _after_terminal_line(self, prompt, line):

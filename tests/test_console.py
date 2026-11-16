@@ -4,10 +4,11 @@ import io
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from robot import relay
 from robot.chats import Transcript
-from robot.console import Console, Interrupts, convo_end_word
+from robot.console import Console, Interrupts, convo_end_word, only_terminal_replies
 from tests.fakes import NoWaitInterrupts, piped_console
 
 
@@ -150,6 +151,83 @@ class Input(unittest.TestCase):
             return False
         console.interrupts.wait = remove_folder
         self.assertIsNone(console.ask(question="Anyone?"))
+
+
+class TerminalReplies(unittest.TestCase):
+    """Answers from the terminal that reached the prompt as if typed.
+
+    The lines here are what readline 8.2 on the Pi left of real replies.
+    """
+
+    def test_what_is_left_of_a_terminal_reply_is_recognised(self):
+        for line in ("11;rgb:0c0c/0c0c/0c0c",  # background colour
+                     "10;rgb:cccc/cccc/cccc11;rgb:0c0c/0c0c/0c0c",  # both colours
+                     "11;rgb:0c/0c/0c",
+                     "61;4;6;7;14;21;22;23;24;28;32;42c",  # terminal type
+                     "0;10;1c",
+                     "61;4;6c0;10;1c10;rgb:cccc/cccc/cccc11;rgb:0C0C/0C0C/0C0C",  # all four
+                     "  11;rgb:0c0c/0c0c/0c0c  "):
+            self.assertTrue(only_terminal_replies(line), line)
+
+    def test_typed_text_is_never_taken_for_one(self):
+        for line in ("", None, "hello", "25c", "c", "10", "1;2", "rgb:0c0c/0c0c/0c0c",
+                     "set the lamp to rgb:ff/00/00",
+                     "why did 11;rgb:0c0c/0c0c/0c0c appear at the prompt?",
+                     "11;rgb:0c0c/0c0c/0c0c what is this?",
+                     "what is 1+111;rgb:0c0c/0c0c/0c0c",
+                     "0;10;1c is what I saw",
+                     "11;rgb:0c0c/0c0c"):
+            self.assertFalse(only_terminal_replies(line), line)
+
+    def test_a_long_line_of_numbers_is_decided_quickly(self):
+        self.assertFalse(only_terminal_replies("1;" * 5000))
+        self.assertFalse(only_terminal_replies("11;rgb:0c0c/0c0c/0c0c" * 500 + "x"))
+        self.assertTrue(only_terminal_replies("0;10;1c" * 500))
+
+
+class TerminalInput(unittest.TestCase):
+    """The prompt at a real terminal, with the keyboard played by a patch."""
+
+    def typed(self, line):
+        console, out = piped_console("")
+        console.tty = True
+        with mock.patch("builtins.input", return_value=line) as asked:
+            reply = console.ask()
+        asked.assert_called_once_with("you> ")
+        return reply, out.getvalue()
+
+    def test_a_typed_line_is_the_reply(self):
+        reply, shown = self.typed("  how hot are you?  ")
+        self.assertEqual(reply, "how hot are you?")
+        self.assertNotIn("ignored", shown)
+
+    def test_a_line_from_the_terminal_itself_counts_as_a_bare_enter(self):
+        reply, shown = self.typed("11;rgb:0c0c/0c0c/0c0c")
+        self.assertEqual(reply, "")
+        self.assertIn("(ignored: that line came from your terminal, not from the keyboard)\n",
+                      shown)
+
+    def test_a_sentence_that_quotes_such_a_line_is_sent_whole(self):
+        line = "why did 11;rgb:0c0c/0c0c/0c0c appear at the prompt?"
+        reply, shown = self.typed(line)
+        self.assertEqual(reply, line)
+        self.assertNotIn("ignored", shown)
+
+    def test_the_ignored_line_is_still_in_the_transcript(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "chat.txt"
+            console, _ = piped_console("")
+            console.tty = True
+            transcript = Transcript(path)
+            console.set_transcript(transcript)
+            with mock.patch("builtins.input", return_value="0;10;1c"):
+                console.ask()
+            console.set_transcript(None)
+            transcript.close()
+            self.assertEqual(
+                path.read_text(encoding="utf-8"),
+                "\nyou> 0;10;1c\n"
+                "(ignored: that line came from your terminal, not from the keyboard)\n")
 
 
 class InterruptRegions(unittest.TestCase):
