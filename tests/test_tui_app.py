@@ -12,7 +12,7 @@ from unittest import mock
 
 from robot.datastore import load_store
 from robot.tui import app as tui_app
-from robot.tui.app import STATE_FILE, OutputBuffer, UiConsole, UiInterrupts
+from robot.tui.app import STATE_FILE, OutputBuffer, UiConsole, UiInterrupts, top_line
 from robot.tui.screen import Mouse, Paste
 from tests.fakes import FakeClient, InterruptDuring, bad_request, reply, text_block, tool_use
 from tests.tui_fakes import AppCase, Check, FakeScreen, Until, typed
@@ -91,6 +91,26 @@ class TheWindow(MainCase):
         self.make_app(instruction="No such thing")
         self.drive(self.shows("Robot  |  Default"))
 
+    def test_a_long_name_gives_way_to_the_settings_in_the_top_row(self):
+        name = "A very long name for an instruction indeed"
+        self.library(**{name: dict(TASK, meta=True)})
+        self.make_app(instruction=name)
+        self.drive(
+            Check(lambda screen: self.assertEqual(
+                screen.line(0), " Robot  |  A very long n...  |  claude-haiku-5-5 (Low)  |  "
+                                "single task  |  meta")),
+            "f4", self.shows("Name: " + name))       # the editor has the name in full
+
+    def test_the_top_row_keeps_the_settings_in_the_smallest_window(self):
+        name = "A very long name for an instruction indeed"
+        self.library(**{name: {"text": "x", "model": "claude-haiku-5-5-20261007",
+                               "thinking_mode": "adaptive", "meta": True}})
+        self.screen = FakeScreen(tui_app.MIN_ROWS, tui_app.MIN_COLS)
+        self.make_app(instruction=name)
+        self.drive(Check(lambda screen: self.assertEqual(
+            screen.line(0),
+            " A very... | claude-haiku-5-5-20261007 (Adaptive) | single task | meta")))
+
     def test_a_first_start_makes_the_default_instruction(self):
         self.datadir.instructions_file.unlink()
         self.drive(self.shows("Robot  |  Default  |  claude-opus-5-5 (Low)"))
@@ -137,6 +157,80 @@ class TheWindow(MainCase):
     def test_escape_does_not_leave_the_main_window(self):
         self.drive("esc", "esc", self.shows("[ START ]"))
         self.assertFalse(self.app.quitting)
+
+
+class TopLine(unittest.TestCase):
+    """The top row: when it is too long, the name gives way, not the settings."""
+
+    SHORT = ["claude-opus-5-5 (Low)", "conversation", "meta"]
+    LONG = ["claude-haiku-5-5-20261007 (Adaptive)", "single task", "meta"]   # the longest there is
+    NAME = "Morning report for the garden"
+
+    def test_a_row_that_fits_is_shown_whole(self):
+        self.assertEqual(top_line(["Default"] + self.SHORT, 78),
+                         "Robot  |  Default  |  claude-opus-5-5 (Low)  |  conversation  |  meta")
+        self.assertEqual(top_line(["Old one", "not saved yet"], 78),
+                         "Robot  |  Old one  |  not saved yet")
+
+    def test_a_long_name_is_cut_and_marked_with_dots(self):
+        row = top_line([self.NAME] + self.SHORT, 78)
+        self.assertEqual(
+            row, "Robot  |  Morning repor...  |  claude-opus-5-5 (Low)  |  conversation  |  meta")
+        self.assertEqual(len(row), 78)                   # every cell of the row is used
+
+    def test_before_the_name_gets_short_the_word_robot_goes(self):
+        # In a window of 72 columns the name would be down to "Morni..."
+        # beside the word Robot. Robot says nothing new, so the name gets its
+        # room. The dots follow the last letter, not the space after a word.
+        self.assertEqual(
+            top_line([self.NAME] + self.SHORT, 70),
+            "Morning report...  |  claude-opus-5-5 (Low)  |  conversation  |  meta")
+
+    def test_a_name_that_fits_once_robot_is_gone_is_shown_whole(self):
+        self.assertEqual(
+            top_line(["Twelve chars"] + self.LONG, 78),
+            "Twelve chars  |  claude-haiku-5-5-20261007 (Adaptive)  |  single task  |  meta")
+
+    def test_without_robot_the_name_may_get_shorter_still(self):
+        self.assertEqual(
+            top_line(["Morning report"] + self.LONG, 78),
+            "Morning r...  |  claude-haiku-5-5-20261007 (Adaptive)  |  single task  |  meta")
+
+    def test_and_then_the_dividers_close_up(self):
+        self.assertEqual(
+            top_line(["Morning report"] + self.LONG, 70),
+            "Morning... | claude-haiku-5-5-20261007 (Adaptive) | single task | meta")
+
+    def test_the_settings_fit_the_smallest_window_whatever_the_name(self):
+        width = tui_app.MIN_COLS - 2
+        for name in ("x", "Default", "A name that goes on and on and on"):
+            with self.subTest(name=name):
+                row = top_line([name] + self.LONG, width)
+                self.assertLessEqual(len(row), width)
+                self.assertTrue(row.endswith("meta"), row)
+                for part in self.LONG:
+                    self.assertIn(part, row)
+
+    def test_a_name_is_only_cut_when_it_is_the_longer_for_it(self):
+        # "Default" would not gain from being "Defau...": it is kept whole,
+        # and the row finds its room elsewhere.
+        row = top_line(["Default"] + self.LONG, 70)
+        self.assertEqual(row,
+                         "Default | claude-haiku-5-5-20261007 (Adaptive) | single task | meta")
+
+    def test_only_when_nothing_else_gives_is_the_end_cut_off(self):
+        whole = "Default | claude-haiku-5-5-20261007 (Adaptive) | single task | meta"
+        self.assertEqual(top_line(["Default"] + self.LONG, 40), whole[:40])
+        self.assertEqual(top_line([self.NAME] + self.LONG, 40),
+                         "Morni... | claude-haiku-5-5-20261007 (Ad")
+        self.assertEqual(top_line([self.NAME] + self.LONG, 0), "")
+
+    def test_a_name_is_measured_in_cells_not_characters(self):
+        wide = chr(0x4e2d) * 20                           # twenty characters, forty cells
+        row = top_line([wide] + self.SHORT, 78)
+        self.assertLessEqual(tui_app.text_width(row), 78)
+        self.assertIn(chr(0x4e2d) * 6 + "...  |  claude-opus-5-5 (Low)", row)
+        self.assertTrue(row.endswith("  |  meta"))
 
 
 class DisplaySwitches(MainCase):

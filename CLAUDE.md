@@ -156,7 +156,7 @@ show the user the output. The user does not want to be asked to test things.
 - Because one skill is on demand, every run now also offers `get_skill`.
 - `.venv/bin/python -m robot.main --skills` and `--list` on the Pi show the
   current skills and instructions; check there instead of trusting this list.
-- 1,162 tests pass. On the Pi 2 are skipped, on the laptop 8 (the 7
+- 1,174 tests pass. On the Pi 2 are skipped, on the laptop 8 (the 7
   real-terminal tests need curses).
 - The windowed interface was added on this day. Its state is in
   `~/robot-data/tui_state.json`.
@@ -530,6 +530,14 @@ underneath is the same code the chat runs; only the console differs.
   rest. There is no rename: a new name saves a copy.
 - Saving writes `thinking_mode` explicitly, also for an entry that had none
   (which ran at Adaptive on Opus): the form shows what a run would use.
+- The top row (`app.top_line`) never loses what follows the name: the model,
+  the kind of run and `meta` are what it is there to show, and the name is
+  the one part of any length. A row too long for the window gives up the end
+  of the name first, marked with three dots (while 16 cells of it are left),
+  then the word Robot, then more of the name (down to 8 cells), then the
+  space around the dividers. Even the longest settings there are fit the
+  smallest window that way. `describe_instruction` returns the parts, not a
+  finished line, so that this can be done.
 - `~/robot-data/tui_state.json` holds the instruction in use and the five
   display boxes. Nothing a run needs is in it.
 

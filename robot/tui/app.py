@@ -540,7 +540,7 @@ class MainWindow(Window):
 
     def paint(self, scr):
         scr.fill(0, 0, 1, self.w, "bar")
-        scr.put(0, 1, clip("Robot  |  " + self.app.summary, self.w - 2), "bar")
+        scr.put(0, 1, top_line(self.app.summary, self.w - 2), "bar")
 
     def on_escape(self):
         pass  # nothing to close: Quit is how to leave
@@ -597,22 +597,61 @@ class MainWindow(Window):
 # ---- the application -------------------------------------------------------------
 
 
-def describe_instruction(datadir, name) -> str:
-    """One line about the instruction START would run, for the top of the screen."""
+def describe_instruction(datadir, name) -> list:
+    """What the top row says about the instruction START would run: its name,
+    then each thing worth knowing about it, as separate parts (see top_line)."""
     entry = instructions.load_instructions(datadir).get(name)
     if entry is None:
-        return f"{name}  |  not saved yet"
+        return [name, "not saved yet"]
     try:
         settings, _warnings = instructions.settings_from_entry(name, entry)
     except instructions.InstructionError:
-        return f"{name}  |  set up for {entry.get('provider')}: it cannot be run here"
+        return [name, f"set up for {entry.get('provider')}: it cannot be run here"]
     mode = models.mode_label(settings.model, settings.thinking_mode,
                              thinking_budget=settings.thinking_budget)
     kind = "conversation" if settings.conversational else "single task"
     parts = [name, f"{settings.model} ({mode})", kind]
     if settings.meta:
         parts.append("meta")
-    return "  |  ".join(parts)
+    return parts
+
+
+# How far a name that is too long is cut down, its three dots included: this
+# far while the word Robot still stands in front of it, and this far at most.
+_NAME_BESIDE_ROBOT = 16
+_NAME_FLOOR = 8
+
+
+def _shortened(text, width) -> str:
+    """`text` in at most `width` cells; where it is cut, three dots say so."""
+    if text_width(text) <= width:
+        return text
+    return clip(text, max(0, width - 3)).rstrip() + "..."
+
+
+def top_line(parts, width) -> str:
+    """The top row of the main window: Robot, then the parts, the name first.
+
+    The name is the one part that can be any length, and what follows it (the
+    model, the kind of run, meta) is what the row is there to show. So a row
+    too long for the window gives up, in this order: the end of the name,
+    which three dots then mark; the word Robot, which never says anything
+    new, once the name beside it would get short; more of the name; the
+    space around the dividers. What follows the name stays whole. Only when
+    all of that is not enough is the end of the row cut off.
+    """
+    name, details = parts[0], list(parts[1:])
+    stages = ((["Robot"], "  |  ", _NAME_BESIDE_ROBOT), ([], "  |  ", _NAME_FLOOR),
+              ([], " | ", _NAME_FLOOR))
+    row = ""
+    for lead, gap, least in stages:
+        room = width - text_width(gap.join(lead + [""] + details))  # what is left for the name
+        if text_width(name) <= room:
+            return gap.join(lead + [name] + details)
+        if room >= least:
+            return gap.join(lead + [_shortened(name, room)] + details)
+        row = gap.join(lead + [_shortened(name, _NAME_FLOOR)] + details)
+    return clip(row, width)
 
 
 class App:
@@ -641,7 +680,7 @@ class App:
         self.flags = {name: bool(state.get(name, default)) for name, default in FLAGS.items()}
         self._apply_flags()
         self.instruction = instruction or state.get("instruction") or instructions.DEFAULT_NAME
-        self.summary = ""
+        self.summary = [self.instruction]  # the parts of the top row, the name first
         self.refresh_instruction()
         self.main = MainWindow(self)
 

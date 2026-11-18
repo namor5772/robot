@@ -91,7 +91,9 @@ bash ~/robot/scripts/ui.sh
 What the main window has:
 
 - **The top line** names the instruction that START will run, with its model,
-  its thinking level and whether it is a conversation or a single task.
+  its thinking level and whether it is a conversation or a single task; `meta`
+  at the end means Meta is on. A name too long for the window is shortened
+  with `...`, so that the settings after it always stay in view.
 - **START** (F2) runs it. What the run shows appears under *Output*, the same
   lines the chat prints. **STOP** (F3 or Ctrl+C) stops the reply or command in
   progress; while the robot is waiting for your message, it ends the run.
