@@ -185,9 +185,10 @@ show the user the output. The user does not want to be asked to test things.
 - Because one skill is on demand, every run now also offers `get_skill`.
 - `.venv/bin/python -m robot.main --skills` and `--list` on the Pi show the
   current skills and instructions; check there instead of trusting this list.
-- 1,225 tests pass (counted on 2026-11-19). On the Pi 2 are skipped, on the
-  laptop 28, among them the 8 real-terminal tests (they need curses) and the
-  19 launcher tests (they need bash). `tests/test_spawn.py` starts real
+- 1,242 tests pass (counted on 2026-11-19). On the Pi 2 are skipped, on the
+  laptop 31, among them the 8 real-terminal tests (they need curses), the 19
+  launcher tests (they need bash) and 3 that build a real tree of child runs
+  (they need the kernel's list of processes). `tests/test_spawn.py` starts real
   processes and is the slow one on the laptop, where starting and stopping a
   process takes a second or so: about a minute there, 12 s on the Pi.
 - The windowed interface was added on this day. Its state is in
@@ -492,15 +493,36 @@ show the user the output. The user does not want to be asked to test things.
     which the owner set on 2026-11-19: every child is a paid run, and with
     gigabytes free memory alone would allow dozens. It is checked first and
     has a refusal of its own. On the Pi Zero memory stops a run long before
-    it. The ceiling is per program, as the old limit of two was: a child may
-    start up to 8 of its own, and their children none (`MAX_DEPTH`), so a
-    whole tree can hold more than 8.
+    it.
+  - The 8 is for the WHOLE TREE, at the owner's word: the first run's
+    children and the children those start (`MAX_DEPTH` lets a child start
+    children, and those none), counted together. The old limit of two was
+    per program. The memory allowance for children still starting is for the
+    whole tree as well.
+  - How the runs of a tree see each other. The first run makes up a name
+    (`spawn.family()`); every child gets it in `ROBOT_SPAWN_FAMILY` and
+    hands it on. `family_members()` then reads the kernel's list: a process
+    counts when its command line starts with `CHILD_COMMAND` and its
+    environment carries the tree's name. Nothing is kept in files, so a run
+    that is killed drops out of the count by itself. The shell commands a
+    child starts inherit the name, which is why the command is looked at
+    too. The first run is not a member: nobody handed it a name.
+  - Two programs of a tree can be starting a child at the same moment (a
+    child and its parent). `_one_start_at_a_time` therefore holds, besides
+    the lock between threads, an exclusive hold (`flock`) on the data
+    folder's `tmp` while a start is judged and made. A hold that cannot be
+    had in ten seconds is done without. Python opens that folder so that a
+    child does not inherit the hold.
+  - Off Linux none of this can be read, and a program counts its own
+    children, as before. `tests/test_spawn.py` builds made-up `/proc` trees
+    for the laptop, and on the Pi a real tree: its stand-in child `Family`
+    starts children of its own (3 tests, skipped on the laptop).
   - Where the free memory cannot be read (anywhere but Linux: the laptop's
     tests), `FALLBACK_MAX_CHILDREN` (2) applies.
   - The tool's description in `meta.py` said "at most two can run at the same
     time". It now says that the number depends on the memory that is free and
-    is never more than 8; the 8 is taken from `spawn.MAX_CHILDREN`, so the
-    two cannot drift apart.
+    is never more than 8 in all, the children of child runs included; the 8
+    is taken from `spawn.MAX_CHILDREN`, so the two cannot drift apart.
 
 ## The windowed interface
 

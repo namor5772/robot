@@ -1,11 +1,13 @@
 """run_instruction, with a small stand-in program playing the child run."""
 
 import concurrent.futures
+import json
 import os
 import subprocess
 import sys
 import tempfile
 import textwrap
+import threading
 import time
 import unittest
 from pathlib import Path
@@ -53,9 +55,33 @@ STAND_IN = textwrap.dedent('''
 
     name = args.l
     if name == "Echo":
-        finish("completed", "extra=%r prepend=%r headless=%r depth=%s" % (
+        finish("completed", "extra=%r prepend=%r headless=%r depth=%s family=%s" % (
             read(args.extra_file), read(args.prepend_file), args.headless,
-            os.environ.get("ROBOT_SPAWN_DEPTH")))
+            os.environ.get("ROBOT_SPAWN_DEPTH"), os.environ.get("ROBOT_SPAWN_FAMILY")))
+    if name == "Family":
+        # A child that starts children of its own, as a real child run with
+        # Meta on can. It says what came of that in a file, then stays until
+        # its children have gone, as a run that waits for them would.
+        from robot import spawn
+        from robot.datastore import DataDir
+        spawn.CHILD_COMMAND = [sys.executable, os.path.abspath(__file__)]
+        spawn.MAX_CHILDREN = int(os.environ["TEST_MAX_CHILDREN"])
+        spawn.available_memory_mb = lambda: 64000
+        spawn._resident_mb = lambda pid: 80
+        spawn._POLL_SECONDS = 0.05
+
+        class Me:
+            datadir = DataDir(os.environ["TEST_DATA_DIR"])
+
+        replies = [spawn.run_instruction(Me(), {"name": "Slow"})
+                   for _ in range(int(os.environ["TEST_GRANDCHILDREN"]))]
+        with open(os.environ["TEST_REPORT"] + ".part", "w", encoding="utf-8") as out:
+            json.dump(replies, out)
+        os.replace(os.environ["TEST_REPORT"] + ".part", os.environ["TEST_REPORT"])
+        while spawn.alive_children():
+            time.sleep(0.05)
+        time.sleep(0.3)   # the helper threads tidy up after the children
+        finish("completed", "family done")
     if name == "Ask":
         first = ask(1, "Proceed?")
         if not first:
@@ -76,6 +102,9 @@ STAND_IN = textwrap.dedent('''
 ''')
 
 
+LINUX = sys.platform.startswith("linux")
+
+
 class SpawnCase(unittest.TestCase):
     def setUp(self):
         self._tmp = tempfile.TemporaryDirectory()
@@ -84,18 +113,25 @@ class SpawnCase(unittest.TestCase):
         self.datadir = DataDir(root / "data")
         self.datadir.ensure()
         instructions.save_instructions(self.datadir, {
-            name: {"text": "x"} for name in ("Echo", "Ask", "Slow", "Crash", "Long", "Failed")})
+            name: {"text": "x"}
+            for name in ("Echo", "Ask", "Slow", "Crash", "Long", "Failed", "Family")})
         script = root / "stand_in.py"
         script.write_text(STAND_IN, encoding="utf-8")
+        # Each test is a first run of its own: no tree name is handed down to
+        # it, and it makes one up that no other test has.
+        environment = mock.patch.dict(os.environ, {spawn.DEPTH_ENV: "0"})
+        environment.start()
+        self.addCleanup(environment.stop)
+        os.environ.pop(spawn.FAMILY_ENV, None)
         patches = (
             mock.patch.object(spawn, "CHILD_COMMAND", [sys.executable, str(script)]),
             mock.patch.object(spawn, "_children", []),
+            mock.patch.object(spawn, "_family_name", ""),
             mock.patch.object(spawn, "_POLL_SECONDS", 0.05),
             mock.patch.object(spawn, "_STOP_GRACE_SECONDS", 3),
             # As where the free memory cannot be read: tests that are about
             # memory say how much there is (MemoryDecides).
             mock.patch.object(spawn, "available_memory_mb", lambda: None),
-            mock.patch.dict(os.environ, {spawn.DEPTH_ENV: "0"}),
         )
         for patch in patches:
             patch.start()
@@ -122,6 +158,14 @@ class SpawnCase(unittest.TestCase):
         while not condition() and time.monotonic() < deadline:
             time.sleep(0.05)
         return condition()
+
+    def memory(self, available, held):
+        """Say how much memory is available, and how much each child holds:
+        a number of MB for all of them, or None for "cannot be read"."""
+        for patch in (mock.patch.object(spawn, "available_memory_mb", lambda: available),
+                      mock.patch.object(spawn, "_resident_mb", lambda pid: held)):
+            patch.start()
+            self.addCleanup(patch.stop)
 
     def start_slow(self, count):
         """Ask for `count` children that would run for a minute. Returns the
@@ -160,7 +204,7 @@ class Refusals(SpawnCase):
         self.assertEqual(self.run_it(), "Error: 'name' is required.")
         self.assertEqual(self.run_it(name="Nope"),
                          "Error: Instruction 'Nope' not found. Available: Ask, Crash, Echo, "
-                         "Failed, Long, Slow")
+                         "Failed, Family, Long, Slow")
 
     def test_answers_must_be_a_list_of_strings(self):
         shown = self.run_it(name="Echo", answers=[1, 2])
@@ -189,14 +233,6 @@ class Refusals(SpawnCase):
 
 class MemoryDecides(SpawnCase):
     """How many children run at once follows from the memory that is free."""
-
-    def memory(self, available, held):
-        """Say how much memory is available, and how much each child holds:
-        a number of MB for all of them, or None for "cannot be read"."""
-        for patch in (mock.patch.object(spawn, "available_memory_mb", lambda: available),
-                      mock.patch.object(spawn, "_resident_mb", lambda pid: held)):
-            patch.start()
-            self.addCleanup(patch.stop)
 
     def test_with_memory_to_spare_more_than_two_run_at_once(self):
         self.memory(available=4000, held=80)
@@ -252,11 +288,10 @@ class MemoryDecides(SpawnCase):
         self.assertEqual(sum("not enough free memory" in reply for reply in replies), 2)
 
     def test_how_much_a_starting_child_has_yet_to_take(self):
-        child = Obj(pid=1)
         for held, to_take in ((None, 80), (0, 80), (5, 75), (71, 9), (72, 0), (77, 0), (93, 0)):
             with self.subTest(held=held), \
                     mock.patch.object(spawn, "_resident_mb", lambda pid, held=held: held):
-                self.assertEqual(spawn._still_to_take(child), to_take)
+                self.assertEqual(spawn._still_to_take(4242), to_take)
 
     def test_there_is_a_ceiling_however_much_memory_is_free(self):
         # Every child is a run that is paid for. The ceiling is 8; it is set
@@ -268,8 +303,9 @@ class MemoryDecides(SpawnCase):
         self.assertTrue(all("Launched" in reply for reply in replies[:3]), replies)
         self.assertEqual(
             replies[3],
-            "Error: 3 child runs are already running, which is the most that are started "
-            "at once. Wait for one to finish and try again, or do the task in this run.")
+            "Error: 3 child runs are already running in this tree of runs (the first run's "
+            "children and the children those started), which is the most at once. Wait for "
+            "one to finish and try again, or do the task in this run.")
         self.assertEqual(len(spawn.alive_children()), 3)
 
     def test_a_child_that_has_ended_makes_room_under_the_ceiling(self):
@@ -303,6 +339,182 @@ class MemoryDecides(SpawnCase):
         self.assertIn("status=completed", self.run_it(name="Echo", wait=True))
         self.memory(available=spawn.MIN_FREE_MB - 1, held=80)
         self.assertIn("not enough free memory", self.run_it(name="Echo", wait=True))
+
+
+class TheWholeTree(SpawnCase):
+    """A child can start children of its own. The ceiling and the memory rule
+    look at the whole tree, not at one run's own children."""
+
+    def test_a_first_run_makes_up_the_name_of_its_tree_once(self):
+        name = spawn.family()
+        self.assertTrue(name.startswith(f"{os.getpid()}."), name)
+        self.assertEqual(spawn.family(), name)
+
+    def test_a_child_is_told_the_tree_it_belongs_to(self):
+        shown = self.run_it(name="Echo", wait=True)
+        self.assertIn(f"depth=1 family={spawn.family()}", shown)
+
+    def test_a_child_hands_the_same_name_on_to_its_own_children(self):
+        with mock.patch.dict(os.environ, {spawn.FAMILY_ENV: "4242.1", spawn.DEPTH_ENV: "1"}):
+            self.assertEqual(spawn.family(), "4242.1")
+            shown = self.run_it(name="Echo", wait=True)
+        self.assertIn("depth=2 family=4242.1", shown)
+
+    def test_runs_elsewhere_in_the_tree_count_towards_the_ceiling(self):
+        # Eight are running, and this run started none of them itself.
+        self.memory(available=64000, held=80)
+        with mock.patch.object(spawn, "family_members", lambda: list(range(501, 509))):
+            shown = self.run_it(name="Echo", wait=True)
+        self.assertIn("8 child runs are already running in this tree of runs", shown)
+        with mock.patch.object(spawn, "family_members", lambda: list(range(501, 508))):
+            self.assertIn("status=completed", self.run_it(name="Echo", wait=True))
+
+    def test_a_run_still_starting_elsewhere_in_the_tree_is_allowed_for(self):
+        self.memory(available=200, held=5)
+        with mock.patch.object(spawn, "family_members", lambda: [501, 502]):
+            shown = self.run_it(name="Echo", wait=True)
+        self.assertIn("about 150 MB of that will go to the 2 child runs still starting", shown)
+
+    def test_where_the_tree_cannot_be_seen_a_runs_own_children_are_counted(self):
+        self.memory(available=64000, held=80)
+        with mock.patch.object(spawn, "family_members", lambda: None), \
+                mock.patch.object(spawn, "MAX_CHILDREN", 1):
+            (first,) = self.start_slow(1)
+            self.assertIn("Launched", first)
+            self.assertIn("1 child runs are already running", self.run_it(name="Echo"))
+
+    @unittest.skipUnless(LINUX, "the tree is seen through the kernel's list of processes")
+    def test_the_children_of_a_child_count_too(self):
+        # A real tree of processes. This run starts one child, then a second
+        # that asks for three of its own. Three at once is the most here.
+        report = Path(self._tmp.name) / "family-report.json"
+        settings = {"TEST_MAX_CHILDREN": "3", "TEST_GRANDCHILDREN": "3",
+                    "TEST_DATA_DIR": str(self.datadir.root), "TEST_REPORT": str(report)}
+        self.memory(available=64000, held=80)
+        with mock.patch.object(spawn, "MAX_CHILDREN", 3), mock.patch.dict(os.environ, settings):
+            (first,) = self.start_slow(1)
+            self.assertIn("Launched", first)
+            self.assertIn("Launched instruction 'Family'", self.run_it(name="Family"))
+            self.assertTrue(self.wait_until(report.exists, seconds=30))
+            asked = json.loads(report.read_text(encoding="utf-8"))
+            for reply in asked:
+                self.kill_later(reply)
+            in_the_tree = len(spawn.family_members())
+            mine = self.run_it(name="Echo")
+        # The first child, the second, and the one grandchild it could have.
+        self.assertEqual(in_the_tree, 3)
+        self.assertEqual(len(spawn.alive_children()), 2)       # of which this run's own: two
+        self.assertEqual(sum("Launched instruction 'Slow'" in reply for reply in asked), 1,
+                         asked)
+        self.assertEqual(
+            sum("3 child runs are already running in this tree of runs" in reply
+                for reply in asked), 2, asked)
+        self.assertIn("3 child runs are already running in this tree of runs", mine)
+
+    @unittest.skipUnless(LINUX, "needs a hold on a folder")
+    def test_a_start_waits_while_another_program_of_the_tree_is_starting_one(self):
+        import fcntl
+        self.datadir.tmp_dir.mkdir(parents=True, exist_ok=True)
+        handle = os.open(self.datadir.tmp_dir, os.O_RDONLY)
+        fcntl.flock(handle, fcntl.LOCK_EX)                     # the other program, mid-start
+        shown = []
+        thread = threading.Thread(
+            target=lambda: shown.append(self.run_it(name="Echo", wait=True)))
+        thread.start()
+        try:
+            time.sleep(0.6)
+            self.assertEqual(shown, [])                        # it is waiting its turn
+        finally:
+            os.close(handle)
+        thread.join(30)
+        self.assertIn("status=completed", shown[0])
+
+    @unittest.skipUnless(LINUX, "needs a hold on a folder")
+    def test_a_hold_that_is_never_let_go_does_not_stop_starts_for_ever(self):
+        import fcntl
+        self.datadir.tmp_dir.mkdir(parents=True, exist_ok=True)
+        handle = os.open(self.datadir.tmp_dir, os.O_RDONLY)
+        self.addCleanup(os.close, handle)
+        fcntl.flock(handle, fcntl.LOCK_EX)
+        with mock.patch.object(spawn, "_LOCK_WAIT_SECONDS", 0.3):
+            self.assertIn("status=completed", self.run_it(name="Echo", wait=True))
+
+
+class SeeingTheTree(unittest.TestCase):
+    """family_members: the child runs of one tree, picked out of the kernel's
+    list of processes."""
+
+    COMMAND = ["/venv/bin/python", "-m", "robot.main"]
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        self.proc = Path(self._tmp.name)
+        for patch in (mock.patch.object(spawn, "_PROC", self.proc),
+                      mock.patch.object(spawn, "CHILD_COMMAND", list(self.COMMAND)),
+                      mock.patch.dict(os.environ, {spawn.FAMILY_ENV: "77.1"})):
+            patch.start()
+            self.addCleanup(patch.stop)
+
+    def process(self, pid, *command, family=None, **environment):
+        folder = self.proc / str(pid)
+        folder.mkdir()
+        (folder / "cmdline").write_bytes(
+            b"".join(part.encode() + b"\0" for part in command))
+        if family is not None:
+            environment[spawn.FAMILY_ENV] = family
+        (folder / "environ").write_bytes(
+            b"".join(f"{key}={value}".encode() + b"\0" for key, value in environment.items()))
+
+    def test_the_child_runs_of_this_tree(self):
+        self.process(10, *self.COMMAND, "-l", "First", "--headless", family="77.1", HOME="/h")
+        self.process(11, *self.COMMAND, "-l", "Second", HOME="/h", family="77.1", LANG="C")
+        self.assertEqual(sorted(spawn.family_members()), [10, 11])
+
+    def test_runs_of_another_tree_are_not_counted(self):
+        self.process(10, *self.COMMAND, "-l", "Theirs", family="88.1")
+        self.process(11, *self.COMMAND, "-l", "Nearly", family="77.10")   # starts the same
+        self.assertEqual(spawn.family_members(), [])
+
+    def test_a_first_run_is_not_a_child(self):
+        # A chat or the interface: nobody handed it the name of a tree.
+        self.process(10, "/venv/bin/python", "-m", "robot.main", HOME="/h")
+        self.process(11, "/venv/bin/python", "-m", "robot.tui", HOME="/h")
+        self.assertEqual(spawn.family_members(), [])
+
+    def test_a_shell_command_started_by_a_child_is_not_a_run(self):
+        # It inherits the name of the tree, but it is another program.
+        self.process(10, "/bin/bash", "-c", "sleep 60", family="77.1")
+        self.process(11, "sleep", "60", family="77.1")
+        self.process(12, "/venv/bin/python", "-m", "robot.main_tools", family="77.1")
+        self.process(13, "/other/python", "-m", "robot.main", family="77.1")
+        self.assertEqual(spawn.family_members(), [])
+
+    def test_what_is_not_a_process_or_cannot_be_read_is_passed_over(self):
+        (self.proc / "meminfo").write_text("MemAvailable: 1 kB\n", encoding="ascii")
+        (self.proc / "self").mkdir()
+        (self.proc / "20").mkdir()                              # gone before it was read
+        (self.proc / "21").mkdir()
+        (self.proc / "21" / "cmdline").write_bytes(b"\0".join(
+            part.encode() for part in self.COMMAND) + b"\0")    # and no environment to read
+        self.process(22, *self.COMMAND, family="77.1")
+        self.assertEqual(spawn.family_members(), [22])
+
+    def test_a_run_that_has_ended_but_is_not_cleared_away_yet(self):
+        self.process(10, family="77.1")                         # no command left: a zombie
+        self.assertEqual(spawn.family_members(), [])
+
+    def test_where_there_is_no_list_of_processes(self):
+        with mock.patch.object(spawn, "_PROC", self.proc / "nowhere"):
+            self.assertIsNone(spawn.family_members())
+
+    def test_a_first_run_looks_for_the_name_it_made_up(self):
+        with mock.patch.dict(os.environ), mock.patch.object(spawn, "_family_name", ""):
+            del os.environ[spawn.FAMILY_ENV]
+            mine = spawn.family()
+            self.process(10, *self.COMMAND, family=mine)
+            self.process(11, *self.COMMAND, family="77.1")
+            self.assertEqual(spawn.family_members(), [10])
 
 
 class ReadingMemory(unittest.TestCase):

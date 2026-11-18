@@ -332,8 +332,8 @@ class MetaInARun(unittest.TestCase):
         # that spawn enforces, taken from the same number.
         described = meta.RUN_INSTRUCTION_TOOL["description"]
         self.assertEqual(spawn.MAX_CHILDREN, 8)
-        self.assertIn("depends on how much memory is free, and is never more than 8.",
-                      described)
+        self.assertIn("depends on how much memory is free, and is never more than 8 in all: "
+                      "the children that child runs start count too.", described)
         self.assertNotIn("at most two", described)
 
     def test_the_tool_schemas_are_well_formed(self):

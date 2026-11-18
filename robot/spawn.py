@@ -6,8 +6,13 @@ relay folder (see relay.py). On a small Pi a child costs many seconds to start
 and a large share of the memory, so one is only started while there is memory
 for it: how many can run at once depends on the computer, up to a ceiling that
 is the same everywhere.
+
+A child can start children of its own, so the runs form a tree. The ceiling
+and the memory rule are for the whole tree: the first run's children and the
+children those start, counted together.
 """
 
+import contextlib
 import json
 import os
 import shutil
@@ -21,6 +26,11 @@ from pathlib import Path
 
 from robot import instructions, relay
 
+try:
+    import fcntl
+except ImportError:  # Windows, where only the tests run
+    fcntl = None
+
 # How many children run at once is decided by the memory that is free, so the
 # same code suits a Pi Zero and a larger computer. Measured on the Pi Zero 2 W
 # on 2026-11-19: a run starts at 5 MB, holds 77 MB eleven seconds later, when
@@ -30,19 +40,25 @@ from robot import instructions, relay
 CHILD_MB = 80  # what a child run holds once it has loaded
 SPARE_MB = 30  # what must still be free when it has
 MIN_FREE_MB = CHILD_MB + SPARE_MB  # so a child is only started with this much available
-# The most children one program has running at once, however much memory is
-# free. Every child is a run that is paid for, and where there are gigabytes
-# to spare memory alone would allow dozens. Set by the owner on 2026-11-19.
+# The most child runs alive at once in a whole tree of runs, however much
+# memory is free: the first run's children and the children those start,
+# counted together. Every child is a run that is paid for, and where there are
+# gigabytes to spare memory alone would allow dozens. Set by the owner on
+# 2026-11-19, who asked for it to cover the whole tree.
 MAX_CHILDREN = 8
 # Where the free memory cannot be read (anywhere but Linux), a fixed number of
 # children at once has to do.
 FALLBACK_MAX_CHILDREN = 2
 MAX_DEPTH = 2  # a child may start children, but their children may not
 DEPTH_ENV = "ROBOT_SPAWN_DEPTH"
+# The name of the tree a run belongs to. The first run makes one up; every
+# child is given it in this variable and hands it on to its own children.
+FAMILY_ENV = "ROBOT_SPAWN_FAMILY"
 DEFAULT_TIMEOUT = 600
 REPORT_LIMIT = 20000
 _POLL_SECONDS = 0.5
 _STOP_GRACE_SECONDS = 15
+_LOCK_WAIT_SECONDS = 10
 
 # What starts a child. Tests point this at a stand-in program.
 CHILD_COMMAND = [sys.executable, "-m", "robot.main"]
@@ -52,6 +68,87 @@ _PROC = Path("/proc")
 _spawn_lock = threading.Lock()
 _children = []  # the children this program started that may still be running
 _children_lock = threading.Lock()
+_family_name = ""  # made up on first use by a run that was given none
+
+
+def family() -> str:
+    """The name of the tree of runs this one belongs to."""
+    global _family_name
+    given = os.environ.get(FAMILY_ENV, "")
+    if given:
+        return given
+    if not _family_name:
+        _family_name = f"{os.getpid()}.{time.time_ns()}"
+    return _family_name
+
+
+def family_members():
+    """The PIDs of the child runs alive in this run's tree, itself included if
+    it is one. None where the list of processes cannot be read (anywhere but
+    Linux).
+
+    The kernel's list is asked, not a count kept by the runs: a run that is
+    killed takes itself off that list, whatever it failed to tidy up. A child
+    run is known by the command it was started with and by the tree's name in
+    its environment. The shell commands a run starts inherit the name, but
+    their command is another.
+    """
+    command = b"\0".join(os.fsencode(part) for part in CHILD_COMMAND) + b"\0"
+    mark = f"{FAMILY_ENV}={family()}".encode()
+    try:
+        entries = os.listdir(_PROC)
+    except OSError:
+        return None
+    members = []
+    for entry in entries:
+        if not entry.isdigit():
+            continue
+        try:
+            if not (_PROC / entry / "cmdline").read_bytes().startswith(command):
+                continue
+            environment = (_PROC / entry / "environ").read_bytes()
+        except OSError:
+            continue  # it ended meanwhile, or is not ours to look at
+        if mark in environment.split(b"\0"):
+            members.append(int(entry))
+    return members
+
+
+@contextlib.contextmanager
+def _one_start_at_a_time(folder):
+    """Hold everything that lets two starts be judged at the same moment.
+
+    Inside this program that is a lock between threads: the model can ask for
+    several children in one turn, and those calls run side by side. Between
+    the programs of a tree it is an exclusive hold on `folder`, the data
+    folder's tmp, which they all share: a child and its parent can both be
+    starting a child. Each start then sees the ones before it. A hold that
+    cannot be had in ten seconds is done without, sooner than never start.
+    """
+    with _spawn_lock:
+        handle = None
+        if fcntl is not None:
+            try:
+                os.makedirs(folder, exist_ok=True)
+                handle = os.open(folder, os.O_RDONLY)
+            except OSError:
+                handle = None
+            deadline = time.monotonic() + _LOCK_WAIT_SECONDS
+            while handle is not None:
+                try:
+                    fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    break
+                except OSError:
+                    if time.monotonic() > deadline:
+                        os.close(handle)
+                        handle = None
+                    else:
+                        time.sleep(0.02)
+        try:
+            yield
+        finally:
+            if handle is not None:
+                os.close(handle)  # which lets the hold go
 
 
 def available_memory_mb():
@@ -90,14 +187,14 @@ def alive_children() -> list:
         return list(_children)
 
 
-def _still_to_take(child) -> int:
+def _still_to_take(pid) -> int:
     """The memory, in MB, that a child which is still starting has yet to take.
 
     A child that holds nine tenths of CHILD_MB has loaded, and what it took is
     in the kernel's figure already. One whose memory cannot be read counts as
     not having taken any.
     """
-    held = _resident_mb(child.pid) or 0
+    held = _resident_mb(pid) or 0
     return CHILD_MB - held if held < CHILD_MB * 9 // 10 else 0
 
 
@@ -105,18 +202,23 @@ def _why_not_another() -> str:
     """Why another child must not be started now, as an error text; "" if it may.
 
     Two things can stand in the way: the ceiling on how many run at once, and
-    too little free memory. The caller holds _spawn_lock, so that starts asked
-    for in the same turn are judged one after the other: each sees the
-    children started before it.
+    too little free memory. Both look at the whole tree this run belongs to.
+    The caller holds _one_start_at_a_time, so that starts asked for at the
+    same moment, here or elsewhere in the tree, are judged one after the
+    other: each sees the children started before it.
     """
-    alive = alive_children()
-    if len(alive) >= MAX_CHILDREN:
-        return (f"Error: {MAX_CHILDREN} child runs are already running, which is the most "
-                "that are started at once. Wait for one to finish and try again, or do the "
-                "task in this run.")
+    own = alive_children()
+    members = family_members()
+    # Where the tree cannot be seen, this program's own children have to do.
+    running = members if members is not None else [child.pid for child in own]
+    if len(running) >= MAX_CHILDREN:
+        return (f"Error: {MAX_CHILDREN} child runs are already running in this tree of runs "
+                "(the first run's children and the children those started), which is the "
+                "most at once. Wait for one to finish and try again, or do the task in this "
+                "run.")
     free = available_memory_mb()
     if free is None:
-        if len(alive) >= FALLBACK_MAX_CHILDREN:
+        if len(own) >= FALLBACK_MAX_CHILDREN:
             return (f"Error: {FALLBACK_MAX_CHILDREN} child runs are already running. How "
                     "much memory is free cannot be read on this computer, so that is the "
                     "most that are started at once. Wait for one to finish and try again, "
@@ -125,7 +227,7 @@ def _why_not_another() -> str:
     # A child that has only just been started holds next to nothing yet, and
     # the kernel's figure does not know what it is about to take. Without this
     # allowance several children asked for at once would each look affordable.
-    shortfalls = [_still_to_take(child) for child in alive]
+    shortfalls = [_still_to_take(pid) for pid in running]
     to_come = sum(shortfalls)
     if free - to_come >= MIN_FREE_MB:
         return ""
@@ -280,7 +382,7 @@ def run_instruction(agent, params) -> str:
     datadir = agent.datadir
     result_path = extra_path = prepend_path = error_path = relay_dir = None
     try:
-        with _spawn_lock:
+        with _one_start_at_a_time(datadir.tmp_dir):
             library = instructions.load_instructions(datadir)
             if name not in library:
                 available = ", ".join(sorted(library)) if library else "(none)"
@@ -316,6 +418,7 @@ def run_instruction(agent, params) -> str:
 
             environment = dict(os.environ)
             environment[DEPTH_ENV] = str(depth + 1)
+            environment[FAMILY_ENV] = family()  # the tree it belongs to, and counts in
             try:
                 with open(error_path, "w", encoding="utf-8") as errors:
                     process = subprocess.Popen(
