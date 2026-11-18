@@ -10,9 +10,14 @@
 #
 # Like the chat (chat.sh), it runs inside tmux and so survives a dropped
 # connection: this same command brings you back to it. Ctrl-B then D leaves it
-# running. It has a tmux session of its own, so a chat can be open as well.
+# running. It has a tmux of its own, so a chat can be open as well.
 #
 # Any arguments are passed to the program, for example: ui.sh -l "Name"
 set -euo pipefail
 
-ROBOT_MODULE=robot.tui ROBOT_SESSION=robot-ui exec bash "$(dirname "$0")/chat.sh" "$@"
+# A tmux server of its own (the socket), because of the last setting: how long
+# tmux holds an Escape character back. The chat needs half a second there
+# (see tmux.conf). The interface recognises the terminal's messages by their
+# shape, so it can do with 20 ms, and its Escape key then acts at once.
+ROBOT_MODULE=robot.tui ROBOT_SOCKET=robot-ui ROBOT_SESSION=robot-ui ROBOT_ESCAPE_TIME=20 \
+  exec bash "$(dirname "$0")/chat.sh" "$@"

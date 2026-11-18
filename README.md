@@ -130,8 +130,7 @@ Good to know:
   save applies from the next run.
 - Like the chat, it runs inside tmux and survives a dropped connection: the
   same command brings you back, and Ctrl-B then D leaves it running. It has a
-  tmux session of its own, so a chat can be open as well.
-- Inside tmux the Escape key takes half a second to act.
+  tmux of its own, so a chat can be open as well.
 - Text pasted into the terminal goes into the box that has the cursor, as text.
 - It runs on the Pi only: Python on Windows has no curses.
 

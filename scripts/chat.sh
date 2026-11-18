@@ -11,13 +11,13 @@
 # Any arguments are passed to the program, for example: chat.sh -l "Name"
 #
 # ui.sh starts the windowed interface through this same script, by naming
-# another program and another tmux session in the two variables below.
+# another program and a tmux of its own in the variables below.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-SOCKET=robot
 MODULE="${ROBOT_MODULE:-robot.main}"
+SOCKET="${ROBOT_SOCKET:-robot}"
 SESSION="${ROBOT_SESSION:-robot}"
 
 # Called by tmux as the session's command: run the program, then keep the
@@ -72,4 +72,11 @@ if [ "${ROBOT_TMUX_DETACHED:-}" = "1" ]; then
   detached=(-d)
 fi
 
-exec tmux -L "$SOCKET" -f scripts/tmux.conf new-session "${detached[@]}" -s "$SESSION" "$inner"
+command=(tmux -L "$SOCKET" -f scripts/tmux.conf new-session "${detached[@]}" -s "$SESSION" "$inner")
+# tmux.conf makes tmux wait half a second after an Escape character, which the
+# chat needs. A program that sorts out the terminal's messages itself can ask
+# for a shorter wait, so that its Escape key acts at once.
+if [ -n "${ROBOT_ESCAPE_TIME:-}" ]; then
+  command+=(";" set-option -sg escape-time "$ROBOT_ESCAPE_TIME")
+fi
+exec "${command[@]}"

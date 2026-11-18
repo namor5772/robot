@@ -126,10 +126,13 @@ show the user the output. The user does not want to be asked to test things.
     tests, about 30 s) and is skipped on the laptop. It gives the program an
     empty API key, with which nothing can be sent.
   - By hand on the Pi, in tmux: `ROBOT_TMUX_DETACHED=1 bash scripts/ui.sh`,
-    then `tmux -L robot send-keys -t robot-ui F4` (keys by name: `F2`, `Enter`,
-    `Escape`, `M-s` for Alt+S, `C-c`), `send-keys -t robot-ui -l -- 'text'`
-    to type, and `tmux -L robot capture-pane -p -t robot-ui` to read the
-    screen. Escape needs a pause of over half a second after it.
+    then `tmux -L robot-ui send-keys -t robot-ui F4` (keys by name: `F2`,
+    `Enter`, `Escape`, `M-s` for Alt+S, `C-c`), `send-keys -t robot-ui -l --
+    'text'` to type, and `tmux -L robot-ui capture-pane -p -t robot-ui` to
+    read the screen (`-e` keeps the colour codes). Leave a fifth of a second
+    after Escape before the next key, or the two are read as Alt+key. Wait
+    for `Waiting for your message` in the bottom line before typing a reply.
+    A paid check is cheap on an instruction set to `claude-haiku-5-5`.
 - To try unfinished work on the Pi without touching the checkout, copy the
   working tree to a scratch folder and run it there with the checkout's
   Python: `tar -cf - --exclude=.venv --exclude=.git . | ssh pi "mkdir -p
@@ -171,13 +174,19 @@ show the user the output. The user does not want to be asked to test things.
   outright leaves the terminal in raw mode, and Enter was not recognised.
 - tmux keeps a chat alive across a dropped connection, not across a reboot of
   the Pi. Nothing starts tmux at boot.
-- `ui.sh` is `chat.sh` with two variables set: `ROBOT_MODULE=robot.tui` and
-  `ROBOT_SESSION=robot-ui`. Same socket, another session, so a chat and the
-  windowed interface can run side by side (two processes of about 77 MB).
-  `chat.sh` names its session as `=robot`: without the `=`, tmux would take
-  `robot` for the start of `robot-ui` and join that. After a normal Quit the
-  interface's window closes at once; after a crash it waits for Enter so the
-  traceback can be read.
+- `ui.sh` is `chat.sh` with four variables set: `ROBOT_MODULE=robot.tui`,
+  `ROBOT_SOCKET=robot-ui`, `ROBOT_SESSION=robot-ui`, `ROBOT_ESCAPE_TIME=20`.
+  The windowed interface therefore has a tmux server of its own (`tmux -L
+  robot-ui ...`), and a chat can run beside it (two processes of about 80 MB).
+  The reason for a second server is `escape-time`, which is a setting of the
+  whole server: the chat needs 500 ms (see below), and with that the Escape
+  key took half a second to close a window. The interface sorts the
+  terminal's messages out itself, so its server runs with 20 ms.
+- `chat.sh` asks tmux for its session by its exact name (`=robot`), because
+  tmux otherwise accepts the start of a name. In a pane target the exact
+  form needs a colon: `-t '=robot:'`.
+- After a normal Quit the interface's window closes at once. After a crash it
+  waits for Enter, so that the traceback can be read.
 - To see why an SSH session ended: `sudo journalctl -t sshd-session --since today`
   on the Pi (not `-u ssh`). On the laptop, standby shows as Kernel-Power events
   506 and 507 in the System log.
@@ -224,10 +233,10 @@ show the user the output. The user does not want to be asked to test things.
   buttons, text in a box. There `KeyParser` (`robot/tui/screen.py`) reads
   every escape sequence to its end and drops the ones that are answers (the
   colours, the type, any other message that starts ESC ] or ESC P). Nothing
-  depends on `escape-time` or on timing at the start. Only an answer whose
-  two pieces arrive more than half a second apart leaves its second piece as
-  typing. `tests/test_tui_terminal.py` sends the real answers to the real
-  program.
+  depends on `escape-time` (its tmux runs with 20 ms) or on timing at the
+  start. Only an answer whose two pieces arrive more than half a second apart
+  leaves its second piece as typing. `tests/test_tui_terminal.py` sends the
+  real answers to the real program.
 - To reproduce a leak without the real terminal, play the terminal from a
   script on the Pi: `pty.fork()`, run `tmux -L <own socket> -f <conf>
   new-session ...` in the child, and from the parent answer `ESC ] 11 ; ? ESC \`
