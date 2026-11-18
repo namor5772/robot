@@ -20,6 +20,13 @@ see "The windowed interface").
   2026-11-15 in `/etc/sudoers.d/010_grobliro-nopasswd`).
 - `/tmp` is a RAM disk. Importing the Anthropic SDK takes about 15 s and one
   process uses about 77 MB.
+- Swap is compressed memory, not the SD card: a zram device of 415 MB with
+  zstd, set up by the `rpi-swap` package, swappiness 60. What sits idle is
+  squeezed to about a quarter of its size once memory gets short (121 MB
+  into 30 MB, measured on 2026-11-19). So a program that is open but idle
+  costs far less than its size, and the kernel's "available" figure, which
+  counts only what can be had without swapping, can rise when one more
+  program is started.
 - The Pi also has a keyboard and screen attached. The screen is a text
   console (tty1) of 240 columns by 67 rows on 1920 x 1080, in UTF-8, with the
   kernel's own font and no mouse service.
@@ -489,6 +496,13 @@ show the user the output. The user does not want to be asked to test things.
     ("... will go to the 2 child runs still starting"), and a third was
     allowed once the two had loaded and 143 MB was left. With a real parent
     run beside them the Pi Zero still comes to two, as before.
+  - The available figure is what can be had without pushing anything into
+    swap, and the swap here is compressed memory (see "Target device").
+    What idle programs would give up to it is not counted until the kernel
+    has moved it. So the rule is on the careful side, and the same programs
+    can leave less before a squeeze than after one: 120 MB was available
+    with two idle interfaces open and 141 to 147 MB with three (2026-11-19,
+    see "Several screens, several interfaces").
   - On top of that there is a ceiling, `MAX_CHILDREN` = 8 alive at once,
     which the owner set on 2026-11-19: every child is a paid run, and with
     gigabytes free memory alone would allow dozens. It is checked first and
@@ -650,6 +664,14 @@ underneath is the same code the chat runs; only the console differs.
   which `KeyParser` takes for one as well. There is no mouse (no `gpm`).
   Alt with an F-key switches text consoles and never reaches a program, which
   costs nothing here: the interface's F-keys are used without Alt.
+- The text consoles give each interface a screen to itself at the Pi. Alt+F2
+  shows tty2 (the keymap has `Console_2` on it), which asks for a login the
+  first time: nothing runs on tty2 to tty6 until one is shown. `ui.sh
+  --session 2` there, and Alt+F1 and Alt+F2 go between the two. The keys
+  work with an interface on the screen: curses' raw mode is a setting of the
+  terminal's line handling, and the kernel goes on reading the keyboard
+  itself (`kbd_mode -C /dev/tty1` says Unicode with the interface up). On
+  2026-11-19 the owner ran three that way, on tty1, tty2 and tty3.
 - A second, separate interface: `ui.sh --session 2` (added 2026-11-19). The
   name is 1 to 12 letters, digits, `-` or `_`; `ui.sh` checks it before
   anything starts, because it becomes part of a tmux session name and of a
@@ -680,12 +702,28 @@ underneath is the same code the chat runs; only the console differs.
   copy's own.
 - Memory decides how many instructions run at once, not a count: there is no
   limit on interfaces or chats, and the limit on child runs is a memory rule
-  (see "Meta tools and child runs"). Measured on 2026-11-18: the interface
-  takes 84 MB when started and 93 MB after half an hour of use, and with one
-  open about 190 MB is available. A second leaves about 100 MB, which is under
-  `spawn.MIN_FREE_MB` (110), so `run_instruction` is refused in both. On the
-  Pi Zero about three running instructions in all is the most, whether they
-  are interfaces, chats or child runs.
+  (see "Meta tools and child runs"). What counts is how many are WORKING at
+  the same moment, not how many are open: the swap is compressed memory (see
+  "Target device"), and an interface that sits idle is squeezed into it.
+  - 2026-11-18: an interface takes 84 MB when started and 93 MB after half
+    an hour of use. With one open about 190 MB was available.
+  - 2026-11-19, the owner's interfaces after a reboot, no run going in any.
+    Two open: 83 MB each, 72 MB of it their own and the rest shared, 2 MB in
+    swap, 120 MB available. Three open, the third two minutes old: 141 to
+    147 MB available, which is more than with two. Starting the third had
+    made the kernel move about 50 MB of each older interface into swap: they
+    then held 33 and 41 MB, the new one 79 MB, and the swap held 121 MB in
+    30 MB of memory. `spawn._why_not_another` would have started a child run
+    at that moment.
+  - So an open interface costs about 80 MB while it works and 30 to 40 MB
+    once it has been squeezed (what it still holds, and its swapped part at
+    a quarter of the size). Using it again brings that memory back first.
+  - Until that day this file said that a second interface leaves about
+    100 MB, so that `run_instruction` is refused in both, and that three
+    running instructions in all is the most. Neither held for interfaces
+    that are merely open. About three WORKING at once is still the estimate
+    (a run with its two children has been seen); it has not been tried with
+    three interfaces each in a run.
 
 ## Where it comes from
 

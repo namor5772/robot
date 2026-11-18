@@ -156,7 +156,7 @@ the Pi's 415 MB. So there are three limits:
 |---|---|
 | Instructions in one interface | One at a time: START is off while a run is going. |
 | Child runs that a run starts itself (`run_instruction`, with Meta on) | As many as there is memory for, and never more than 8 at once in all, counting the children that children start: one is started only while 110 MB is free. On this Pi that comes to two at once. |
-| Interfaces and chats open at once | No fixed number. Memory allows about three instructions running in all, however they were started. |
+| Interfaces and chats open at once | No fixed number. What memory limits is how many are working at the same moment: about three, however they were started. One that is open but idle takes far less (see below). |
 
 A chat and the interface can be open together: `chat.sh` and `ui.sh` each
 have a tmux of their own. For a second interface, give it a session name:
@@ -166,6 +166,12 @@ bash ~/robot/scripts/ui.sh --session 2
 ```
 
 From the laptop that is `ssh -t pi "bash ~/robot/scripts/ui.sh --session 2"`.
+
+At the Pi's own screen every interface can have a text terminal to itself.
+Hold Alt and press F2 for the second terminal, log in there (it asks the
+first time), and start the interface with `--session 2`. Alt+F1 goes back to
+the first terminal, and Alt+F3 to Alt+F6 are four more. The keys work while
+an interface is on the screen, and whatever you leave keeps running.
 
 - Any short name will do in place of the 2: up to 12 letters, digits, `-`
   or `_`.
@@ -185,8 +191,21 @@ All the interfaces are in one tmux, and its keys go from one to the other:
 | Ctrl-B then D | Leave them all running. |
 
 The interfaces share the instructions, the skills and the cost log, and each
-keeps its own runs and saved chats. With two open, less than 110 MB is
-usually free, so neither can start child runs.
+keeps its own runs and saved chats.
+
+An interface takes about 80 MB when it starts. One that sits idle gives most
+of that back when memory gets short: the Pi squeezes it into compressed
+memory, and brings it back when the interface is used again. Measured on
+2026-11-19 with no run going in any of them:
+
+| Interfaces open | Memory still available | What each held |
+|---|---|---|
+| Two | 120 MB | 83 MB each |
+| Three | 141 to 147 MB | The new one 79 MB, the two older ones 33 and 41 MB |
+
+So three open interfaces left more room than two. Whether a run can start
+child runs (110 MB must be free) depends on the memory at that moment, not on
+how many interfaces are open.
 
 ## Saved instructions
 
