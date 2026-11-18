@@ -85,11 +85,23 @@ show the user the output. The user does not want to be asked to test things.
   Piped lines are echoed, and the end of input ends the conversation.
   `--model claude-haiku-5-5` keeps checks cheap (a whole chat for well under a
   cent); the default Opus chat costs about 5 cents to start.
-- A check that needs a real terminal (Ctrl-C, prompts): start the chat in tmux
-  detached and drive it. `ROBOT_TMUX_DETACHED=1 bash scripts/chat.sh ...`, then
-  `tmux -L robot send-keys -t robot -l -- 'text'`, `send-keys -t robot Enter`,
-  `send-keys -t robot C-c`, and `tmux -L robot capture-pane -p -t robot` to
-  read the screen. Wait for the last line to be `you>` before typing.
+- The owner uses the Pi while work goes on. A chat may be open in tmux on the
+  socket `robot`, and the windowed interface on `robot-ui`. A check must
+  NEVER use those two sockets: no `kill-server`, no `send-keys`, and neither
+  `chat.sh` nor `ui.sh` with their own socket, because a second start joins
+  whatever is running there and the keys that follow are typed into the
+  owner's session. On 2026-11-18 a check that used `robot-ui` was running when
+  the owner opened the interface: they were joined to the check's session,
+  and it closed under them four seconds later. Eight seconds earlier, the
+  check's `kill-server` would have ended a session of theirs.
+- So a check that needs a real terminal (Ctrl-C, prompts) runs in a tmux of
+  its own. `chat.sh` takes the socket and the session from the environment:
+  `ROBOT_SOCKET=zz-chat ROBOT_SESSION=zz-chat ROBOT_TMUX_DETACHED=1 bash
+  scripts/chat.sh ...`, then `tmux -L zz-chat send-keys -t zz-chat -l --
+  'text'`, `send-keys -t zz-chat Enter`, `send-keys -t zz-chat C-c`, and
+  `tmux -L zz-chat capture-pane -p -t zz-chat` to read the screen. Wait for
+  the last line to be `you>` before typing. End with `tmux -L zz-chat
+  kill-server`.
 - To run a script on the Pi without writing a file there, feed it over stdin:
   `ssh pi "cd ~/robot && .venv/bin/python -" < script.py` or `bash -s`. An
   `ssh` command inside such a script needs `-n`.
@@ -125,14 +137,20 @@ show the user the output. The user does not want to be asked to test things.
     and sends it real bytes. It needs curses, so it runs on the Pi only (7
     tests, about 30 s) and is skipped on the laptop. It gives the program an
     empty API key, with which nothing can be sent.
-  - By hand on the Pi, in tmux: `ROBOT_TMUX_DETACHED=1 bash scripts/ui.sh`,
-    then `tmux -L robot-ui send-keys -t robot-ui F4` (keys by name: `F2`,
-    `Enter`, `Escape`, `M-s` for Alt+S, `C-c`), `send-keys -t robot-ui -l --
-    'text'` to type, and `tmux -L robot-ui capture-pane -p -t robot-ui` to
-    read the screen (`-e` keeps the colour codes). Leave a fifth of a second
-    after Escape before the next key, or the two are read as Alt+key. Wait
-    for `Waiting for your message` in the bottom line before typing a reply.
-    A paid check is cheap on an instruction set to `claude-haiku-5-5`.
+  - By hand on the Pi, in a tmux of the check's own (see above: never the
+    owner's `robot-ui`). `ui.sh` always uses `robot-ui`, so start the
+    interface through `chat.sh`: `ROBOT_MODULE=robot.tui ROBOT_SOCKET=zz-ui
+    ROBOT_SESSION=zz-ui ROBOT_ESCAPE_TIME=20 ROBOT_TMUX_DETACHED=1 bash
+    scripts/chat.sh`. Then `tmux -L zz-ui send-keys -t zz-ui F4` (keys by
+    name: `F2`, `Enter`, `Escape`, `M-s` for Alt+S, `C-c`), `send-keys -t
+    zz-ui -l -- 'text'` to type, `tmux -L zz-ui capture-pane -p -t zz-ui` to
+    read the screen (`-e` keeps the colour codes), and `tmux -L zz-ui
+    resize-window -t zz-ui -x 72 -y 24` for another window size. Leave a
+    fifth of a second after Escape before the next key, or the two are read
+    as Alt+key. Wait for `Waiting for your message` in the bottom line
+    before typing a reply. A paid check is cheap on an instruction set to
+    `claude-haiku-5-5`. A check that starts no run can have a data folder of
+    its own (`ROBOT_DATA_DIR`, exported before the tmux server starts).
 - To try unfinished work on the Pi without touching the checkout, copy the
   working tree to a scratch folder and run it there with the checkout's
   Python: `tar -cf - --exclude=.venv --exclude=.git . | ssh pi "mkdir -p
