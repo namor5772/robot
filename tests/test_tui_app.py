@@ -225,6 +225,23 @@ class TopLine(unittest.TestCase):
                          "Morni... | claude-haiku-5-5-20261007 (Ad")
         self.assertEqual(top_line([self.NAME] + self.LONG, 0), "")
 
+    def test_a_session_name_follows_the_word_robot(self):
+        self.assertEqual(
+            top_line(["Default"] + self.SHORT, 78, "2"),
+            "Robot 2  |  Default  |  claude-opus-5-5 (Low)  |  conversation  |  meta")
+
+    def test_the_session_name_stays_when_the_word_robot_goes(self):
+        # It is what tells two copies of the interface apart.
+        self.assertEqual(
+            top_line([self.NAME] + self.SHORT, 70, "2"),
+            "2  |  Morning r...  |  claude-opus-5-5 (Low)  |  conversation  |  meta")
+
+    def test_with_a_session_name_the_settings_still_fit_the_smallest_window(self):
+        # The name of the instruction gives way down to its first letters.
+        self.assertEqual(
+            top_line(["Morning report"] + self.LONG, tui_app.MIN_COLS - 2, "2"),
+            "2 | Mor... | claude-haiku-5-5-20261007 (Adaptive) | single task | meta")
+
     def test_a_name_is_measured_in_cells_not_characters(self):
         wide = chr(0x4e2d) * 20                           # twenty characters, forty cells
         row = top_line([wide] + self.SHORT, 78)
@@ -254,6 +271,54 @@ class DisplaySwitches(MainCase):
     def test_a_state_file_with_junk_in_it_is_survivable(self):
         (self.datadir.root / STATE_FILE).write_text("not json at all", encoding="utf-8")
         self.drive(self.shows("[x] Activity", "Robot  |  Default"))
+
+
+class Sessions(MainCase):
+    """Several copies of the interface open at once, each with a name (--session)."""
+
+    def fresh_copy(self, **options):
+        self.app = None
+        self.console = UiConsole(self.bridge, self.interrupts)
+        return self.make_app(**options)
+
+    def test_a_named_copy_says_so_in_the_top_row(self):
+        self.make_app(session="2")
+        self.drive(self.shows("Robot 2  |  Default  |  claude-opus-5-5 (Low)"))
+
+    def test_the_first_copy_has_no_name_to_show(self):
+        self.drive(Check(lambda screen: self.assertTrue(
+            screen.line(0).startswith(" Robot  |  Default"))))
+
+    def test_each_copy_keeps_its_settings_in_a_file_of_its_own(self):
+        self.assertEqual(tui_app.state_file_name(), STATE_FILE)
+        self.assertEqual(tui_app.state_file_name("2"), "tui_state_2.json")
+        self.assertEqual(tui_app.state_file_name("garden"), "tui_state_garden.json")
+
+    def test_each_copy_remembers_its_own_instruction_and_boxes(self):
+        self.drive("alt+t")                                  # the first copy: Thinking on
+        self.fresh_copy(session="2")
+        self.drive("f4", "end", "alt+u", "alt+d")            # the second: uses Task, Debug on
+        first = load_store(self.datadir.root / STATE_FILE)
+        second = load_store(self.datadir.root / "tui_state_2.json")
+        self.assertEqual((first["instruction"], first["thinking"], first["debug"]),
+                         ("Default", True, False))
+        self.assertEqual((second["instruction"], second["thinking"], second["debug"]),
+                         ("Task", False, True))
+        # Started again, each shows what it had, not what the other had.
+        self.fresh_copy(session="2")
+        self.drive(self.shows("Robot 2  |  Task", "[ ] Thinking", "[x] Debug"))
+        self.fresh_copy()
+        self.drive(self.shows("Robot  |  Default", "[x] Thinking", "[ ] Debug"))
+
+    def test_a_new_copy_starts_on_default_whatever_the_others_use(self):
+        self.make_app(instruction="Task")
+        self.drive("alt+a")                                  # saves the first copy's settings
+        self.fresh_copy(session="3")
+        self.drive(self.shows("Robot 3  |  Default", "[x] Activity"))
+
+    def test_the_copies_share_the_library(self):
+        self.make_app(session="2")
+        self.drive("f4", self.shows("Chat", "Default  (in use)", "Talk", "Task"))
 
 
 class SingleTask(MainCase):
@@ -782,6 +847,28 @@ class StartingUp(unittest.TestCase):
     def test_the_command_line(self):
         self.assertEqual(tui_app.build_parser().parse_args(["-l", "Name"]).load, "Name")
         self.assertIsNone(tui_app.build_parser().parse_args([]).load)
+
+    def test_a_session_name_on_the_command_line(self):
+        parse = tui_app.build_parser().parse_args
+        self.assertFalse(parse([]).session)                  # no name: the first copy
+        self.assertFalse(parse(["-l", "Name"]).session)
+        self.assertEqual(parse(["--session", "2"]).session, "2")
+        self.assertEqual(parse(["--session=garden-1", "-l", "Name"]).session, "garden-1")
+        self.assertEqual(parse(["--session", "x" * 12]).session, "x" * 12)
+        # Session 1 is the first copy, the one that is started without a name.
+        self.assertEqual(parse(["--session", "1"]).session, "")
+
+    def test_a_session_name_must_be_fit_for_a_file_name(self):
+        # It becomes part of the name of the copy's settings file, and of a
+        # tmux session.
+        for bad in ("two words", "a/b", "..", "x" * 13, "", "semi;colon"):
+            with self.subTest(name=bad):
+                errors = io.StringIO()
+                with self.assertRaises(SystemExit) as stopped, \
+                        contextlib.redirect_stderr(errors):
+                    tui_app.build_parser().parse_args(["--session", bad])
+                self.assertEqual(stopped.exception.code, 2)
+                self.assertIn("a session name is 1 to 12 letters, digits", errors.getvalue())
 
 
 if __name__ == "__main__":

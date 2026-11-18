@@ -11,7 +11,7 @@
 # Any arguments are passed to the program, for example: chat.sh -l "Name"
 #
 # ui.sh starts the windowed interface through this same script, by naming
-# another program and a tmux of its own in the variables below.
+# another program, a tmux of its own and a session in the variables below.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -19,6 +19,11 @@ cd "$(dirname "$0")/.."
 MODULE="${ROBOT_MODULE:-robot.main}"
 SOCKET="${ROBOT_SOCKET:-robot}"
 SESSION="${ROBOT_SESSION:-robot}"
+# Arguments the launcher itself gives the program, ahead of yours: plain words
+# with spaces between them (ui.sh says "--session 2" this way). They are kept
+# apart from yours, so that "the arguments are ignored" below is only ever said
+# of something you typed.
+read -r -a OWN_ARGS <<< "${ROBOT_PROGRAM_ARGS:-}"
 
 # Called by tmux as the session's command: run the program, then keep the
 # window open until Enter so the last lines can be read.
@@ -45,7 +50,7 @@ fi
 
 if ! command -v tmux >/dev/null 2>&1; then
   echo "tmux is not installed, so this will end if the connection drops." >&2
-  exec .venv/bin/python -m "$MODULE" "$@"
+  exec .venv/bin/python -m "$MODULE" "${OWN_ARGS[@]}" "$@"
 fi
 
 if tmux -L "$SOCKET" has-session -t "=$SESSION" 2>/dev/null; then
@@ -62,7 +67,7 @@ fi
 
 # Quote the arguments so they survive tmux handing the command to a shell.
 inner="bash $(printf '%q' "$PWD/scripts/chat.sh") --inside-tmux $(printf '%q' "$MODULE")"
-for arg in "$@"; do
+for arg in "${OWN_ARGS[@]}" "$@"; do
   inner+=" $(printf '%q' "$arg")"
 done
 

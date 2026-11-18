@@ -159,28 +159,34 @@ the Pi's 415 MB. So there are three limits:
 | Interfaces and chats open at once | No fixed number. Memory allows about three instructions running in all, however they were started. |
 
 A chat and the interface can be open together: `chat.sh` and `ui.sh` each
-have a tmux of their own. A second interface needs a session name of its own,
-because `ui.sh` always uses the same one and would join the first:
+have a tmux of their own. For a second interface, give it a session name:
 
 ```bash
-ROBOT_MODULE=robot.tui ROBOT_SOCKET=robot-ui ROBOT_SESSION=robot-ui2 ROBOT_ESCAPE_TIME=20 bash ~/robot/scripts/chat.sh
+bash ~/robot/scripts/ui.sh --session 2
 ```
 
-The same line brings you back to it later. Both interfaces are then in one
-tmux, and its keys go from one to the other:
+From the laptop that is `ssh -t pi "bash ~/robot/scripts/ui.sh --session 2"`.
+
+- Any short name will do in place of the 2: up to 12 letters, digits, `-`
+  or `_`.
+- The same command brings you back to that interface later. Without
+  `--session` you get the first one, which is also what `--session 1` means.
+- Each interface shows its name in its top row (`Robot 2  |  Default  | ...`)
+  and remembers its own instruction in use and its own display boxes.
+- `-l "Name"` still works beside it: `ui.sh --session 2 -l "Zero state chat"`.
+
+All the interfaces are in one tmux, and its keys go from one to the other:
 
 | Keys | What happens |
 |---|---|
 | Ctrl-B then `)` | The next interface. |
 | Ctrl-B then `(` | The one before. |
 | Ctrl-B then `s` | A list to pick from. |
-| Ctrl-B then D | Leave both running. |
+| Ctrl-B then D | Leave them all running. |
 
-Two interfaces share the instructions, the skills and the cost log, and each
-keeps its own runs and saved chats. What they remember (the instruction in
-use, the display boxes) is one file, so the one that saved last decides what
-the next start shows. With two open, less than 110 MB is usually free, so
-neither can start child runs.
+The interfaces share the instructions, the skills and the cost log, and each
+keeps its own runs and saved chats. With two open, less than 110 MB is
+usually free, so neither can start child runs.
 
 ## Saved instructions
 
@@ -392,7 +398,7 @@ On the Pi, outside this repository, in `~/robot-data`:
 | `skills/<name>/SKILL.md` | The skills. |
 | `saved_chats/` | Every run's transcript (`.txt`) and messages (`.json`). |
 | `APICostLog_<host>.txt` | One line per run: time, model, cost, tokens. |
-| `tui_state.json` | What the windowed interface remembers: the instruction in use and the display boxes. |
+| `tui_state.json` | What the windowed interface remembers: the instruction in use and the display boxes. An interface started with `--session 2` has `tui_state_2.json`. |
 | `tui_errors.log` | Anything a library printed while the windows were up (normally empty). |
 
 These files use MyAgent's formats, so instructions and skills can be copied

@@ -12,6 +12,7 @@ import contextlib
 import io
 import os
 import queue
+import re
 import signal
 import sys
 import threading
@@ -38,6 +39,26 @@ MIN_COLS = 72
 STATE_FILE = "tui_state.json"
 ERROR_LOG = "tui_errors.log"
 _ERROR_LOG_LIMIT = 256 * 1024
+
+# Several copies of the interface can be open at once (ui.sh --session NAME).
+# A copy's session name tells it apart: it is shown in the top row and is part
+# of the name of the file the copy keeps its settings in. The first copy, the
+# one started without a name, is session 1 and has none of that.
+_SESSION_NAME = re.compile(r"[A-Za-z0-9_-]{1,12}")
+FIRST_SESSION = "1"
+
+
+def session_name(value) -> str:
+    """A --session value as the program keeps it: "" for the first copy."""
+    if not _SESSION_NAME.fullmatch(value):
+        raise argparse.ArgumentTypeError(
+            "a session name is 1 to 12 letters, digits, '-' or '_' (for example: 2)")
+    return "" if value == FIRST_SESSION else value
+
+
+def state_file_name(session="") -> str:
+    """The file a copy of the interface keeps what it remembers in."""
+    return f"tui_state_{session}.json" if session else STATE_FILE
 
 # The signals a run is stopped or ended with (see robot.console.Interrupts).
 _RUN_SIGNALS = {getattr(signal, name) for name in ("SIGINT", "SIGTERM", "SIGHUP")
@@ -100,6 +121,13 @@ THE SKILLS MANAGER
 INSIDE TMUX
   Ctrl+B then D leaves everything running and returns to the
   shell. The command that started the interface brings it back.
+
+MORE THAN ONE INTERFACE
+  ui.sh --session 2 starts a second interface, or brings you back
+  to it. Any short name will do in place of the 2. Each one shows
+  its name in the top row and remembers its own instruction.
+  Ctrl+B then ) goes to the next interface, Ctrl+B then ( to the
+  one before, and Ctrl+B then S shows a list of them.
 """
 
 
@@ -540,7 +568,7 @@ class MainWindow(Window):
 
     def paint(self, scr):
         scr.fill(0, 0, 1, self.w, "bar")
-        scr.put(0, 1, top_line(self.app.summary, self.w - 2), "bar")
+        scr.put(0, 1, top_line(self.app.summary, self.w - 2, self.app.session), "bar")
 
     def on_escape(self):
         pass  # nothing to close: Quit is how to leave
@@ -617,9 +645,11 @@ def describe_instruction(datadir, name) -> list:
 
 
 # How far a name that is too long is cut down, its three dots included: this
-# far while the word Robot still stands in front of it, and this far at most.
+# far while the word Robot still stands in front of it, this far before the
+# dividers close up, and this far (one letter and the dots) at the very most.
 _NAME_BESIDE_ROBOT = 16
 _NAME_FLOOR = 8
+_NAME_LEAST = 4
 
 
 def _shortened(text, width) -> str:
@@ -629,7 +659,7 @@ def _shortened(text, width) -> str:
     return clip(text, max(0, width - 3)).rstrip() + "..."
 
 
-def top_line(parts, width) -> str:
+def top_line(parts, width, session="") -> str:
     """The top row of the main window: Robot, then the parts, the name first.
 
     The name is the one part that can be any length, and what follows it (the
@@ -637,12 +667,18 @@ def top_line(parts, width) -> str:
     too long for the window gives up, in this order: the end of the name,
     which three dots then mark; the word Robot, which never says anything
     new, once the name beside it would get short; more of the name; the
-    space around the dividers. What follows the name stays whole. Only when
-    all of that is not enough is the end of the row cut off.
+    space around the dividers; and the name down to its first letter. What
+    follows the name stays whole. Only when all of that is not enough is the
+    end of the row cut off.
+
+    A copy of the interface with a session name shows it after the word
+    Robot, and keeps it when the word goes: it is what tells the copies apart.
     """
     name, details = parts[0], list(parts[1:])
-    stages = ((["Robot"], "  |  ", _NAME_BESIDE_ROBOT), ([], "  |  ", _NAME_FLOOR),
-              ([], " | ", _NAME_FLOOR))
+    whole = [f"Robot {session}"] if session else ["Robot"]
+    mark = [session] if session else []
+    stages = ((whole, "  |  ", _NAME_BESIDE_ROBOT), (mark, "  |  ", _NAME_FLOOR),
+              (mark, " | ", _NAME_FLOOR), (mark, " | ", _NAME_LEAST))
     row = ""
     for lead, gap, least in stages:
         room = width - text_width(gap.join(lead + [""] + details))  # what is left for the name
@@ -658,7 +694,7 @@ class App:
     """The windows on the screen, and the loop that draws them and reads keys."""
 
     def __init__(self, screen, bridge, datadir, console, interrupts, sdk_ready=None,
-                 instruction=None):
+                 instruction=None, session=""):
         self.screen = screen
         self.bridge = bridge
         self.datadir = datadir
@@ -676,7 +712,11 @@ class App:
         self._seconds_shown = None
         self._ready_shown = None
 
-        state = load_store(datadir.root / STATE_FILE)
+        # This copy's name when several are open, "" for the first. Each copy
+        # remembers its own instruction and display boxes.
+        self.session = session
+        self.state_path = datadir.root / state_file_name(session)
+        state = load_store(self.state_path)
         self.flags = {name: bool(state.get(name, default)) for name, default in FLAGS.items()}
         self._apply_flags()
         self.instruction = instruction or state.get("instruction") or instructions.DEFAULT_NAME
@@ -700,8 +740,7 @@ class App:
 
     def save_state(self):
         try:
-            save_store(self.datadir.root / STATE_FILE,
-                       {"instruction": self.instruction, **self.flags})
+            save_store(self.state_path, {"instruction": self.instruction, **self.flags})
         except (OSError, ValueError):
             pass  # only what the window remembers; a run does not depend on it
 
@@ -942,6 +981,13 @@ def build_parser() -> argparse.ArgumentParser:
                     "instructions, and edit instructions and skills.")
     parser.add_argument("-l", "--load", metavar="NAME",
                         help="start with this saved instruction chosen")
+    # No default of "": argparse would put a default that is a string through
+    # session_name as well, which refuses an empty name.
+    parser.add_argument("--session", metavar="NAME", type=session_name,
+                        help="a name for this copy of the interface when more than one is "
+                             "open, for example 2: it is shown in the top row, and the copy "
+                             "remembers its own instruction and display boxes (1 is the "
+                             "first copy, the one started without this option)")
     return parser
 
 
@@ -1027,7 +1073,7 @@ def main(argv=None) -> int:
             from robot.tui.screen import CursesScreen
             screen = CursesScreen()
             App(screen, bridge, datadir, console, interrupts, sdk_ready=loader.is_ready,
-                instruction=args.load).run()
+                instruction=args.load, session=args.session or "").run()
         except BaseException:
             crashes.append(traceback.format_exc())
         finally:

@@ -36,7 +36,7 @@ ESC = b"\x1b"
 class Terminal:
     """`python -m robot.tui` running on a pseudo-terminal."""
 
-    def __init__(self, data_dir, rows=24, cols=80, term="xterm-256color"):
+    def __init__(self, data_dir, rows=24, cols=80, term="xterm-256color", args=()):
         self.output = b""
         self._searched = 0
         self.term = term
@@ -47,7 +47,7 @@ class Terminal:
                 env = dict(os.environ, TERM=term, ROBOT_DATA_DIR=str(data_dir),
                            ANTHROPIC_API_KEY="", LANG="C.UTF-8", LC_ALL="C.UTF-8")
                 os.chdir(REPO)
-                os.execve(sys.executable, [sys.executable, "-m", "robot.tui"], env)
+                os.execve(sys.executable, [sys.executable, "-m", "robot.tui", *args], env)
             finally:
                 os._exit(127)
         self.pid, self.fd = pid, fd
@@ -238,6 +238,15 @@ class OnATerminal(unittest.TestCase):
                 self.assertEqual(terminal.wait(), 0)
                 self.assertEqual(terminal.modes(), before)
                 terminal.close()
+
+    def test_a_copy_with_a_session_name_shows_it_and_keeps_its_own_settings(self):
+        terminal = self.start(args=["--session", "2"])
+        terminal.expect(b"Robot 2")                     # the top row says which copy this is
+        terminal.expect(b"nstruction")
+        terminal.send(ESC + b"t")                       # Alt+T: a display box, which is remembered
+        self.leave(terminal)
+        self.assertTrue((self.datadir.root / "tui_state_2.json").exists())
+        self.assertFalse((self.datadir.root / "tui_state.json").exists())
 
     def test_ctrl_c_does_not_end_the_program(self):
         terminal = self.start()

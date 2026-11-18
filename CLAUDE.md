@@ -136,23 +136,30 @@ show the user the output. The user does not want to be asked to test things.
     `drive` is one whole session: when the script runs out, every open window
     is gone, so a second call starts again at the main window.
   - `tests/test_tui_terminal.py` starts the real program on a pseudo-terminal
-    and sends it real bytes. It needs curses, so it runs on the Pi only (7
+    and sends it real bytes. It needs curses, so it runs on the Pi only (8
     tests, about 30 s) and is skipped on the laptop. It gives the program an
     empty API key, with which nothing can be sent.
+  - `tests/test_launchers.py` runs `chat.sh` and `ui.sh` with a stand-in for
+    tmux that only writes down how it was called: which socket, which
+    session, which program with which arguments. Nothing is started. bash
+    scripts for the Pi, so it is skipped on the laptop too (19 tests).
   - By hand on the Pi, in a tmux of the check's own (see above: never the
-    owner's `robot-ui`). `ui.sh` always uses `robot-ui`, so start the
-    interface through `chat.sh`: `ROBOT_MODULE=robot.tui ROBOT_SOCKET=zz-ui
-    ROBOT_SESSION=zz-ui ROBOT_ESCAPE_TIME=20 ROBOT_TMUX_DETACHED=1 bash
-    scripts/chat.sh`. Then `tmux -L zz-ui send-keys -t zz-ui F4` (keys by
-    name: `F2`, `Enter`, `Escape`, `M-s` for Alt+S, `C-c`), `send-keys -t
-    zz-ui -l -- 'text'` to type, `tmux -L zz-ui capture-pane -p -t zz-ui` to
-    read the screen (`-e` keeps the colour codes), and `tmux -L zz-ui
-    resize-window -t zz-ui -x 72 -y 24` for another window size. Leave a
-    fifth of a second after Escape before the next key, or the two are read
-    as Alt+key. Wait for `Waiting for your message` in the bottom line
-    before typing a reply. A paid check is cheap on an instruction set to
-    `claude-haiku-5-5`. A check that starts no run can have a data folder of
-    its own (`ROBOT_DATA_DIR`, exported before the tmux server starts).
+    owner's `robot-ui`). `ui.sh` takes another socket from the environment:
+    `ROBOT_SOCKET=zz-ui ROBOT_TMUX_DETACHED=1 bash scripts/ui.sh`. The
+    session in it is still called `robot-ui`. Then `tmux -L zz-ui send-keys
+    -t robot-ui F4` (keys by name: `F2`, `Enter`, `Escape`, `M-s` for Alt+S,
+    `C-c`), `send-keys -t robot-ui -l -- 'text'` to type, `tmux -L zz-ui
+    capture-pane -p -t robot-ui` to read the screen (`-e` keeps the colour
+    codes), and `tmux -L zz-ui resize-window -t robot-ui -x 72 -y 24` for
+    another window size. Leave a fifth of a second after Escape before the
+    next key, or the two are read as Alt+key. Wait for `Waiting for your
+    message` in the bottom line before typing a reply. A paid check is cheap
+    on an instruction set to `claude-haiku-5-5`. A check that starts no run
+    can have a data folder of its own (`ROBOT_DATA_DIR`, exported before the
+    tmux server starts). To act as a person at a terminal (joining, Ctrl-B
+    keys), run the launcher under `pty.fork()` and write the keys to it.
+    Mind the memory: every interface started is another 80 MB or so beside
+    whatever the owner has open.
 - To try unfinished work on the Pi without touching the checkout, copy the
   working tree to a scratch folder and run it there with the checkout's
   Python: `tar -cf - --exclude=.venv --exclude=.git . | ssh pi "mkdir -p
@@ -178,8 +185,9 @@ show the user the output. The user does not want to be asked to test things.
 - Because one skill is on demand, every run now also offers `get_skill`.
 - `.venv/bin/python -m robot.main --skills` and `--list` on the Pi show the
   current skills and instructions; check there instead of trusting this list.
-- 1,174 tests pass. On the Pi 2 are skipped, on the laptop 8 (the 7
-  real-terminal tests need curses).
+- 1,205 tests pass (counted on 2026-11-19). On the Pi 2 are skipped, on the
+  laptop 28, among them the 8 real-terminal tests (they need curses) and the
+  19 launcher tests (they need bash).
 - The windowed interface was added on this day. Its state is in
   `~/robot-data/tui_state.json`. The owner used it the same evening, over SSH
   from the laptop and at the Pi's own screen.
@@ -197,8 +205,11 @@ show the user the output. The user does not want to be asked to test things.
   outright leaves the terminal in raw mode, and Enter was not recognised.
 - tmux keeps a chat alive across a dropped connection, not across a reboot of
   the Pi. Nothing starts tmux at boot.
-- `ui.sh` is `chat.sh` with four variables set: `ROBOT_MODULE=robot.tui`,
-  `ROBOT_SOCKET=robot-ui`, `ROBOT_SESSION=robot-ui`, `ROBOT_ESCAPE_TIME=20`.
+- `ui.sh` is `chat.sh` with five variables set: `ROBOT_MODULE=robot.tui`,
+  `ROBOT_SOCKET=robot-ui` (unless the environment already names a socket,
+  which is how a check gets a tmux of its own), `ROBOT_SESSION` (`robot-ui`,
+  or `robot-ui-NAME` with `--session NAME`), `ROBOT_ESCAPE_TIME=20` and
+  `ROBOT_PROGRAM_ARGS` (the program's `--session NAME`).
   The windowed interface therefore has a tmux server of its own (`tmux -L
   robot-ui ...`), and a chat can run beside it (two processes of about 80 MB).
   The reason for a second server is `escape-time`, which is a setting of the
@@ -558,11 +569,13 @@ underneath is the same code the chat runs; only the console differs.
   the one part of any length. A row too long for the window gives up the end
   of the name first, marked with three dots (while 16 cells of it are left),
   then the word Robot, then more of the name (down to 8 cells), then the
-  space around the dividers. Even the longest settings there are fit the
-  smallest window that way. `describe_instruction` returns the parts, not a
-  finished line, so that this can be done.
+  space around the dividers, then the name down to one letter and its dots.
+  Even the longest settings there are fit the smallest window that way, also
+  with a short session name in front. `describe_instruction` returns the
+  parts, not a finished line, so that this can be done.
 - `~/robot-data/tui_state.json` holds the instruction in use and the five
-  display boxes. Nothing a run needs is in it.
+  display boxes (`tui_state_NAME.json` for a copy started with a session
+  name). Nothing a run needs is in it.
 - The Tools dialog lists `editor.TOOL_NAMES`: the six ordinary tools first,
   the four Meta tools last, then any blocked name the program does not know
   (one copied in from MyAgent), so that such a block is not lost on saving.
@@ -582,17 +595,34 @@ underneath is the same code the chat runs; only the console differs.
   which `KeyParser` takes for one as well. There is no mouse (no `gpm`).
   Alt with an F-key switches text consoles and never reaches a program, which
   costs nothing here: the interface's F-keys are used without Alt.
-- A second, separate interface needs a session name of its own, since `ui.sh`
-  fixes its own: `ROBOT_MODULE=robot.tui ROBOT_SOCKET=robot-ui
-  ROBOT_SESSION=robot-ui2 ROBOT_ESCAPE_TIME=20 bash scripts/chat.sh`. On the
-  same socket both are in one tmux, and its keys go between them: Ctrl-B then
-  `)`, `(` or `s`. That was tested on 2026-11-18 with a stand-in program,
-  joined through a pseudo-terminal. On a socket of its own the second
-  interface is a separate tmux, and no key switches.
-- Two interfaces share the instruction library and the skills (each editor
-  reads afresh before it writes), the cost log (lines are appended) and
-  `tui_state.json` (the last to save wins). Runs, saved chats and in-progress
-  cost records are each program's own.
+- A second, separate interface: `ui.sh --session 2` (added 2026-11-19). The
+  name is 1 to 12 letters, digits, `-` or `_`; `ui.sh` checks it before
+  anything starts, because it becomes part of a tmux session name and of a
+  file name, and the program checks it again (`app.session_name`). Session 1
+  is the first interface, the one started without the option.
+  - `ui.sh` takes the option out of the arguments and does two things with
+    it. The tmux session becomes `robot-ui-2`, on the same socket, so every
+    interface is in one tmux and its keys go between them: Ctrl-B then `)`,
+    `(` or `s`. And the program is started with `--session 2`, which
+    `chat.sh` gets through `ROBOT_PROGRAM_ARGS`, not among the person's own
+    arguments: "the arguments are ignored" is then only ever said of
+    something the person typed.
+  - In the program the name does two things. It is shown in the top row
+    (`Robot 2  |  ...`) and stays there when the word Robot gives way, since
+    it is what tells the copies apart. And the copy keeps its settings in
+    `tui_state_2.json`, so each remembers its own instruction and boxes, the
+    way MyAgent's instance N has its own `agent_state_N.json`.
+  - `--session` has no string default in `build_parser`: argparse puts a
+    default that is a string through the option's `type`, and `session_name`
+    refuses an empty name. With `default=""` the program did not start at
+    all. The tests caught it; the laptop cannot run the program to show it.
+  - Tried for real on the Pi on 2026-11-19, on a socket of the check's own:
+    two interfaces, a terminal that joined one and went to the other and back
+    with tmux's keys, and a settings file each.
+- The interfaces share the instruction library and the skills (each editor
+  reads afresh before it writes) and the cost log (lines are appended). Runs,
+  saved chats, in-progress cost records and remembered settings are each
+  copy's own.
 - Memory decides how many instructions run at once, not a count. Measured on
   2026-11-18: the interface takes 84 MB when started and 93 MB after half an
   hour of use, and with one open about 190 MB is available. A second leaves
