@@ -4,7 +4,7 @@ import json
 import tempfile
 import unittest
 
-from robot import instructions, meta
+from robot import instructions, meta, spawn
 from robot.agent import Agent
 from robot.datastore import DataDir, StoreUnreadableError
 from robot.instructions import RunSettings
@@ -326,6 +326,15 @@ class MetaInARun(unittest.TestCase):
         made.run()
         self.assertEqual(made.messages[2]["content"][0]["content"],
                          "Nothing changed - this run is already on claude-fable-5-2.")
+
+    def test_the_model_is_told_what_limits_child_runs(self):
+        # The description is what the model plans by. It names the ceiling
+        # that spawn enforces, taken from the same number.
+        described = meta.RUN_INSTRUCTION_TOOL["description"]
+        self.assertEqual(spawn.MAX_CHILDREN, 8)
+        self.assertIn("depends on how much memory is free, and is never more than 8.",
+                      described)
+        self.assertNotIn("at most two", described)
 
     def test_the_tool_schemas_are_well_formed(self):
         for tool in (meta.MANAGE_INSTRUCTIONS_TOOL, meta.MANAGE_SKILLS_TOOL,

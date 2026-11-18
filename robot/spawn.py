@@ -4,8 +4,8 @@ A child is a whole separate process running `python -m robot.main -l NAME`.
 It reports back through a result file, and its questions travel through a
 relay folder (see relay.py). On a small Pi a child costs many seconds to start
 and a large share of the memory, so one is only started while there is memory
-for it: how many can run at once depends on the computer, not on a fixed
-number.
+for it: how many can run at once depends on the computer, up to a ceiling that
+is the same everywhere.
 """
 
 import json
@@ -30,6 +30,10 @@ from robot import instructions, relay
 CHILD_MB = 80  # what a child run holds once it has loaded
 SPARE_MB = 30  # what must still be free when it has
 MIN_FREE_MB = CHILD_MB + SPARE_MB  # so a child is only started with this much available
+# The most children one program has running at once, however much memory is
+# free. Every child is a run that is paid for, and where there are gigabytes
+# to spare memory alone would allow dozens. Set by the owner on 2026-11-19.
+MAX_CHILDREN = 8
 # Where the free memory cannot be read (anywhere but Linux), a fixed number of
 # children at once has to do.
 FALLBACK_MAX_CHILDREN = 2
@@ -100,10 +104,16 @@ def _still_to_take(child) -> int:
 def _why_not_another() -> str:
     """Why another child must not be started now, as an error text; "" if it may.
 
-    The caller holds _spawn_lock, so that starts asked for in the same turn are
-    judged one after the other: each sees the children started before it.
+    Two things can stand in the way: the ceiling on how many run at once, and
+    too little free memory. The caller holds _spawn_lock, so that starts asked
+    for in the same turn are judged one after the other: each sees the
+    children started before it.
     """
     alive = alive_children()
+    if len(alive) >= MAX_CHILDREN:
+        return (f"Error: {MAX_CHILDREN} child runs are already running, which is the most "
+                "that are started at once. Wait for one to finish and try again, or do the "
+                "task in this run.")
     free = available_memory_mb()
     if free is None:
         if len(alive) >= FALLBACK_MAX_CHILDREN:

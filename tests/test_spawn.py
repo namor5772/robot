@@ -258,6 +258,45 @@ class MemoryDecides(SpawnCase):
                     mock.patch.object(spawn, "_resident_mb", lambda pid, held=held: held):
                 self.assertEqual(spawn._still_to_take(child), to_take)
 
+    def test_there_is_a_ceiling_however_much_memory_is_free(self):
+        # Every child is a run that is paid for. The ceiling is 8; it is set
+        # to 3 here so that the test need not start nine processes.
+        self.assertEqual(spawn.MAX_CHILDREN, 8)
+        self.memory(available=64000, held=80)
+        with mock.patch.object(spawn, "MAX_CHILDREN", 3):
+            replies = self.start_slow(4)
+        self.assertTrue(all("Launched" in reply for reply in replies[:3]), replies)
+        self.assertEqual(
+            replies[3],
+            "Error: 3 child runs are already running, which is the most that are started "
+            "at once. Wait for one to finish and try again, or do the task in this run.")
+        self.assertEqual(len(spawn.alive_children()), 3)
+
+    def test_a_child_that_has_ended_makes_room_under_the_ceiling(self):
+        self.memory(available=64000, held=80)
+        with mock.patch.object(spawn, "MAX_CHILDREN", 1):
+            for _ in range(3):
+                self.assertIn("status=completed", self.run_it(name="Echo", wait=True))
+            (running,) = self.start_slow(1)
+            self.assertIn("Launched", running)
+            self.assertIn("1 child runs are already running", self.run_it(name="Echo"))
+
+    def test_below_the_ceiling_memory_still_decides(self):
+        self.memory(available=100, held=80)
+        with mock.patch.object(spawn, "MAX_CHILDREN", 8):
+            self.assertIn("not enough free memory", self.run_it(name="Echo", wait=True))
+
+    def test_the_ceiling_counts_starts_asked_for_in_the_same_moment(self):
+        self.memory(available=64000, held=5)
+        with mock.patch.object(spawn, "MAX_CHILDREN", 2), \
+                concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
+            replies = list(pool.map(lambda _: self.run_it(name="Slow"), range(4)))
+        for reply in replies:
+            self.kill_later(reply)
+        self.assertEqual(sum("Launched" in reply for reply in replies), 2, replies)
+        self.assertEqual(sum("2 child runs are already running" in reply for reply in replies),
+                         2)
+
     def test_the_least_free_memory_is_a_child_and_something_to_spare(self):
         self.assertEqual(spawn.MIN_FREE_MB, spawn.CHILD_MB + spawn.SPARE_MB)
         self.memory(available=spawn.MIN_FREE_MB, held=80)

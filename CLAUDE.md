@@ -185,7 +185,7 @@ show the user the output. The user does not want to be asked to test things.
 - Because one skill is on demand, every run now also offers `get_skill`.
 - `.venv/bin/python -m robot.main --skills` and `--list` on the Pi show the
   current skills and instructions; check there instead of trusting this list.
-- 1,220 tests pass (counted on 2026-11-19). On the Pi 2 are skipped, on the
+- 1,225 tests pass (counted on 2026-11-19). On the Pi 2 are skipped, on the
   laptop 28, among them the 8 real-terminal tests (they need curses) and the
   19 launcher tests (they need bash). `tests/test_spawn.py` starts real
   processes and is the slow one on the laptop, where starting and stopping a
@@ -469,9 +469,9 @@ show the user the output. The user does not want to be asked to test things.
   through a relay folder and are answered from `answers`, or put to the person
   at the parent's terminal. A child nobody waits for and nobody answers stops
   at its first question. Temp files are in `~/robot-data/tmp`.
-- How many children run at once is decided by free memory, not by a count
-  (since 2026-11-19, at the owner's request, so that the same code suits a
-  Pi 5; until then it was two, fixed). `spawn._why_not_another` starts a child
+- How many children run at once is decided by free memory, up to a ceiling
+  of 8 (since 2026-11-19, at the owner's request, so that the same code suits
+  a Pi 5; until then it was two, fixed). `spawn._why_not_another` starts a child
   only while `MIN_FREE_MB` (110) is available: `CHILD_MB` (80) for the child
   and `SPARE_MB` (30) left over.
   - A child that has just been started holds almost nothing, and the kernel's
@@ -488,13 +488,19 @@ show the user the output. The user does not want to be asked to test things.
     ("... will go to the 2 child runs still starting"), and a third was
     allowed once the two had loaded and 143 MB was left. With a real parent
     run beside them the Pi Zero still comes to two, as before.
-  - There is NO upper count any more. On a computer with gigabytes free a run
-    can start dozens of children, each a paid run. The owner asked for memory
-    to decide; a ceiling was offered and is theirs to ask for.
+  - On top of that there is a ceiling, `MAX_CHILDREN` = 8 alive at once,
+    which the owner set on 2026-11-19: every child is a paid run, and with
+    gigabytes free memory alone would allow dozens. It is checked first and
+    has a refusal of its own. On the Pi Zero memory stops a run long before
+    it. The ceiling is per program, as the old limit of two was: a child may
+    start up to 8 of its own, and their children none (`MAX_DEPTH`), so a
+    whole tree can hold more than 8.
   - Where the free memory cannot be read (anywhere but Linux: the laptop's
     tests), `FALLBACK_MAX_CHILDREN` (2) applies.
   - The tool's description in `meta.py` said "at most two can run at the same
-    time". It now says that the number depends on the memory that is free.
+    time". It now says that the number depends on the memory that is free and
+    is never more than 8; the 8 is taken from `spawn.MAX_CHILDREN`, so the
+    two cannot drift apart.
 
 ## The windowed interface
 

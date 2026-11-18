@@ -155,7 +155,7 @@ the Pi's 415 MB. So there are three limits:
 | What | Limit |
 |---|---|
 | Instructions in one interface | One at a time: START is off while a run is going. |
-| Child runs that a run starts itself (`run_instruction`, with Meta on) | As many as there is memory for: one is started only while 110 MB is free. On this Pi that comes to two at once. |
+| Child runs that a run starts itself (`run_instruction`, with Meta on) | As many as there is memory for, and never more than 8 at once: one is started only while 110 MB is free. On this Pi that comes to two at once. |
 | Interfaces and chats open at once | No fixed number. Memory allows about three instructions running in all, however they were started. |
 
 A chat and the interface can be open together: `chat.sh` and `ui.sh` each
@@ -370,7 +370,9 @@ by the memory that is free, not by a fixed number: a child is started only
 while 110 MB is free (80 for it, 30 to spare), and memory that children still
 starting have yet to take counts as taken. On the Pi Zero that comes to two at
 once, as before. A computer with more memory, such as a Pi 5, runs as many as
-fit, with no change to the program.
+fit, with no change to the program, up to a ceiling of 8 at once: every child
+is a run that is paid for. The ceiling is for each run, so a child may start
+up to 8 of its own (their children can start none).
 
 ## What you see
 
