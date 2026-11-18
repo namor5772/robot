@@ -20,7 +20,9 @@ see "The windowed interface").
   2026-11-15 in `/etc/sudoers.d/010_grobliro-nopasswd`).
 - `/tmp` is a RAM disk. Importing the Anthropic SDK takes about 15 s and one
   process uses about 77 MB.
-- The Pi also has a keyboard and screen attached.
+- The Pi also has a keyboard and screen attached. The screen is a text
+  console (tty1) of 240 columns by 67 rows on 1920 x 1080, in UTF-8, with the
+  kernel's own font and no mouse service.
 
 ## Reaching the Pi
 
@@ -160,8 +162,10 @@ show the user the output. The user does not want to be asked to test things.
 
 ## State on 2026-11-18
 
-- The instruction library on the Pi holds `Default` and `Zero state chat`
-  (Opus, Low, Convo on, Meta off, no text).
+- The instruction library on the Pi holds `Default` (Opus, Medium, Convo on,
+  Meta on) and `Zero state chat` (Opus, Medium, Convo on, Meta off, no text).
+  The owner moved both from Low to Medium that evening, in the Instruction
+  Editor.
 - The Pi has two skills, both made by the owner in chats, in
   `~/robot-data/skills`:
   - `robot-identity` (enabled, so its text is in every run's system prompt):
@@ -177,7 +181,8 @@ show the user the output. The user does not want to be asked to test things.
 - 1,174 tests pass. On the Pi 2 are skipped, on the laptop 8 (the 7
   real-terminal tests need curses).
 - The windowed interface was added on this day. Its state is in
-  `~/robot-data/tui_state.json`.
+  `~/robot-data/tui_state.json`. The owner used it the same evening, over SSH
+  from the laptop and at the Pi's own screen.
 - No hardware tools exist yet beyond the CPU temperature reading.
 
 ## When the SSH connection drops
@@ -558,6 +563,42 @@ underneath is the same code the chat runs; only the console differs.
   finished line, so that this can be done.
 - `~/robot-data/tui_state.json` holds the instruction in use and the five
   display boxes. Nothing a run needs is in it.
+- The Tools dialog lists `editor.TOOL_NAMES`: the six ordinary tools first,
+  the four Meta tools last, then any blocked name the program does not know
+  (one copied in from MyAgent), so that such a block is not lost on saving.
+  The README's tool table is in the same order. Nothing marks where the Meta
+  group starts. `meta` in the top row stands for that group of four.
+
+### Several screens, several interfaces
+
+- `ui.sh` run a second time JOINS the interface that is running: one program,
+  several screens (`tmux -L robot-ui list-clients` shows them), each showing
+  the same windows, any keyboard driving them. The window takes the size of
+  the screen used last (tmux's `window-size latest`), so another screen may
+  show it cut off or padded.
+- At the Pi's own screen (`TERM=linux`, 240 x 67) it is the same command. The
+  owner has used it there. Shift+Tab works: the console's keymap sends ESC
+  Tab for it, which is the back-tab of the `linux` terminal description and
+  which `KeyParser` takes for one as well. There is no mouse (no `gpm`).
+  Alt with an F-key switches text consoles and never reaches a program, which
+  costs nothing here: the interface's F-keys are used without Alt.
+- A second, separate interface needs a session name of its own, since `ui.sh`
+  fixes its own: `ROBOT_MODULE=robot.tui ROBOT_SOCKET=robot-ui
+  ROBOT_SESSION=robot-ui2 ROBOT_ESCAPE_TIME=20 bash scripts/chat.sh`. On the
+  same socket both are in one tmux, and its keys go between them: Ctrl-B then
+  `)`, `(` or `s`. That was tested on 2026-11-18 with a stand-in program,
+  joined through a pseudo-terminal. On a socket of its own the second
+  interface is a separate tmux, and no key switches.
+- Two interfaces share the instruction library and the skills (each editor
+  reads afresh before it writes), the cost log (lines are appended) and
+  `tui_state.json` (the last to save wins). Runs, saved chats and in-progress
+  cost records are each program's own.
+- Memory decides how many instructions run at once, not a count. Measured on
+  2026-11-18: the interface takes 84 MB when started and 93 MB after half an
+  hour of use, and with one open about 190 MB is available. A second leaves
+  about 100 MB, which is under `spawn.MIN_FREE_MB` (110), so `run_instruction`
+  is refused in both. About three running instructions in all is the most,
+  whether they are interfaces, chats or child runs.
 
 ## Where it comes from
 

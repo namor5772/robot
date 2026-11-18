@@ -91,9 +91,11 @@ bash ~/robot/scripts/ui.sh
 What the main window has:
 
 - **The top line** names the instruction that START will run, with its model,
-  its thinking level and whether it is a conversation or a single task; `meta`
-  at the end means Meta is on. A name too long for the window is shortened
-  with `...`, so that the settings after it always stay in view.
+  its thinking level and whether it is a conversation or a single task. `meta`
+  at the end means the instruction's Meta switch is on, which gives its runs
+  the group of four Meta tools (see [Tools](#tools)). No other tool is shown
+  here. A name too long for the window is shortened with `...`, so that the
+  settings after it always stay in view.
 - **START** (F2) runs it. What the run shows appears under *Output*, the same
   lines the chat prints. **STOP** (F3 or Ctrl+C) stops the reply or command in
   progress; while the robot is waiting for your message, it ends the run.
@@ -133,10 +135,52 @@ Good to know:
 - Like the chat, it runs inside tmux and survives a dropped connection: the
   same command brings you back, and Ctrl-B then D leaves it running. It has a
   tmux of its own, so a chat can be open as well.
+- Starting it again joins it. If the interface is already running, the
+  command does not start a second one, whether you type it on the laptop or
+  at the Pi. There is then one program with several screens: each shows the
+  same windows, and any of the keyboards drives them. The window takes the
+  size of the screen that was used last.
+- At the Pi's own screen it is the same command and the same keys, Shift+Tab
+  included. There is no mouse there.
 - Text pasted into the terminal goes into the box that has the cursor, as text.
 - It runs on the Pi only: Python on Windows has no curses.
 
 Without tmux: `cd ~/robot && .venv/bin/python -m robot.tui`.
+
+### More than one at a time
+
+Whatever runs an instruction is a program of its own, taking 80 to 95 MB of
+the Pi's 415 MB. So there are three limits:
+
+| What | Limit |
+|---|---|
+| Instructions in one interface | One at a time: START is off while a run is going. |
+| Child runs that a run starts itself (`run_instruction`, with Meta on) | Two at once for each run, and none while less than 110 MB of memory is free. |
+| Interfaces and chats open at once | No fixed number. Memory allows about three instructions running in all, however they were started. |
+
+A chat and the interface can be open together: `chat.sh` and `ui.sh` each
+have a tmux of their own. A second interface needs a session name of its own,
+because `ui.sh` always uses the same one and would join the first:
+
+```bash
+ROBOT_MODULE=robot.tui ROBOT_SOCKET=robot-ui ROBOT_SESSION=robot-ui2 ROBOT_ESCAPE_TIME=20 bash ~/robot/scripts/chat.sh
+```
+
+The same line brings you back to it later. Both interfaces are then in one
+tmux, and its keys go from one to the other:
+
+| Keys | What happens |
+|---|---|
+| Ctrl-B then `)` | The next interface. |
+| Ctrl-B then `(` | The one before. |
+| Ctrl-B then `s` | A list to pick from. |
+| Ctrl-B then D | Leave both running. |
+
+Two interfaces share the instructions, the skills and the cost log, and each
+keeps its own runs and saved chats. What they remember (the instruction in
+use, the display boxes) is one file, so the one that saved last decides what
+the next start shows. With two open, less than 110 MB is usually free, so
+neither can start child runs.
 
 ## Saved instructions
 
@@ -287,13 +331,24 @@ Each skill has a mode:
 | `run_shell_command` | always | Runs any bash command on the Pi as its user, with sudo. |
 | `get_current_datetime` | always | Reads the Pi's clock. |
 | `get_cpu_temperature` | if the sensor can be read | Reads the CPU temperature. |
-| `web_search` | always | Searches the web on Anthropic's servers, up to 5 searches per request. |
 | `user_prompt` | always | Asks you a question and waits for the answer. |
 | `get_skill` | if a skill is on demand | Fetches an on-demand skill's text. |
+| `web_search` | always | Searches the web on Anthropic's servers, up to 5 searches per request. |
 | `manage_instructions` | Meta on | Lists, reads, creates, updates and deletes instructions. |
 | `manage_skills` | Meta on | The same for skills and their bundled files. |
 | `run_instruction` | Meta on | Runs another instruction as a child run. |
 | `upgrade_model` | Meta on | Moves the rest of the run to a stronger model. |
+
+Meta is the only group of tools. It is one switch on an instruction, and it
+turns the last four on together: the tools with which the robot works on its
+own setup. Their descriptions add about 3,000 tokens to every request. The
+first six are not grouped: each is offered on its own, whenever it can work.
+
+Any of the ten can be switched off for one instruction. In the Instruction
+Editor the Tools button shows this list, in this order, with a tick beside
+each tool the instruction may use. A cleared tool is blocked for that
+instruction only (`blocked_tools` in the file), and a Meta tool needs both
+the Meta switch and its tick.
 
 The shell tool is deliberately unrestricted: no confirmation, no allowlist, no
 blocked commands, and the Pi has passwordless sudo, so the agent has root. It
