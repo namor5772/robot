@@ -21,6 +21,9 @@ SESSION=robot
 if [ "${1:-}" = "--inside-tmux" ]; then
   shift
   status=0
+  # Until the program shows its prompt, nothing that arrives is typing: it is
+  # the terminal answering tmux. Do not print it. The prompt does its own echo.
+  stty -echo 2>/dev/null || true
   .venv/bin/python -m robot.main "$@" || status=$?
   # A program that was killed outright cannot put the terminal back the way it
   # found it, and then Enter would not be recognised below.

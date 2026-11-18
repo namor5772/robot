@@ -169,6 +169,24 @@ class Console:
         self._relay_seq = 0
         self._parent_pid = os.getppid()
         self.input_wait_secs = 0.0  # time spent waiting on the person, not working
+        self._startup_input_dropped = False
+
+    def _drop_startup_input(self):
+        """Before the first prompt, throw away what arrived while starting up.
+
+        A terminal's answers to tmux can land here during the seconds the
+        program takes to start (see only_terminal_replies). Left alone they
+        would sit at the first prompt, in front of whatever is typed next.
+        Only the first prompt: later on, typing ahead of the prompt is wanted.
+        """
+        if self._startup_input_dropped:
+            return
+        self._startup_input_dropped = True
+        try:
+            import termios
+            termios.tcflush(self._in.fileno(), termios.TCIFLUSH)
+        except Exception:  # no termios (Windows), or not a real terminal
+            pass
 
     def set_transcript(self, transcript):
         self._transcript = transcript
@@ -311,6 +329,7 @@ class Console:
     def _ask_terminal(self, question, preface, prompt):
         seq = self._relay_announce(question, preface)
         self._emit("\n")
+        self._drop_startup_input()
         try:
             with self.interrupts.raisable():
                 line = input(prompt)

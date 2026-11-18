@@ -104,11 +104,23 @@ show the user the output. The user does not want to be asked to test things.
 - On this laptop, long heredocs with quotes passed to the Bash tool have
   broken several times. Use the Write and Edit tools for file content.
 
-## State on 2026-11-16
+## State on 2026-11-18
 
-- The instruction library on the Pi holds only `Default`, and there are no
-  skills. The user has been shown how to create both by asking in a chat.
-- 886 tests pass on the laptop and on the Pi.
+- The instruction library on the Pi holds `Default` and `Zero state chat`
+  (Opus, Low, Convo on, Meta off, no text).
+- The Pi has two skills, both made by the owner in chats, in
+  `~/robot-data/skills`:
+  - `robot-identity` (enabled, so its text is in every run's system prompt):
+    the robot's name and one sentence on what it is.
+  - `wifi-monitor` (on demand, fetched with `get_skill`): describes a Wi-Fi
+    monitor the robot set up on 2026-11-18. That monitor is not part of this
+    repo: a bash loop in `~/wifimon` that pings the gateway every 10 s, logs
+    each change to `~/wifimon/wifi.log`, and starts at boot from the user's
+    crontab.
+- Because one skill is on demand, every run now also offers `get_skill`.
+- `.venv/bin/python -m robot.main --skills` and `--list` on the Pi show the
+  current skills and instructions; check there instead of trusting this list.
+- 888 tests pass on the laptop and on the Pi.
 - No hardware tools exist yet beyond the CPU temperature reading.
 
 ## When the SSH connection drops
@@ -144,6 +156,22 @@ show the user the output. The user does not want to be asked to test things.
   answers as a bare Enter (`console.only_terminal_replies`): it says so and
   the prompt comes back. Whole lines only: the same characters inside a
   sentence are sent as typed, so the person can ask about them.
+- A second way in, seen on 2026-11-18: tmux asks for the terminal's type once
+  and keeps one answer. Any further answer is passed into the pane whole,
+  whatever `escape-time` is (played back on the Pi: one answer, nothing gets
+  through; the same answer twice, the second arrives in the pane complete).
+  That day the terminal's type answers (`ESC [ ? 61;4;...c` and
+  `ESC [ > 0;10;1c`) arrived twice at the start of a new chat. Why the
+  terminal answered twice is not known; tmux itself asked once.
+- At the start of a chat such an answer arrives while Python is still
+  starting, so two more things deal with it: `chat.sh` turns the pane's echo
+  off before starting the program (the answer was printed in front of the
+  banner), and `Console._drop_startup_input` discards whatever is waiting just
+  before the first prompt (it sat at `you>`, in front of whatever was typed
+  next, and with text after it the whole-line check no longer applies). So
+  keys pressed before the first `you>` are lost, and typing during a reply
+  shows only when the next prompt appears. An answer that arrives later, when
+  rejoining a running chat, is still left to the whole-line check.
 - tmux reads its config when its server starts. A chat that is already running
   keeps the old value until it ends, unless it is set by hand:
   `tmux -L robot set -sg escape-time 500`.

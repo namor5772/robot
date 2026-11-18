@@ -230,6 +230,28 @@ class TerminalInput(unittest.TestCase):
                 "(ignored: that line came from your terminal, not from the keyboard)\n")
 
 
+class StartupInput(unittest.TestCase):
+    """What reached the keyboard buffer before the first prompt is dropped."""
+
+    def test_only_the_first_prompt_drops_pending_input(self):
+        console, _ = piped_console("")
+        console.tty = True
+        console._in = mock.Mock()
+        console._in.fileno.return_value = 7
+        termios = mock.Mock(TCIFLUSH=0)
+        with mock.patch.dict("sys.modules", {"termios": termios}), \
+                mock.patch("builtins.input", return_value="hello"):
+            self.assertEqual(console.ask(), "hello")
+            self.assertEqual(console.ask(), "hello")
+        termios.tcflush.assert_called_once_with(7, 0)
+
+    def test_a_stream_that_is_no_terminal_is_left_alone(self):
+        console, _ = piped_console("")
+        console.tty = True
+        with mock.patch("builtins.input", return_value="hello"):
+            self.assertEqual(console.ask(), "hello")
+
+
 class InterruptRegions(unittest.TestCase):
     def test_the_handler_only_raises_inside_a_declared_region(self):
         interrupts = Interrupts()
