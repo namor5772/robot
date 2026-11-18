@@ -576,7 +576,9 @@ def process_is_robot(pid: int) -> bool:
         return True
     try:
         with open(_PROC / str(int(pid)) / "cmdline", "rb") as source:
-            return b"robot.main" in source.read()
+            command = source.read()
+        # Either way of starting the program: the chat, or the windowed interface.
+        return b"robot.main" in command or b"robot.tui" in command
     except (FileNotFoundError, ProcessLookupError):
         return False  # no such process
     except (OSError, ValueError, TypeError):

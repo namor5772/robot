@@ -3,6 +3,9 @@
 This repo is the Anthropic-API agent "brain" for a small robot. It is developed
 on a Windows laptop and runs on a Raspberry Pi. Since 2026-11-16 the program is
 a terminal port of the owner's MyAgent harness (see "Where it comes from").
+Since 2026-11-18 it has two faces: the line-by-line chat (`python -m
+robot.main`) and a windowed interface drawn with curses (`python -m robot.tui`,
+see "The windowed interface").
 
 ## Target device
 
@@ -37,7 +40,9 @@ a terminal port of the owner's MyAgent harness (see "Where it comes from").
 2. Commit and push to GitHub (`origin`, branch `main`). The laptop remote is
    HTTPS; the Pi's remote is SSH.
 3. Deploy: `ssh pi "bash ~/robot/scripts/deploy.sh"`
-4. Run on the Pi: `ssh -t pi "bash ~/robot/scripts/chat.sh"` (inside tmux).
+4. Run on the Pi: `ssh -t pi "bash ~/robot/scripts/chat.sh"` for the chat, or
+   `ssh -t pi "bash ~/robot/scripts/ui.sh"` for the windowed interface (both
+   inside tmux).
 
 Never edit files on the Pi directly. Every change goes through git; the Pi only
 receives code via `git pull --ff-only`, which refuses to run if its checkout
@@ -102,7 +107,35 @@ show the user the output. The user does not want to be asked to test things.
   fails once and then passes, find the race instead of rerunning until green
   (running the suite with all four cores loaded brought that one out).
 - On this laptop, long heredocs with quotes passed to the Bash tool have
-  broken several times. Use the Write and Edit tools for file content.
+  broken several times, and backslashes in them are rewritten (a `\x11` in a
+  heredoc reached the file as the control character itself). Use the Write
+  and Edit tools for file content, scripts included.
+- The Write and Edit tools turn a `\uXXXX` in the text they are given into
+  the character itself. To keep a source file plain ASCII, spell such a
+  character as `chr(0x2500)`.
+- The windowed interface has three kinds of test:
+  - `tests/test_tui_*.py` except `_terminal` run everywhere, the laptop
+    included, on a screen that lives in memory (`tests/tui_fakes.py`:
+    `FakeScreen`, and `AppCase` with `drive(...)`). A test is a script of key
+    names, `typed("text")`, `Check(function)` to look at the screen so far and
+    `Until(function)` to wait for the thread that runs the agent. One call of
+    `drive` is one whole session: when the script runs out, every open window
+    is gone, so a second call starts again at the main window.
+  - `tests/test_tui_terminal.py` starts the real program on a pseudo-terminal
+    and sends it real bytes. It needs curses, so it runs on the Pi only (7
+    tests, about 30 s) and is skipped on the laptop. It gives the program an
+    empty API key, with which nothing can be sent.
+  - By hand on the Pi, in tmux: `ROBOT_TMUX_DETACHED=1 bash scripts/ui.sh`,
+    then `tmux -L robot send-keys -t robot-ui F4` (keys by name: `F2`, `Enter`,
+    `Escape`, `M-s` for Alt+S, `C-c`), `send-keys -t robot-ui -l -- 'text'`
+    to type, and `tmux -L robot capture-pane -p -t robot-ui` to read the
+    screen. Escape needs a pause of over half a second after it.
+- To try unfinished work on the Pi without touching the checkout, copy the
+  working tree to a scratch folder and run it there with the checkout's
+  Python: `tar -cf - --exclude=.venv --exclude=.git . | ssh pi "mkdir -p
+  /tmp/robot-try && tar -xf - -C /tmp/robot-try"`, then `cd /tmp/robot-try &&
+  ~/robot/.venv/bin/python -m unittest ...`. Give it `ROBOT_DATA_DIR` of its
+  own. It finds no `.env` there, so it cannot make paid calls.
 
 ## State on 2026-11-18
 
@@ -120,7 +153,10 @@ show the user the output. The user does not want to be asked to test things.
 - Because one skill is on demand, every run now also offers `get_skill`.
 - `.venv/bin/python -m robot.main --skills` and `--list` on the Pi show the
   current skills and instructions; check there instead of trusting this list.
-- 888 tests pass on the laptop and on the Pi.
+- 1,162 tests pass. On the Pi 2 are skipped, on the laptop 8 (the 7
+  real-terminal tests need curses).
+- The windowed interface was added on this day. Its state is in
+  `~/robot-data/tui_state.json`.
 - No hardware tools exist yet beyond the CPU temperature reading.
 
 ## When the SSH connection drops
@@ -135,6 +171,13 @@ show the user the output. The user does not want to be asked to test things.
   outright leaves the terminal in raw mode, and Enter was not recognised.
 - tmux keeps a chat alive across a dropped connection, not across a reboot of
   the Pi. Nothing starts tmux at boot.
+- `ui.sh` is `chat.sh` with two variables set: `ROBOT_MODULE=robot.tui` and
+  `ROBOT_SESSION=robot-ui`. Same socket, another session, so a chat and the
+  windowed interface can run side by side (two processes of about 77 MB).
+  `chat.sh` names its session as `=robot`: without the `=`, tmux would take
+  `robot` for the start of `robot-ui` and join that. After a normal Quit the
+  interface's window closes at once; after a crash it waits for Enter so the
+  traceback can be read.
 - To see why an SSH session ended: `sudo journalctl -t sshd-session --since today`
   on the Pi (not `-u ssh`). On the laptop, standby shows as Kernel-Power events
   506 and 507 in the System log.
@@ -176,6 +219,15 @@ show the user the output. The user does not want to be asked to test things.
 - tmux reads its config when its server starts. A chat that is already running
   keeps the old value until it ends, unless it is set by hand:
   `tmux -L robot set -sg escape-time 500`.
+- The windowed interface has no prompt for such an answer to land at, but an
+  answer would arrive as key presses all the same: letters that press
+  buttons, text in a box. There `KeyParser` (`robot/tui/screen.py`) reads
+  every escape sequence to its end and drops the ones that are answers (the
+  colours, the type, any other message that starts ESC ] or ESC P). Nothing
+  depends on `escape-time` or on timing at the start. Only an answer whose
+  two pieces arrive more than half a second apart leaves its second piece as
+  typing. `tests/test_tui_terminal.py` sends the real answers to the real
+  program.
 - To reproduce a leak without the real terminal, play the terminal from a
   script on the Pi: `pty.fork()`, run `tmux -L <own socket> -f <conf>
   new-session ...` in the child, and from the parent answer `ESC ] 11 ; ? ESC \`
@@ -203,9 +255,21 @@ show the user the output. The user does not want to be asked to test things.
 - `robot/costs.py`: per-call cost, the cost log, the in-progress record.
 - `robot/history.py`: trimming and repairing the message history.
 - `robot/chats.py`, `robot/datastore.py`, `robot/relay.py`, `robot/prompts.py`.
+- `robot/tui/`: the windowed interface (see its section below).
+  - `text.py`: cell widths, wrapping, and `EditBuffer`, the text of a text box.
+  - `screen.py`: `Screen` (what everything draws on), `CursesScreen`, and
+    `KeyParser`. The only module that imports `curses`, and only inside
+    `CursesScreen`.
+  - `widgets.py`: `Button`, `Checkbox`, `Choice`, `TextField`, `TextArea`,
+    `ListBox`, and `Window` (focus, Tab order, Alt letters, the mouse).
+  - `dialogs.py`: `MessageBox`, `PickDialog`, `TextDialog`, `ChecklistDialog`.
+  - `editor.py`: `InstructionEditor` and its two small windows.
+    `skillsui.py`: `SkillsManager`.
+  - `app.py`: `App` and `MainWindow`, the output pane, and the three classes
+    that join a run to the screen (`UiConsole`, `UiInterrupts`, `Runner`).
 - `scripts/deploy.sh` (runs on the Pi: pull, pip install, install tmux; its
   body is in a `main` function so the pull can replace the file safely),
-  `scripts/chat.sh`, `scripts/tmux.conf`.
+  `scripts/chat.sh`, `scripts/ui.sh`, `scripts/tmux.conf`.
 - `requirements.txt`: `anthropic==2.8.0`, `python-dotenv==1.2.4`. Pinned on
   purpose: 2.8.0 sends API version 2026-10-21, has no `temperature`
   parameter, sends the key as a Bearer token, and is built on `httpx2`.
@@ -362,6 +426,104 @@ show the user the output. The user does not want to be asked to test things.
   parent's terminal. A child nobody waits for and nobody answers stops at its
   first question. Temp files are in `~/robot-data/tmp`.
 
+## The windowed interface
+
+`python -m robot.tui`, started through `scripts/ui.sh`. It does what MyAgent's
+windows do, as far as a terminal allows: a main window with START, STOP,
+Instruction and Skills, an Instruction Editor and a Skills Manager. The agent
+underneath is the same code the chat runs; only the console differs.
+
+### A run and the screen
+
+- Two threads. The agent keeps the MAIN thread, because its Ctrl-C handling
+  (`Interrupts`) works through signals, and Python delivers those to the main
+  thread only. The screen has a thread of its own. `app.main` starts both.
+- They share a `Bridge` of three queues: `events` (run to screen: output,
+  "the robot is waiting", "the run ended"), `replies` (screen to run: what was
+  typed), `jobs` (screen to run: run this instruction, or quit).
+- `Runner.serve` (main thread) takes a job and sets the run up with the same
+  functions `robot.main` uses (`load_library`, `load_skills`, `show_banner`,
+  `first_message`), then `Agent.run()`. One run at a time. `api.Learned` is
+  carried from one run to the next.
+- A run here is always the run of a NAMED instruction, `Default` included
+  (like `-l Default`): chat files and the cost log carry the name. The plain
+  chat's nameless run exists only in `robot.main`.
+- `UiConsole` is a `Console` whose `_show` posts to the screen and whose
+  `_read_reply` waits for the reply box. `tty` is True, so the forgiving
+  rules of a chat at a terminal apply. The transcript is written as before.
+- STOP is `UiInterrupts.press()`: it sets the flag and sends the main thread
+  a real SIGINT (`signal.pthread_kill`). The flag alone would not do: the
+  agent may be blocked in a network read or a 60 s shell command, and only a
+  signal wakes it there. From then on it is the chat's Ctrl-C path, unchanged.
+  The screen's thread blocks SIGINT, SIGTERM and SIGHUP for itself, so that a
+  signal from outside also lands on the main thread.
+- STOP while the robot waits for a message ends the run (`_read_reply`
+  returns None, "nobody is there"). The chat's "press Ctrl-C again" does not
+  exist here, and neither does its "three presses leave at once", which would
+  skip putting the terminal back.
+- Quit during a run asks, then presses stop with `end_run` and waits up to
+  15 s for the run to wind down (cost logged, chat saved) before the window
+  goes.
+- `costs.process_is_robot` counts a `robot.tui` process as the program. It
+  must: otherwise a chat started beside the interface would take the
+  interface's in-progress cost record for a dead run and log it.
+
+### The screen and the keys
+
+- Everything draws on a `Screen`: `put`, `fill`, `box`, clipped at the edges.
+  `CursesScreen` is the real one. Tests use `FakeScreen`, a grid in memory,
+  because Python on Windows has no curses. Keep curses out of every other
+  module, or the laptop's tests stop importing.
+- Drawing is immediate: each frame erases, draws every open window in order,
+  and lets curses send only what changed. A frame is drawn only when
+  something happened (`App.dirty`). There are no curses sub-windows.
+- The terminal is in raw mode with `nonl`: Ctrl-C, Ctrl-Q and Ctrl-Z arrive
+  as keys, and Enter (CR) is told apart from Ctrl+J (LF), which the reply box
+  uses for a new line.
+- `KeyParser` turns bytes into key names. curses recognises the keys the
+  terminal's description lists; the parser does the rest: Alt+letter (ESC,
+  then the letter at once), pasted text (bracketed paste is switched on, so a
+  paste arrives between two marks and goes into a box as text), the mouse,
+  and the terminal's own answers, which it drops.
+- Importing `readline` (the chat's console does) takes the window-size signal
+  for itself, and curses then never hears of a resize. `app.main` gives the
+  signal back before curses starts, and `CursesScreen` also asks the terminal
+  for its size whenever a read times out. Either one is enough.
+- curses must start AFTER `Interrupts.install()`: it leaves alone the signals
+  that already have a handler, and takes over the ones that do not.
+- While the windows are up, Python's stdout and stderr and the process's
+  error stream go to `~/robot-data/tui_errors.log`: anything printed straight
+  to the terminal would land in the middle of the windows.
+- The smallest screen is 72 x 18. Below that a message asks for a larger one.
+
+### The windows
+
+- A `Window` holds widgets; the order they are added is the Tab order. In a
+  label, `&` marks the Alt letter (`"&Save"`). Letters are unique per window.
+- A dialog is shown with `App.run_modal(window)`, which loops until the
+  window closes and returns its result, so asking a question is one line
+  (`if self.app.confirm(...)`). The run's events are taken in on every turn of
+  every such loop.
+- The focus is never left on START: Enter presses the focused button, and a
+  stray Enter must not start a run that costs money. It starts on Instruction
+  (as in MyAgent) and goes to the output pane when a run ends.
+- A letter typed without Alt presses nothing, except in a message box (y, n).
+  Typing while the robot waits goes to the reply box wherever the focus is.
+- A `Choice` changes only through its list. Arrow keys never change a
+  setting, they move the focus.
+- Both editors read their store afresh before every write, and write one
+  entry: a change a run made meanwhile to another instruction or skill
+  survives. The Skills Manager makes every change through `manage_skills`,
+  the tool's own code, so rules and messages are the same.
+- The Instruction Editor keeps the keys of other programs in an entry
+  (`section`, `order`, ...). An entry for another provider can be read but
+  not saved or used. "New" keeps the settings on the form and clears the
+  rest. There is no rename: a new name saves a copy.
+- Saving writes `thinking_mode` explicitly, also for an entry that had none
+  (which ran at Adaptive on Opus): the form shows what a run would use.
+- `~/robot-data/tui_state.json` holds the instruction in use and the five
+  display boxes. Nothing a run needs is in it.
+
 ## Where it comes from
 
 - MyAgent is the owner's tkinter agent app, in the folder
@@ -375,9 +537,16 @@ show the user the output. The user does not want to be asked to test things.
   `instructions_mixin.py` -> `instructions.py`, `meta.py`; `skills_mixin.py`
   and `datapaths.py` -> `skills.py`, `spawn.py`, `datastore.py`;
   `chat_mixin.py` -> `chats.py`; `relay.py` -> `relay.py`.
-- Left out on purpose: all GUI, the safety confirm system, other providers,
-  MyAgent's file, document, desktop, browser, mail and MCP tools, OneDrive
-  sharing, images, voice, the live model listing. MyAgent runs on SDK 0.84.0;
+- `robot/tui` is new code, not a port: MyAgent's windows are tkinter. It
+  follows MyAgent's layout and habits (START / STOP / Instruction, the
+  editor's list beside its form, the skill list's `[ON]` and `[OD]`, Cycle
+  Mode, where the focus starts). MyAgent's sections in the instruction list,
+  its Apply of an unsaved draft, images, voice and window colours are not
+  there.
+- Left out on purpose: MyAgent's tkinter code, the safety confirm system,
+  other providers, MyAgent's file, document, desktop, browser, mail and MCP
+  tools, OneDrive sharing, images, voice, the live model listing. MyAgent runs
+  on SDK 0.84.0;
   this runs on 2.8.0, which is why temperature and several of MyAgent's
   workarounds are gone.
 - File formats match MyAgent's (`agent_instructions.json`, `SKILL.md`, the

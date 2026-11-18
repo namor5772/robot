@@ -43,6 +43,100 @@ running, and the same command brings you back to it.
 
 Without tmux: `cd ~/robot && .venv/bin/python -m robot.main`.
 
+## The windowed interface
+
+The same agent behind buttons, lists, text boxes and dialogs, all drawn with
+characters. It needs no graphical desktop: it works over SSH and on the Pi's
+own screen and keyboard.
+
+From the laptop:
+
+```powershell
+ssh -t pi "bash ~/robot/scripts/ui.sh"
+```
+
+At the Pi's console:
+
+```bash
+bash ~/robot/scripts/ui.sh
+```
+
+```
+ Robot  |  ZZ ui chat  |  claude-haiku-5-5 (Low)  |  conversation
+ [ START ] [ STOP ] [ Instruction ] [ Skills ]                [ Help ] [ Quit ]
+┌─ Output ─────────────────────────────────────────────────────────────────────┐
+│This instruction has no saved task. Type it as your message.                  ▲
+│you> Say hello in exactly five words.                                         │
+│robot> Hello there, friend, nice to meet you.                                 │
+│  call 1: $0.0010 this call  |  $0.0010 total  (in:4  out:17                  │
+│cache_write:7,604)                                                            │
+│you> How hot is your CPU right now? Use your tool, then answer in one         │
+│sentence.                                                                     │
+│  call 2: $0.0001 this call  |  $0.0011 total  (in:4  out:32  cache_write:45  │
+│cache_read:7,604)                                                             │
+│[tool: get_cpu_temperature]                                                   │
+│robot> My CPU is running at 45.6 degrees Celsius right now.                   │
+│  call 3: $0.0001 this call  |  $0.0012 total  (in:2  out:24  cache_write:50  │
+│cache_read:7,649)                                                             │
+└──────────────────────────────────────────────────────────────────────────────┘
+┌─ Your message (Enter sends, Ctrl+J starts a new line) ───────────────────────┐
+│                                                                              │
+│                                                                              │
+│                                                                              │
+└──────────────────────────────────────────────────────────────────────────────┘
+ [x] Activity [ ] Thinking [ ] Tool calls [ ] Debug [ ] Save thinking
+ Waiting for your message                  F1 Help  F2 Start  F3 Stop  F10 Quit
+```
+
+What the main window has:
+
+- **The top line** names the instruction that START will run, with its model,
+  its thinking level and whether it is a conversation or a single task.
+- **START** (F2) runs it. What the run shows appears under *Output*, the same
+  lines the chat prints. **STOP** (F3 or Ctrl+C) stops the reply or command in
+  progress; while the robot is waiting for your message, it ends the run.
+- **Your message** takes the cursor whenever the robot waits for you. Enter
+  sends; Ctrl+J starts a new line. `quit`, `exit`, `stop` or `bye` on its own
+  ends a conversation, as in the chat.
+- **Instruction** (F4) opens the Instruction Editor: a list of the saved
+  instructions and a form for the one selected (name, model, thinking level,
+  Fast, Meta, Convo, notes, blocked tools, skills, upgrade model, text).
+  *Save* stores the form under the name in the Name box, so a new name makes a
+  new instruction. *Use* makes it the one START runs.
+- **Skills** (F5) opens the Skills Manager: every skill with its mode, text,
+  description and bundled files. Space on the list switches a skill between
+  off, ON (in every prompt) and OD (on demand).
+- **The boxes along the bottom** choose what a run shows: Activity (tool lines
+  and the cost of each call), Thinking, Tool calls, Debug. They are remembered.
+- **Help** (F1) lists every key. **Quit** is F10.
+
+Getting around:
+
+| Key | What it does |
+|---|---|
+| Tab, Shift+Tab | The next or the previous control. |
+| Alt+letter | The control that shows that letter highlighted. |
+| Enter or Space | Press the button, tick the box, open the list. |
+| Escape | Close the window. Unsaved changes are asked about first. |
+| Up, Down, PgUp, PgDn, Home, End | Move in a list or a text; look back through the output. |
+| Mouse | Click a control; the wheel scrolls. Hold Shift to select text. |
+
+Good to know:
+
+- A run started here is always the run of a named instruction, `Default`
+  included, so its saved chat and its cost-log line carry that name. An
+  instruction with no text asks you for the task.
+- One run at a time. The editors can be used while a run is going; what they
+  save applies from the next run.
+- Like the chat, it runs inside tmux and survives a dropped connection: the
+  same command brings you back, and Ctrl-B then D leaves it running. It has a
+  tmux session of its own, so a chat can be open as well.
+- Inside tmux the Escape key takes half a second to act.
+- Text pasted into the terminal goes into the box that has the cursor, as text.
+- It runs on the Pi only: Python on Windows has no curses.
+
+Without tmux: `cd ~/robot && .venv/bin/python -m robot.tui`.
+
 ## Saved instructions
 
 An instruction is a saved task together with the settings to run it with:
@@ -84,13 +178,19 @@ can ask it ("which model are you on?").
 
 ### Creating and changing instructions
 
-There is no editor. Ask the agent: with Meta on it creates, changes and
-deletes instructions and skills itself ("save this as an instruction called
-Night watch", "make the default model Haiku"). Changes apply from the next
-run, not the one you are in.
+Three ways:
 
-The library is one JSON file, `~/robot-data/agent_instructions.json`, so it can
-also be edited by hand. Each instruction is a named block, for example:
+- **The Instruction Editor** of the windowed interface (above): a form with
+  the name, the model, the thinking level, the switches and the text.
+- **Ask the agent.** With Meta on it creates, changes and deletes instructions
+  and skills itself ("save this as an instruction called Night watch", "make
+  the default model Haiku").
+- **Edit the file by hand** (below).
+
+Whichever way, a change applies from the next run, not the one in progress.
+
+The library is one JSON file, `~/robot-data/agent_instructions.json`. Each
+instruction is a named block, for example:
 
 ```json
 {
@@ -165,6 +265,9 @@ Each skill has a mode:
 - **Creating one:** ask in a chat, naming the skill, its mode, its description
   and its content. A good way is to have the robot do the job once and then
   say "save what you just did as a skill". It applies from the next chat.
+- **Reading and changing them:** the Skills Manager of the windowed interface
+  shows every skill, its text, its description and its bundled files, and
+  switches its mode with one key.
 - **Bundled files:** the robot can list, read, write and delete files inside a
   skill's folder. When it fetches a skill that has such files it is told where
   the folder is, so it can run a bundled script with the shell.
@@ -233,6 +336,8 @@ On the Pi, outside this repository, in `~/robot-data`:
 | `skills/<name>/SKILL.md` | The skills. |
 | `saved_chats/` | Every run's transcript (`.txt`) and messages (`.json`). |
 | `APICostLog_<host>.txt` | One line per run: time, model, cost, tokens. |
+| `tui_state.json` | What the windowed interface remembers: the instruction in use and the display boxes. |
+| `tui_errors.log` | Anything a library printed while the windows were up (normally empty). |
 
 These files use MyAgent's formats, so instructions and skills can be copied
 between the two programs. Nothing in `~/robot-data` is backed up.
@@ -263,7 +368,8 @@ address. If it times out, the address has changed; see `CLAUDE.md`.
 - `robot/instructions.py`, `robot/skills.py`: the library and the skills.
 - `robot/prompts.py`: the system prompt's wording.
 - `robot/models.py`: model and price tables. `robot/costs.py`, `robot/chats.py`, `robot/history.py`, `robot/datastore.py`, `robot/relay.py`: supporting parts.
-- `scripts/chat.sh`, `scripts/tmux.conf`: the tmux launcher. `scripts/deploy.sh`: run on the Pi to update it.
+- `robot/tui/`: the windowed interface. `app.py`: the main window and how a run and the screen work side by side. `editor.py`, `skillsui.py`: the Instruction Editor and the Skills Manager. `widgets.py`, `dialogs.py`: buttons, lists, text boxes and small windows. `screen.py`: the screen and the keyboard (curses). `text.py`: wrapping and editing text.
+- `scripts/chat.sh`, `scripts/ui.sh`, `scripts/tmux.conf`: the tmux launchers for the chat and the windowed interface. `scripts/deploy.sh`: run on the Pi to update it.
 - `tests/`: the test suite. `CLAUDE.md`: detailed notes for Claude Code sessions.
 
 ## Setup on the Pi

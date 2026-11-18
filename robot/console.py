@@ -201,16 +201,20 @@ class Console:
 
     # -- output ------------------------------------------------------------
 
+    def _show(self, text, dim):
+        """Put text in front of the person. The windowed interface replaces this."""
+        shown = f"{_DIM}{text}{_RESET}" if dim and self._styled else text
+        try:
+            self._out.write(shown)
+            self._out.flush()
+        except (OSError, ValueError, UnicodeError):
+            pass  # the terminal is gone (hang-up) or cannot show this text
+
     def _emit(self, text, dim=False):
         if not text:
             return
         with self._lock:
-            shown = f"{_DIM}{text}{_RESET}" if dim and self._styled else text
-            try:
-                self._out.write(shown)
-                self._out.flush()
-            except (OSError, ValueError, UnicodeError):
-                pass  # the terminal is gone (hang-up) or cannot show this text
+            self._show(text, dim)
             if self._transcript is not None:
                 self._transcript.write(text)
             self._at_line_start = text.endswith("\n")

@@ -1600,6 +1600,13 @@ class ProcessIsRobotTests(FakeProc):
         self.process(4242, "/home/robot/.venv/bin/python", "-m", "robot.main", "-l", "Name")
         self.assertIs(process_is_robot(4242), True)
 
+    def test_the_windowed_interface_is_the_program_too(self):
+        # Its runs keep the same in-progress records, so a chat started beside
+        # it must not take one of them for a run that died.
+        self.on_linux()
+        self.process(4242, "/home/robot/.venv/bin/python", "-m", "robot.tui")
+        self.assertIs(process_is_robot(4242), True)
+
     def test_another_program_with_the_same_pid(self):
         self.on_linux()
         self.process(4242, "/usr/bin/vim", "notes.txt")

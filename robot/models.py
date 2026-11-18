@@ -576,6 +576,11 @@ def _upgrade_levels(model: str) -> list[str]:
     return []
 
 
+def upgrade_levels(model: str) -> list[str]:
+    """The levels an upgrade to this model can be given, weakest first ("Low" ... "Max")."""
+    return _upgrade_levels(_model_id(model))
+
+
 def upgrade_level_for(model: str, level: str) -> str:
     """The level an upgrade to this model really runs at, as a label ("Max").
 
