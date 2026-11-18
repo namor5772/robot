@@ -178,13 +178,21 @@ class Console:
         program takes to start (see only_terminal_replies). Left alone they
         would sit at the first prompt, in front of whatever is typed next.
         Only the first prompt: later on, typing ahead of the prompt is wanted.
+
+        chat.sh starts the program with the terminal's echo off, so that such
+        an answer is not printed either. Echo goes back on here: readline
+        shows what is typed only when the terminal had echo on.
         """
         if self._startup_input_dropped:
             return
         self._startup_input_dropped = True
         try:
             import termios
-            termios.tcflush(self._in.fileno(), termios.TCIFLUSH)
+            fd = self._in.fileno()
+            termios.tcflush(fd, termios.TCIFLUSH)
+            attrs = termios.tcgetattr(fd)
+            attrs[3] |= termios.ECHO
+            termios.tcsetattr(fd, termios.TCSANOW, attrs)
         except Exception:  # no termios (Windows), or not a real terminal
             pass
 

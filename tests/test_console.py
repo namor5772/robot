@@ -238,12 +238,15 @@ class StartupInput(unittest.TestCase):
         console.tty = True
         console._in = mock.Mock()
         console._in.fileno.return_value = 7
-        termios = mock.Mock(TCIFLUSH=0)
+        termios = mock.Mock(TCIFLUSH=0, TCSANOW=0, ECHO=8)
+        termios.tcgetattr.return_value = [1, 2, 3, 16, 5, 6, []]
         with mock.patch.dict("sys.modules", {"termios": termios}), \
                 mock.patch("builtins.input", return_value="hello"):
             self.assertEqual(console.ask(), "hello")
             self.assertEqual(console.ask(), "hello")
         termios.tcflush.assert_called_once_with(7, 0)
+        # Echo is switched back on, and nothing else about the terminal changes.
+        termios.tcsetattr.assert_called_once_with(7, 0, [1, 2, 3, 24, 5, 6, []])
 
     def test_a_stream_that_is_no_terminal_is_left_alone(self):
         console, _ = piped_console("")

@@ -168,10 +168,11 @@ show the user the output. The user does not want to be asked to test things.
   off before starting the program (the answer was printed in front of the
   banner), and `Console._drop_startup_input` discards whatever is waiting just
   before the first prompt (it sat at `you>`, in front of whatever was typed
-  next, and with text after it the whole-line check no longer applies). So
-  keys pressed before the first `you>` are lost, and typing during a reply
-  shows only when the next prompt appears. An answer that arrives later, when
-  rejoining a running chat, is still left to the whole-line check.
+  next, and with text after it the whole-line check no longer applies) and
+  turns echo back on. It must: readline shows typing only when the terminal
+  had echo on, and with echo left off nothing typed at `you>` was visible.
+  So keys pressed before the first `you>` are lost. An answer that arrives
+  later, when rejoining a running chat, is still left to the whole-line check.
 - tmux reads its config when its server starts. A chat that is already running
   keeps the old value until it ends, unless it is set by hand:
   `tmux -L robot set -sg escape-time 500`.
