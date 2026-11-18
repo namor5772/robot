@@ -155,7 +155,7 @@ the Pi's 415 MB. So there are three limits:
 | What | Limit |
 |---|---|
 | Instructions in one interface | One at a time: START is off while a run is going. |
-| Child runs that a run starts itself (`run_instruction`, with Meta on) | Two at once for each run, and none while less than 110 MB of memory is free. |
+| Child runs that a run starts itself (`run_instruction`, with Meta on) | As many as there is memory for: one is started only while 110 MB is free. On this Pi that comes to two at once. |
 | Interfaces and chats open at once | No fixed number. Memory allows about three instructions running in all, however they were started. |
 
 A chat and the interface can be open together: `chat.sh` and `ui.sh` each
@@ -365,7 +365,12 @@ take root away, run `sudo rm /etc/sudoers.d/010_grobliro-nopasswd` on the Pi.
 An instruction's `blocked_tools` list removes tools from its runs.
 
 A child run is a second copy of the program. On the Pi Zero it takes about 15
-seconds to start and about 80 MB of memory, so at most two run at once.
+seconds to start and about 80 MB of memory. How many run at once is decided
+by the memory that is free, not by a fixed number: a child is started only
+while 110 MB is free (80 for it, 30 to spare), and memory that children still
+starting have yet to take counts as taken. On the Pi Zero that comes to two at
+once, as before. A computer with more memory, such as a Pi 5, runs as many as
+fit, with no change to the program.
 
 ## What you see
 

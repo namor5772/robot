@@ -2,8 +2,10 @@
 
 A child is a whole separate process running `python -m robot.main -l NAME`.
 It reports back through a result file, and its questions travel through a
-relay folder (see relay.py). On the Pi a child costs many seconds to start
-and a large share of the memory, so their number is capped.
+relay folder (see relay.py). On a small Pi a child costs many seconds to start
+and a large share of the memory, so one is only started while there is memory
+for it: how many can run at once depends on the computer, not on a fixed
+number.
 """
 
 import json
@@ -19,8 +21,18 @@ from pathlib import Path
 
 from robot import instructions, relay
 
-MAX_CHILDREN = 2  # alive at once, per parent run
-MIN_FREE_MB = 110  # do not start a child with less memory than this available
+# How many children run at once is decided by the memory that is free, so the
+# same code suits a Pi Zero and a larger computer. Measured on the Pi Zero 2 W
+# on 2026-11-19: a run starts at 5 MB, holds 77 MB eleven seconds later, when
+# everything is loaded, and grows a little with use (93 MB was seen); the
+# memory the kernel calls available falls by less, 57 MB, because the runs
+# share what they load from the same files.
+CHILD_MB = 80  # what a child run holds once it has loaded
+SPARE_MB = 30  # what must still be free when it has
+MIN_FREE_MB = CHILD_MB + SPARE_MB  # so a child is only started with this much available
+# Where the free memory cannot be read (anywhere but Linux), a fixed number of
+# children at once has to do.
+FALLBACK_MAX_CHILDREN = 2
 MAX_DEPTH = 2  # a child may start children, but their children may not
 DEPTH_ENV = "ROBOT_SPAWN_DEPTH"
 DEFAULT_TIMEOUT = 600
@@ -31,21 +43,91 @@ _STOP_GRACE_SECONDS = 15
 # What starts a child. Tests point this at a stand-in program.
 CHILD_COMMAND = [sys.executable, "-m", "robot.main"]
 REPO_ROOT = Path(__file__).resolve().parent.parent
+_PROC = Path("/proc")
 
 _spawn_lock = threading.Lock()
-_slots = threading.BoundedSemaphore(MAX_CHILDREN)
+_children = []  # the children this program started that may still be running
+_children_lock = threading.Lock()
 
 
 def available_memory_mb():
     """Memory the kernel says can be used without swapping, or None if unknown."""
     try:
-        with open("/proc/meminfo", encoding="ascii") as source:
+        with open(_PROC / "meminfo", encoding="ascii") as source:
             for line in source:
                 if line.startswith("MemAvailable:"):
                     return int(line.split()[1]) // 1024
     except (OSError, ValueError, IndexError):
         pass
     return None
+
+
+def _page_size() -> int:
+    try:
+        return os.sysconf("SC_PAGE_SIZE")
+    except (AttributeError, ValueError, OSError):
+        return 4096
+
+
+def _resident_mb(pid):
+    """The memory a process holds right now, or None where that cannot be read."""
+    try:
+        with open(_PROC / str(int(pid)) / "statm", encoding="ascii") as source:
+            pages = int(source.read().split()[1])
+    except (OSError, ValueError, IndexError, TypeError):
+        return None
+    return pages * _page_size() // (1024 * 1024)
+
+
+def alive_children() -> list:
+    """The child runs this program started that are still running."""
+    with _children_lock:
+        _children[:] = [child for child in _children if child.poll() is None]
+        return list(_children)
+
+
+def _still_to_take(child) -> int:
+    """The memory, in MB, that a child which is still starting has yet to take.
+
+    A child that holds nine tenths of CHILD_MB has loaded, and what it took is
+    in the kernel's figure already. One whose memory cannot be read counts as
+    not having taken any.
+    """
+    held = _resident_mb(child.pid) or 0
+    return CHILD_MB - held if held < CHILD_MB * 9 // 10 else 0
+
+
+def _why_not_another() -> str:
+    """Why another child must not be started now, as an error text; "" if it may.
+
+    The caller holds _spawn_lock, so that starts asked for in the same turn are
+    judged one after the other: each sees the children started before it.
+    """
+    alive = alive_children()
+    free = available_memory_mb()
+    if free is None:
+        if len(alive) >= FALLBACK_MAX_CHILDREN:
+            return (f"Error: {FALLBACK_MAX_CHILDREN} child runs are already running. How "
+                    "much memory is free cannot be read on this computer, so that is the "
+                    "most that are started at once. Wait for one to finish and try again, "
+                    "or do the task in this run.")
+        return ""
+    # A child that has only just been started holds next to nothing yet, and
+    # the kernel's figure does not know what it is about to take. Without this
+    # allowance several children asked for at once would each look affordable.
+    shortfalls = [_still_to_take(child) for child in alive]
+    to_come = sum(shortfalls)
+    if free - to_come >= MIN_FREE_MB:
+        return ""
+    starting = sum(1 for shortfall in shortfalls if shortfall)
+    promised = ""
+    if starting:
+        promised = (f", but about {to_come} MB of that will go to the {starting} child "
+                    f"run{'s' if starting != 1 else ''} still starting")
+    return (f"Error: not enough free memory to start a child run ({free} MB available"
+            f"{promised}; a child run takes about {CHILD_MB} MB and {SPARE_MB} MB must stay "
+            "free). Wait for a child run or other work to finish and try again, or do the "
+            "task in this run.")
 
 
 def _temp_file(folder, prefix, suffix, text=None):
@@ -187,7 +269,6 @@ def run_instruction(agent, params) -> str:
 
     datadir = agent.datadir
     result_path = extra_path = prepend_path = error_path = relay_dir = None
-    have_slot = False
     try:
         with _spawn_lock:
             library = instructions.load_instructions(datadir)
@@ -201,16 +282,9 @@ def run_instruction(agent, params) -> str:
             if depth >= MAX_DEPTH:
                 return ("Error: this run is already a child of a child run and cannot "
                         "start further child runs. Do the work in this run instead.")
-            free = available_memory_mb()
-            if free is not None and free < MIN_FREE_MB:
-                return (f"Error: not enough free memory to start a child run ({free} MB "
-                        "available; a child needs about 80 MB). Wait for other work to "
-                        "finish, or do the task in this run.")
-            if not _slots.acquire(blocking=False):
-                return (f"Error: {MAX_CHILDREN} child runs are already running, which is "
-                        "all this small computer can run at once. Wait for one to finish "
-                        "and try again, or do the task in this run.")
-            have_slot = True
+            refusal = _why_not_another()
+            if refusal:
+                return refusal
 
             datadir.tmp_dir.mkdir(parents=True, exist_ok=True)
             command = list(CHILD_COMMAND) + ["-l", name, "--headless"]
@@ -240,15 +314,17 @@ def run_instruction(agent, params) -> str:
                         start_new_session=(os.name == "posix"))
             except Exception as error:
                 return f"Error launching instruction '{name}': {error}"
+            # Noted before the lock is let go: the next start must count it.
+            with _children_lock:
+                _children.append(process)
 
         if not wait:
             # The child carries on by itself. A helper thread answers its
-            # questions, frees its place when it ends, and tidies up.
+            # questions and tidies up when it ends.
             threading.Thread(
                 target=_attend, name=f"child-{process.pid}", daemon=True,
                 args=(process, relay_dir, answers,
-                      (extra_path, prepend_path, error_path), _slots)).start()
-            have_slot = False  # _attend releases it
+                      (extra_path, prepend_path, error_path))).start()
             extra_path = prepend_path = error_path = relay_dir = None
             noted = " with extra task context" if extra_text else ""
             if prepend_text:
@@ -267,13 +343,10 @@ def run_instruction(agent, params) -> str:
             _remove(path)
         if relay_dir:
             shutil.rmtree(relay_dir, ignore_errors=True)
-        if have_slot:
-            _slots.release()
 
 
-def _attend(process, relay_dir, answers, leftovers, slots):
-    """Look after a child nobody is waiting for, until it ends. `slots` is the
-    counter its place was taken from."""
+def _attend(process, relay_dir, answers, leftovers):
+    """Look after a child nobody is waiting for, until it ends."""
     served = []
     try:
         while process.poll() is None:
@@ -288,7 +361,6 @@ def _attend(process, relay_dir, answers, leftovers, slots):
             _remove(path)
         if relay_dir:
             shutil.rmtree(relay_dir, ignore_errors=True)
-        slots.release()
 
 
 def _wait_for(agent, process, name, timeout, relay_dir, answers, result_path, error_path):
