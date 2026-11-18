@@ -141,7 +141,8 @@ Good to know:
   same windows, and any of the keyboards drives them. The window takes the
   size of the screen that was used last.
 - At the Pi's own screen it is the same command and the same keys, Shift+Tab
-  included. There is no mouse there.
+  included. There is no mouse there: the Pi's text screen passes no clicks on
+  to a program, so everything is done with the keys.
 - Text pasted into the terminal goes into the box that has the cursor, as text.
 - It runs on the Pi only: Python on Windows has no curses.
 
@@ -429,7 +430,55 @@ On the Pi, outside this repository, in `~/robot-data`:
 | `tui_errors.log` | Anything a library printed while the windows were up (normally empty). |
 
 These files use MyAgent's formats, so instructions and skills can be copied
-between the two programs. Nothing in `~/robot-data` is backed up.
+between the two programs. Nothing in `~/robot-data` is backed up by itself:
+see the next section.
+
+## Backing up the Pi
+
+There are two kinds of backup, and both are kept on the laptop.
+
+**The data that changes every day.** Instructions, skills, chats and the cost
+log are in `~/robot-data`, a few megabytes. From PowerShell, in the folder
+that is to hold the copy:
+
+```powershell
+scp -r pi:robot-data .
+```
+
+**The whole SD card.** One file, an exact copy of the card. Written back to a
+card, it gives the Pi as it was that day: the system, the program and its
+key. (The code alone is on GitHub.)
+
+1. Shut the Pi down with `sudo poweroff`, wait until the green light stays
+   off, and take the card out.
+2. Put the card in the laptop. If Windows offers to format a disk, cancel.
+3. In Win32 Disk Imager, name a new image file, choose the card's drive
+   letter (the drive called `bootfs`) and press **Read**. Write would
+   overwrite the card with the file.
+
+To restore, write the file to a card with Raspberry Pi Imager, with "Use
+custom" as the operating system. If it asks about customisation settings,
+answer No: with them the Pi sets itself up as a new machine at its first
+start and may reset its name, password and keys.
+
+- Keep the file private, and out of folders that are synced elsewhere: it
+  holds the API key, the Wi-Fi password and the Pi's keys.
+- The file is as large as the card, whatever is on it, and fits only a card
+  of that size or larger. Cards sold as the same size differ a little, so a
+  larger one is the safe choice.
+- A copy has the same name and keys as the original. Two Pis must not run
+  from the two cards on one network at the same time.
+
+On a larger card the system does not use the extra room by itself: `df -h /`
+still shows the old size. These two commands claim it while the Pi runs,
+without a restart:
+
+```bash
+sudo growpart /dev/mmcblk0 2
+sudo resize2fs /dev/mmcblk0p2
+```
+
+That is how the Pi moved from a 16 GB card to a 32 GB one on 2026-11-19.
 
 ## Working on it
 

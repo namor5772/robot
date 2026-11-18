@@ -27,6 +27,44 @@ see "The windowed interface").
   costs far less than its size, and the kernel's "available" figure, which
   counts only what can be had without swapping, can rise when one more
   program is started.
+- The SD card is a 32 GB card (29.1 GiB) since 2026-11-19, and the system
+  partition fills it: 29 GB, of which 2.7 GB is used. Before that it was a
+  16 GB card. The owner keeps an image of the 16 GB card on the laptop (the
+  state of that morning; it fits any card of 16 GB or more). What the move
+  showed, since restoring a backup goes the same way:
+  - The image was read with Win32 Disk Imager, with the Pi shut down, and
+    written to the new card with Raspberry Pi Imager ("Use custom"). The
+    copy started as the same machine: same name, same keys, `ssh pi` without
+    a warning.
+  - The system had been set up through cloud-init: Raspberry Pi Imager put
+    `user-data` and `meta-data` on the boot partition, and `cmdline.txt`
+    carries `ds=nocloud;i=<instance>`. A copy has the same instance name, so
+    nothing is set up again. Writing a copy WITH the Imager's customisation
+    settings would give it a new one, and the first start could then reset
+    the name, the password and the keys.
+  - The system does not enlarge itself on a larger card, cloud-init or not.
+    `sudo growpart /dev/mmcblk0 2` (try `--dry-run` first) and `sudo
+    resize2fs /dev/mmcblk0p2` did it while the Pi was running, with no
+    restart and with an interface of the owner's open. The partition keeps
+    its start and the disk its identifier, which is all that
+    `root=PARTUUID=...` in `cmdline.txt` goes by. `raspi-config
+    --expand-rootfs` does it with `fdisk` and a step at the next start (read
+    in its script, not tried here).
+  - A copy onto a card writes and verifies only the image's own length, here
+    the first 14.6 GB. The rest of the new card was therefore tested in
+    full: 23.8 GB written over the free space, in files whose every 4 KB
+    block carries a stamp of its place, and all of it read back right, up to
+    the card's last block (16 MB/s writing, 22 MB/s reading, 50 minutes).
+    Its size is proven and needs no second test. The script was fed over
+    ssh and is not in the repo.
+  - `sudo dpkg --verify` checks every installed system file against its
+    checksum (two minutes). On this Pi it always reports one file,
+    `/usr/lib/modprobe.d/g_ether.conf`, which the tool of its own package
+    (`rpi-usb-gadget`) rewrites. That is not damage.
+  - A backup of the card as it is now is a 29 GB file and needs a card of
+    32 GB or more.
+  - The Pi keeps no log across restarts (the journal is in memory), so the
+    messages of an earlier start cannot be read afterwards.
 - The Pi also has a keyboard and screen attached. The screen is a text
   console (tty1) of 240 columns by 67 rows on 1920 x 1080, in UTF-8, with the
   kernel's own font and no mouse service.
@@ -167,6 +205,16 @@ show the user the output. The user does not want to be asked to test things.
     keys), run the launcher under `pty.fork()` and write the keys to it.
     Mind the memory: every interface started is another 80 MB or so beside
     whatever the owner has open.
+- A job on the Pi that outlasts an ssh command (the card test of 2026-11-19
+  took 50 minutes) is started detached, `setsid nohup python3 -u /tmp/x.py >
+  /tmp/x.log 2>&1 < /dev/null &`, and ends its log with a line that says so
+  (`FINISHED: ...`). A background loop on the laptop asks once a minute
+  whether that line is there. The job then survives a dropped connection and
+  a laptop that sleeps. Rehearse such a job small first, and once with a
+  fault put in on purpose: a check that cannot fail proves nothing.
+- `pgrep -f name` run over ssh also finds the shell that ssh started for the
+  command, because the name is in that shell's own command line. Write the
+  pattern so that it does not match itself: `pgrep -f 'zz-cardful[l]'`.
 - To try unfinished work on the Pi without touching the checkout, copy the
   working tree to a scratch folder and run it there with the checkout's
   Python: `tar -cf - --exclude=.venv --exclude=.git . | ssh pi "mkdir -p
@@ -201,6 +249,8 @@ show the user the output. The user does not want to be asked to test things.
 - The windowed interface was added on this day. Its state is in
   `~/robot-data/tui_state.json`. The owner used it the same evening, over SSH
   from the laptop and at the Pi's own screen.
+- On 2026-11-19 the Pi moved from its 16 GB card to a 32 GB one (see "Target
+  device"), and the owner ran three interfaces at once at its own screen.
 - No hardware tools exist yet beyond the CPU temperature reading.
 
 ## When the SSH connection drops
@@ -661,9 +711,17 @@ underneath is the same code the chat runs; only the console differs.
 - At the Pi's own screen (`TERM=linux`, 240 x 67) it is the same command. The
   owner has used it there. Shift+Tab works: the console's keymap sends ESC
   Tab for it, which is the back-tab of the `linux` terminal description and
-  which `KeyParser` takes for one as well. There is no mouse (no `gpm`).
+  which `KeyParser` takes for one as well.
   Alt with an F-key switches text consoles and never reaches a program, which
   costs nothing here: the interface's F-keys are used without Alt.
+- There is no mouse at the Pi's own screen. The kernel sees the owner's
+  mouse, but the text console hands no clicks to a program: over SSH it is
+  the laptop's terminal that reports them. `gpm` (not installed) would not
+  change that, because tmux takes the mouse only from a terminal that
+  reports it. The interface could read `/dev/input/mice` itself and draw a
+  pointer (the user is in the `input` group). The owner was asked on
+  2026-11-19 and is content with the keyboard there: do not build that
+  unasked.
 - The text consoles give each interface a screen to itself at the Pi. Alt+F2
   shows tty2 (the keymap has `Console_2` on it), which asks for a login the
   first time: nothing runs on tty2 to tty6 until one is shown. `ui.sh
