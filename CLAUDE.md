@@ -305,9 +305,15 @@ show the user the output. The user does not want to be asked to test things.
   failed before any password was looked at: the access point did not answer
   the Pi's request to authenticate ("Authentication ... timed out", then
   NetworkManager's "no-secrets"). It announces WPA2 with WPA3 and Wi-Fi 6.
-  The cause is not known and may lie in the access point's settings. While
-  that network is in range and the first one is not, both NetworkManager and
-  `robot-wifi` keep trying it and failing.
+  The cause is not known and may lie in the access point's settings. Left to
+  connect automatically, both profiles were tried and failed over and over
+  whenever the first network was away. So the owner had automatic connecting
+  switched off for the two of them on 2026-11-20 (`nmcli connection modify
+  NAME connection.autoconnect no`): neither NetworkManager nor `robot-wifi`
+  tries them now, and the Pi waits for the first network. Once that second
+  network can be joined, `connection.autoconnect yes` brings them back.
+- That makes the opening of this section out of date in one point: not all
+  saved Wi-Fi networks connect automatically any more.
 - The Wi-Fi monitor the robot made (`~/wifimon`, see "State on 2026-11-18")
   is separate and only writes down changes: it pings the gateway, so its log
   also shows short losses during which the Pi never left the network.
