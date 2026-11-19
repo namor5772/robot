@@ -248,8 +248,8 @@ show the user the output. The user does not want to be asked to test things.
 - Because one skill is on demand, every run now also offers `get_skill`.
 - `.venv/bin/python -m robot.main --skills` and `--list` on the Pi show the
   current skills and instructions; check there instead of trusting this list.
-- 1,256 tests pass (counted on 2026-11-19). On the Pi 2 are skipped, on the
-  laptop 31, among them the 8 real-terminal tests (they need curses), the 19
+- 1,269 tests pass (counted on 2026-11-20). On the Pi 2 are skipped, on the
+  laptop 44, among them the 13 of the Wi-Fi service (bash), the 8 real-terminal tests (they need curses), the 19
   launcher tests (they need bash) and 3 that build a real tree of child runs
   (they need the kernel's list of processes). `tests/test_spawn.py` starts real
   processes and is the slow one on the laptop, where starting and stopping a
@@ -260,6 +260,50 @@ show the user the output. The user does not want to be asked to test things.
 - On 2026-11-19 the Pi moved from its 16 GB card to a 32 GB one (see "Target
   device"), and the owner ran three interfaces at once at its own screen.
 - No hardware tools exist yet beyond the CPU temperature reading.
+
+## Getting back on the Wi-Fi
+
+- The Pi's network is run by NetworkManager (`nmcli`). Its saved Wi-Fi
+  networks all connect automatically; the one in everyday use has the
+  highest priority. `nmcli connection show` on the Pi lists them: they are
+  not named here.
+- NetworkManager rejoins a saved network by itself when it sees it again. But
+  it can give up: on the night of 2026-11-19 the network went away and came
+  back several times, and from 23:26 the Pi stayed off it until the owner
+  restarted the Pi in the morning. Why is not known: the Pi keeps no log
+  across restarts. A likely cause is a join that fails at the wrong moment,
+  after which NetworkManager waits for somebody to connect by hand.
+- So since 2026-11-20 a service, `robot-wifi`, is that somebody
+  (`scripts/wifi-reconnect.sh`, run as root by systemd, started with the Pi).
+  Every 30 s it reads `wlan0`'s state. Connected or connecting: nothing, not
+  even a scan. Off the Wi-Fi at one look: NetworkManager gets its own go. Off
+  at the next: it scans, and when a saved network that connects automatically
+  is in range (highest priority first) it runs `nmcli connection up` for it.
+  Ten failures in a row restart NetworkManager, at most once an hour. Nothing
+  in range is said once and waited out.
+- The script names no network (the repo is public). Its log is
+  `/var/log/robot-wifi.log`, events only, cut to its newer half at 200 KB.
+- `deploy.sh` sets the service up (`install_wifi_service`): it writes
+  `/etc/systemd/system/robot-wifi.service`, whose text is in `deploy.sh`
+  because it names the checkout's folder, enables it, and restarts it on
+  every deploy so that it runs the script as it is now. A failure there only
+  warns. The deploy that first brings a new step to `deploy.sh` does not run
+  it: bash has the old script in memory by then. Deploy twice.
+- Tried for real on 2026-11-20 with a detached job (see "Running and
+  testing"): `sudo nmcli device disconnect wlan0` leaves the Pi as
+  NetworkManager is when it has given up. With the service stopped it stayed
+  off for the 100 s that were watched; once the service was started it was
+  back after 34 s. `tests/test_wifi_reconnect.py` runs the script against a
+  stand-in for `nmcli` (13 tests, bash, so skipped on the laptop).
+- Such a check takes the Pi off the network for minutes. It must run
+  detached, must put the Wi-Fi back by hand at its end whatever happened, and
+  must not start while a run is in progress (`~/robot-data/runs` holds a file
+  then).
+- The Wi-Fi monitor the robot made (`~/wifimon`, see "State on 2026-11-18")
+  is separate and only writes down changes: it pings the gateway, so its log
+  also shows short losses during which the Pi never left the network.
+- Not done, and not asked for: Wi-Fi power saving is on (`iw dev wlan0 get
+  power_save`), which may be behind some of those short losses.
 
 ## When the SSH connection drops
 
@@ -379,8 +423,9 @@ show the user the output. The user does not want to be asked to test things.
     `skillsui.py`: `SkillsManager`.
   - `app.py`: `App` and `MainWindow`, the output pane, and the three classes
     that join a run to the screen (`UiConsole`, `UiInterrupts`, `Runner`).
-- `scripts/deploy.sh` (runs on the Pi: pull, pip install, install tmux; its
-  body is in a `main` function so the pull can replace the file safely),
+- `scripts/deploy.sh` (runs on the Pi: pull, pip install, install tmux, set
+  up the `robot-wifi` service; its body is in a `main` function so the pull
+  can replace the file safely), `scripts/wifi-reconnect.sh` (that service),
   `scripts/chat.sh`, `scripts/ui.sh`, `scripts/tmux.conf`.
 - `requirements.txt`: `anthropic==2.8.0`, `python-dotenv==1.2.4`. Pinned on
   purpose: 2.8.0 sends API version 2026-10-21, has no `temperature`
