@@ -486,6 +486,31 @@ sudo resize2fs /dev/mmcblk0p2
 
 That is how the Pi moved from a 16 GB card to a 32 GB one on 2026-11-19.
 
+## Getting back on the Wi-Fi
+
+When a Wi-Fi network the Pi knows goes away and comes back (a phone's
+hotspot, for instance), the Pi rejoins it by itself. Two things see to that:
+
+- NetworkManager, the system's own network service, rejoins a saved network
+  when it sees it again. Most of the time that is all it takes.
+- Sometimes NetworkManager gives up on a network and waits for somebody to
+  connect by hand; the Pi then stayed off the air until it was restarted. So a
+  small service, `robot-wifi`, looks every half minute. When the Pi is off the
+  Wi-Fi while a saved network is in range, it connects to it. If that fails
+  ten times in a row it restarts NetworkManager, at most once an hour.
+
+Expect the Pi back about a minute after the network returns. The service
+knows no network by name: it uses the Wi-Fi networks saved on the Pi that are
+set to connect automatically, the one with the highest priority first.
+`deploy.sh` sets it up, and it starts with the Pi.
+
+```bash
+systemctl status robot-wifi          # is it running
+tail /var/log/robot-wifi.log         # what it did, and when
+sudo systemctl stop robot-wifi       # stop it until the Pi is next started
+sudo systemctl disable --now robot-wifi   # switch it off for good
+```
+
 ## Working on it
 
 Develop on the laptop, push to GitHub, deploy to the Pi. Never edit files on
@@ -513,7 +538,7 @@ address. If it times out, the address has changed; see `CLAUDE.md`.
 - `robot/prompts.py`: the system prompt's wording.
 - `robot/models.py`: model and price tables. `robot/costs.py`, `robot/chats.py`, `robot/history.py`, `robot/datastore.py`, `robot/relay.py`: supporting parts.
 - `robot/tui/`: the windowed interface. `app.py`: the main window and how a run and the screen work side by side. `editor.py`, `skillsui.py`: the Instruction Editor and the Skills Manager. `widgets.py`, `dialogs.py`: buttons, lists, text boxes and small windows. `screen.py`: the screen and the keyboard (curses). `text.py`: wrapping and editing text.
-- `scripts/chat.sh`, `scripts/ui.sh`, `scripts/tmux.conf`: the tmux launchers for the chat and the windowed interface. `scripts/deploy.sh`: run on the Pi to update it.
+- `scripts/chat.sh`, `scripts/ui.sh`, `scripts/tmux.conf`: the tmux launchers for the chat and the windowed interface. `scripts/deploy.sh`: run on the Pi to update it. `scripts/wifi-reconnect.sh`: the `robot-wifi` service, which puts the Pi back on the Wi-Fi.
 - `tests/`: the test suite. `CLAUDE.md`: detailed notes for Claude Code sessions.
 
 ## Setup on the Pi
@@ -521,4 +546,5 @@ address. If it times out, the address has changed; see `CLAUDE.md`.
 - Checkout at `~/robot`, venv at `~/robot/.venv` (created with `--system-site-packages`).
 - `~/robot/.env` contains `ANTHROPIC_API_KEY=...` and is never committed.
 - Passwordless sudo for the Pi's user, if the agent should have root.
-- `deploy.sh` installs the pinned Python packages and tmux.
+- `deploy.sh` installs the pinned Python packages and tmux, and sets up the
+  `robot-wifi` service (it needs sudo for that).

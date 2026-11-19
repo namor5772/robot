@@ -19,12 +19,46 @@ main() {
     fi
   fi
 
+  install_wifi_service || echo "warning: could not set up the robot-wifi service" >&2
+
   # Anchored at the start of the command line, so a shell whose own command
   # merely mentions the program is not mistaken for a running one. Either way
   # of running it counts: the chat, or the windowed interface.
   if pgrep -f "^[^ ]*python[^ ]* -m robot\.(main|tui)" >/dev/null 2>&1; then
     echo "note: the robot program is running and keeps the old code until it is restarted"
   fi
+}
+
+# The service that puts the Pi back on the Wi-Fi (see wifi-reconnect.sh). Its
+# description for systemd is written here and not kept as a file, because it
+# names the folder this checkout is in. A failure here must not fail the
+# deploy. ROBOT_SYSTEMD_DIR is for the tests.
+install_wifi_service() {
+  local unit_dir="${ROBOT_SYSTEMD_DIR:-/etc/systemd/system}"
+  local unit="$unit_dir/robot-wifi.service"
+  local script="$PWD/scripts/wifi-reconnect.sh"
+  local wanted
+  command -v systemctl >/dev/null 2>&1 || return 0
+  command -v nmcli >/dev/null 2>&1 || return 0
+  wanted="[Unit]
+Description=Robot: put the Pi back on the Wi-Fi when a saved network returns
+After=NetworkManager.service
+
+[Service]
+ExecStart=/bin/bash $script
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target"
+  if [ "$(cat "$unit" 2>/dev/null)" != "$wanted" ]; then
+    echo "Setting up the robot-wifi service..."
+    printf '%s\n' "$wanted" | sudo -n tee "$unit" >/dev/null || return 1
+    sudo -n systemctl daemon-reload || return 1
+  fi
+  sudo -n systemctl enable --quiet robot-wifi || return 1
+  # Restarted every time, so that it runs the script as it is now.
+  sudo -n systemctl restart robot-wifi || return 1
 }
 
 main "$@"
