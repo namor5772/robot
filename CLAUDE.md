@@ -317,8 +317,20 @@ show the user the output. The user does not want to be asked to test things.
 - The Wi-Fi monitor the robot made (`~/wifimon`, see "State on 2026-11-18")
   is separate and only writes down changes: it pings the gateway, so its log
   also shows short losses during which the Pi never left the network.
-- Not done, and not asked for: Wi-Fi power saving is on (`iw dev wlan0 get
-  power_save`), which may be behind some of those short losses.
+- Wi-Fi power saving is off since 2026-11-20, at the owner's request. It is a
+  setting of the Pi, not of the repo:
+  `/etc/NetworkManager/conf.d/wifi-powersave-off.conf` holds `[connection]`
+  and `wifi.powersave = 2` (2 is NetworkManager's "disable"), for every
+  network, read with `sudo nmcli general reload conf`. NetworkManager applies
+  it each time a network is joined; `sudo iw dev wlan0 set power_save off`
+  did it at once, without leaving the network. Checked: switched on again by
+  hand, then the network joined afresh, and `iw dev wlan0 get power_save`
+  said off. A card written from an image older than that day does not have
+  the file.
+- What it changed in 40 pings to the gateway, a quarter of a second apart:
+  14 ms on average with it on, 9 ms with it off, none lost either way. So
+  the short losses in the monitor's log were not shown to come from power
+  saving; whether there are fewer of them now is for that log to say.
 
 ## When the SSH connection drops
 
@@ -363,7 +375,8 @@ show the user the output. The user does not want to be asked to test things.
   and Enter sends it. That happened on 2026-11-16 and cost one call.
 - `scripts/tmux.conf` therefore sets `escape-time 500`. tmux 3.5's own default
   is 10 ms; a 100 ms gap reproduced the leak with 10 and not with 500. The
-  Pi's Wi-Fi has power saving on, which delivers packets in bunches. A gap of
+  Pi's Wi-Fi had power saving on then, which delivers packets in bunches (it
+  is off since 2026-11-20, see "Getting back on the Wi-Fi"). A gap of
   more than half a second still gets through.
 - For that case `Console._ask_terminal` does not take a line that is nothing
   but such answers for a reply (`console.only_terminal_replies`): it says so
