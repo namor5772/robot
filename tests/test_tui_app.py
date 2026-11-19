@@ -421,7 +421,7 @@ class SingleTask(MainCase):
                      reply(text_block("Blue it is."))],
             "f2", self.asked(),
             self.shows("robot asks> Which colour?", "Waiting for your message",
-                       "Your message (Enter sends, Ctrl+J starts a new line)"),
+                       "Your message (Enter sends, empty Enter ends, Ctrl+J new line)"),
             typed("blue"), "enter", self.ended(),
             self.shows("you> blue", "robot> Blue it is.",
                        "Your message (the robot is not waiting for one)"))
@@ -502,10 +502,41 @@ class Conversation(MainCase):
             self.shows("you> one", "two"))
         self.assertEqual(said(client.requests[1]["messages"][-1]), "one\ntwo")
 
-    def test_an_empty_message_is_not_sent(self):
+    def test_an_empty_message_ends_the_conversation(self):
         client = self.run_with(
-            "Talk", [reply(text_block("Hello."))], "f2", self.asked(), "enter", typed("  "),
-            "enter", self.shows("Type a message first.", "Waiting for your message"))
+            "Talk", [reply(text_block("Hello.")), reply(text_block("Never said."))],
+            "f2", self.asked(), "enter", self.ended(),
+            self.shows("Conversation ended.", "--- run ended: completed"),
+            self.lacks("Never said."))
+        self.assertFalse(self.app.asking)
+        self.assertEqual(len(client.requests), 1)
+
+    def test_a_message_of_spaces_only_ends_it_too(self):
+        client = self.run_with(
+            "Talk", [reply(text_block("Hello.")), reply(text_block("Never said."))],
+            "f2", self.asked(), typed("  "), "enter", self.ended(),
+            self.shows("--- run ended: completed"))
+        self.assertEqual(len(client.requests), 1)
+        self.assertEqual(self.app.main.reply.text(), "")
+
+    def test_an_empty_answer_to_a_question_stops_the_run(self):
+        client = self.run_with(
+            "Task", [reply(tool_use("user_prompt", {"message": "Which colour?"})),
+                     reply(text_block("Never said."))],
+            "f2", self.asked(), "enter", self.ended(),
+            self.shows("--- run ended: stopped"), self.lacks("Never said."))
+        self.assertEqual(len(client.requests), 1)
+
+    def test_an_empty_first_message_means_nothing_is_run(self):
+        client = self.run_with("Chat", [], "f2", self.asked(), "enter", self.ended(),
+                               self.shows("(nothing was run)", "--- run ended: stopped"))
+        self.assertEqual(client.requests, [])
+
+    def test_enter_elsewhere_is_no_empty_message(self):
+        # Only the reply box sends: Enter on the output pane leaves the robot waiting.
+        client = self.run_with(
+            "Talk", [reply(text_block("Hello."))], "f2", self.asked(), "alt+o", "enter",
+            self.shows("Waiting for your message"))
         self.assertTrue(self.app.asking)
         self.assertEqual(len(client.requests), 1)
 

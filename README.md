@@ -79,7 +79,7 @@ bash ~/robot/scripts/ui.sh
 │  call 3: $0.0001 this call  |  $0.0012 total  (in:2  out:24  cache_write:50  │
 │cache_read:7,649)                                                             │
 └──────────────────────────────────────────────────────────────────────────────┘
-┌─ Your message (Enter sends, Ctrl+J starts a new line) ───────────────────────┐
+┌─ Your message (Enter sends, empty Enter ends, Ctrl+J new line) ──────────────┐
 │                                                                              │
 │                                                                              │
 │                                                                              │
@@ -102,7 +102,9 @@ What the main window has:
   progress; while the robot is waiting for your message, it ends the run.
 - **Your message** takes the cursor whenever the robot waits for you. Enter
   sends; Ctrl+J starts a new line. `quit`, `exit`, `stop` or `bye` on its own
-  ends a conversation, as in the chat.
+  ends a conversation, as in the chat. Enter on an empty box ends it too, as
+  in MyAgent (the chat ignores an empty line): a conversation ends, and when
+  the robot has asked a question the run stops.
 - **Instruction** (F4) opens the Instruction Editor: a list of the saved
   instructions and a form for the one selected (name, model, thinking level,
   Fast, Meta, Convo, notes, blocked tools, skills, upgrade model, text).

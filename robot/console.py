@@ -171,6 +171,20 @@ class Console:
         self.input_wait_secs = 0.0  # time spent waiting on the person, not working
         self._startup_input_dropped = False
 
+    # True where an empty reply from a person is meant (the windowed
+    # interface's reply box), not a slip of the Enter key.
+    empty_is_answer = False
+
+    @property
+    def skips_empty(self) -> bool:
+        """An empty reply is ignored and the person asked again.
+
+        So it is at a terminal prompt. Everywhere else an empty reply is an
+        answer: it ends a conversation, and stops the run when the model had
+        asked a question.
+        """
+        return self.tty and not self.empty_is_answer
+
     def _drop_startup_input(self):
         """Before the first prompt, throw away what arrived while starting up.
 

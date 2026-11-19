@@ -211,7 +211,7 @@ def first_message(console) -> str:
         if reply is INTERRUPTED or reply is None:
             return ""
         if reply == "":
-            if console.tty:
+            if console.skips_empty:
                 continue
             return ""
         if convo_end_word(reply):

@@ -276,7 +276,8 @@ class Agent:
         """A conversation with a person at the keyboard.
 
         There the chat forgives: Ctrl-C and API errors return to the prompt
-        instead of ending the run, and an empty line is ignored.
+        instead of ending the run. (Whether an empty line is ignored as well
+        is the console's skips_empty: yes at a prompt, no in the windows.)
         """
         return self.settings.conversational and self.console.tty
 
@@ -409,7 +410,7 @@ class Agent:
             if reply is None:
                 break  # nobody is there to answer
             if reply == "":
-                if console.tty:
+                if console.skips_empty:
                     continue  # a stray Enter at a terminal is not an answer
                 break
             if convo_end_word(reply):
@@ -555,7 +556,7 @@ class Agent:
                     reply = console.ask(question=question)
                     if reply is INTERRUPTED:
                         reply = None
-                    if reply == "" and console.tty:
+                    if reply == "" and console.skips_empty:
                         continue  # a stray Enter at a terminal is not an answer
                     break
             finally:
@@ -579,7 +580,7 @@ class Agent:
             reply = console.ask(question=message, preface=self._turn_text)
             if reply is INTERRUPTED:
                 reply = None
-            if reply == "" and console.tty:
+            if reply == "" and console.skips_empty:
                 continue  # a stray Enter at a terminal is not an answer
             break
         if not reply:

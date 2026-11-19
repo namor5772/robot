@@ -93,7 +93,9 @@ THE MAIN WINDOW
   the run has shown. End returns to the newest line.
 
   Your message: Enter sends it. Ctrl+J or Alt+Enter starts a new
-  line. quit, exit, stop or bye on its own ends a conversation.
+  line. Enter on an empty box ends a conversation, and so does
+  quit, exit, stop or bye on its own. When the robot has asked a
+  question, Enter on an empty box stops the run.
 
   The boxes along the bottom choose what a run shows: Activity
   (tool lines and the cost of each call), Thinking, Tool calls
@@ -185,7 +187,10 @@ class UiConsole(Console):
         super().__init__(interrupts=interrupts, stdin=io.StringIO(""), stdout=io.StringIO(),
                          **flags)
         self.bridge = bridge
-        self.tty = True  # a person is there: the forgiving rules of a chat apply
+        self.tty = True  # a person is there: STOP and an API error return to the reply box
+        # But an empty message is an answer here, as in MyAgent's dialog: the
+        # reply box takes Enter only while it has the focus, so it is no slip.
+        self.empty_is_answer = True
 
     def _show(self, text, dim):
         self.bridge.events.put(("out", text, dim))
@@ -592,9 +597,8 @@ class MainWindow(Window):
         super().handle(event)
 
     def _send(self, text):
-        if not text.strip():
-            self.app.status = "Type a message first."
-            return
+        # An empty message is sent like any other: it ends the conversation,
+        # or stops the run when the robot had asked a question.
         if self.app.send_reply(text.strip()):
             self.reply.set_text("")
             self.reply_over()
@@ -603,7 +607,7 @@ class MainWindow(Window):
 
     def await_reply(self):
         self.reply.enabled = True
-        self.reply.note = "Enter sends, Ctrl+J starts a new line"
+        self.reply.note = "Enter sends, empty Enter ends, Ctrl+J new line"
         self.focus = self.reply
 
     def reply_over(self):

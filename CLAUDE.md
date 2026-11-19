@@ -240,7 +240,7 @@ show the user the output. The user does not want to be asked to test things.
 - Because one skill is on demand, every run now also offers `get_skill`.
 - `.venv/bin/python -m robot.main --skills` and `--list` on the Pi show the
   current skills and instructions; check there instead of trusting this list.
-- 1,246 tests pass (counted on 2026-11-19). On the Pi 2 are skipped, on the
+- 1,250 tests pass (counted on 2026-11-19). On the Pi 2 are skipped, on the
   laptop 31, among them the 8 real-terminal tests (they need curses), the 19
   launcher tests (they need bash) and 3 that build a real tree of child runs
   (they need the kernel's list of processes). `tests/test_spawn.py` starts real
@@ -465,7 +465,7 @@ show the user the output. The user does not want to be asked to test things.
   end of input means nobody is there), `--headless` (never reads stdin: a relay
   folder answers, or nobody does).
 - At a terminal the chat is forgiving, unlike MyAgent's dialog: an empty line is
-  ignored (and so is a line that came from the terminal itself, see "Terminal
+  ignored (not so in the windowed interface, see "A run and the screen"; and so is a line that came from the terminal itself, see "Terminal
   answers that reach the prompt"), Ctrl-C cancels the reply or command and
   returns to `you>`, an API error returns to `you>`. Everywhere else MyAgent's rules hold: an empty reply
   ends a conversation, and an empty reply or `exit` to `user_prompt` stops the
@@ -612,7 +612,15 @@ underneath is the same code the chat runs; only the console differs.
   chat's nameless run exists only in `robot.main`.
 - `UiConsole` is a `Console` whose `_show` posts to the screen and whose
   `_read_reply` waits for the reply box. `tty` is True, so the forgiving
-  rules of a chat at a terminal apply. The transcript is written as before.
+  rules of a chat at a terminal apply, with one exception. The transcript is
+  written as before.
+- The exception (since 2026-11-19, at the owner's request, to match MyAgent's
+  dialog): Enter on an empty reply box is an answer. It ends a conversation,
+  stops the run when the model had asked through `user_prompt`, and at the
+  first message of an instruction without text nothing is run. The chat still
+  ignores an empty line. `Console.skips_empty` is what the agent asks (`tty
+  and not empty_is_answer`); `UiConsole` sets `empty_is_answer`. Only the
+  reply box sends: Enter with the focus elsewhere presses what is focused.
 - STOP is `UiInterrupts.press()`: it sets the flag and sends the main thread
   a real SIGINT (`signal.pthread_kill`). The flag alone would not do: the
   agent may be blocked in a network read or a 60 s shell command, and only a
