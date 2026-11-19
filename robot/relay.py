@@ -30,13 +30,36 @@ REPLY = "reply.json"
 ANSWERED = "answered.json"
 
 
+def _while_not_in_use(action):
+    """Do `action`, trying again for a moment while Windows says the file is in use.
+
+    On Windows a file that another process has open for reading can be neither
+    replaced nor removed, and the two sides of a relay folder read each
+    other's files every fraction of a second. Linux has no such rule, so on
+    the Pi the first try is the only one.
+    """
+    for _ in range(200):
+        try:
+            return action()
+        except PermissionError:
+            time.sleep(0.01)
+    return action()
+
+
 def _write(path, data):
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     fd, tmp = tempfile.mkstemp(dir=str(path.parent), suffix=".tmp")
     with os.fdopen(fd, "w", encoding="utf-8") as handle:
         json.dump(data, handle, ensure_ascii=False)
-    os.replace(tmp, path)
+    try:
+        _while_not_in_use(lambda: os.replace(tmp, path))
+    except OSError:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
 
 
 def _read(path):
@@ -50,7 +73,7 @@ def _read(path):
 
 def _unlink(path):
     try:
-        Path(path).unlink()
+        _while_not_in_use(Path(path).unlink)
     except FileNotFoundError:
         pass
 

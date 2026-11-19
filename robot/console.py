@@ -171,20 +171,6 @@ class Console:
         self.input_wait_secs = 0.0  # time spent waiting on the person, not working
         self._startup_input_dropped = False
 
-    # True where an empty reply from a person is meant (the windowed
-    # interface's reply box), not a slip of the Enter key.
-    empty_is_answer = False
-
-    @property
-    def skips_empty(self) -> bool:
-        """An empty reply is ignored and the person asked again.
-
-        So it is at a terminal prompt. Everywhere else an empty reply is an
-        answer: it ends a conversation, and stops the run when the model had
-        asked a question.
-        """
-        return self.tty and not self.empty_is_answer
-
     def _drop_startup_input(self):
         """Before the first prompt, throw away what arrived while starting up.
 
@@ -354,26 +340,31 @@ class Console:
 
     def _ask_terminal(self, question, preface, prompt):
         seq = self._relay_announce(question, preface)
-        self._emit("\n")
-        self._drop_startup_input()
         try:
-            with self.interrupts.raisable():
-                line = input(prompt)
-        except EOFError:
-            self._after_terminal_line(prompt, None)
-            return None
-        except KeyboardInterrupt:
-            self.interrupts.clear()
-            self._after_terminal_line(prompt, None)
-            return None if self.interrupts.stop.is_set() else INTERRUPTED
+            while True:
+                self._emit("\n")
+                self._drop_startup_input()
+                try:
+                    with self.interrupts.raisable():
+                        line = input(prompt)
+                except EOFError:
+                    self._after_terminal_line(prompt, None)
+                    return None
+                except KeyboardInterrupt:
+                    self.interrupts.clear()
+                    self._after_terminal_line(prompt, None)
+                    return None if self.interrupts.stop.is_set() else INTERRUPTED
+                self._after_terminal_line(prompt, line)
+                if only_terminal_replies(line):
+                    # Nobody typed this. It is not an answer of any kind, not
+                    # even the empty one (which ends the conversation), so the
+                    # prompt comes back.
+                    self._line("(ignored: that line came from your terminal, "
+                               "not from the keyboard)")
+                    continue
+                return line.strip()
         finally:
             self._relay_answered(seq)
-        self._after_terminal_line(prompt, line)
-        if only_terminal_replies(line):
-            # Nobody typed this, so it is no more an answer than a bare Enter.
-            self._line("(ignored: that line came from your terminal, not from the keyboard)")
-            return ""
-        return line.strip()
 
     def _after_terminal_line(self, prompt, line):
         # The terminal echoed what was typed, so _emit never saw it: record it.

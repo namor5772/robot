@@ -171,10 +171,16 @@ class AskingForTheTask(MainCase):
         # What a terminal's answer to tmux left at the prompt on 2026-11-16,
         # followed by Enter. It was sent to the model as the first message.
         self.console.tty = True
-        typed = ["11;rgb:0c0c/0c0c/0c0c", "", "how hot are you?"]
+        typed = ["11;rgb:0c0c/0c0c/0c0c", "how hot are you?"]
         with mock.patch("builtins.input", side_effect=typed):
             self.assertEqual(main.first_message(self.console), "how hot are you?")
         self.assertEqual(self.out.getvalue().count("(ignored: that line came from"), 1)
+
+    def test_an_empty_line_at_a_terminal_means_no_task(self):
+        self.console.tty = True
+        with mock.patch("builtins.input", side_effect=["", "how hot are you?"]) as asked:
+            self.assertEqual(main.first_message(self.console), "")
+        self.assertEqual(asked.call_count, 1)
 
 
 class StartingAndFailing(MainCase):

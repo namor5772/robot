@@ -246,13 +246,14 @@ class UserPromptTool(LoopCase):
         self.assertEqual(made.run(), "completed")
         self.assertEqual(made.messages[2]["content"][0]["content"], "quit")
 
-    def test_at_a_terminal_a_stray_enter_is_not_an_answer(self):
+    def test_at_a_terminal_too_an_empty_answer_stops_the_run(self):
         console = TerminalConsole(["", "red"])
         script = [reply(tool_use("user_prompt", {"message": "Colour?"})),
                   reply(text_block("Red."))]
         made = self.make(script, console=console)
-        self.assertEqual(made.run(), "completed")
-        self.assertEqual(made.messages[2]["content"][0]["content"], "red")
+        self.assertEqual(made.run(), "stopped")
+        self.assertEqual(len(self.client.requests), 1)
+        self.assertEqual(console.replies, ["red"])  # nobody was asked a second time
 
     def test_the_preface_is_what_the_model_said_before_asking(self):
         console = TerminalConsole(["yes"])
@@ -317,12 +318,14 @@ class Conversations(LoopCase):
         made = self.make([reply(text_block("Hi."))], lines="", conversational=True)
         self.assertEqual(made.run(), "completed")
 
-    def test_at_a_terminal_an_empty_line_is_ignored(self):
-        console = TerminalConsole(["", "", "again", None])
+    def test_at_a_terminal_too_an_empty_line_ends_the_conversation(self):
+        console = TerminalConsole(["", "again", None])
         script = [reply(text_block("Hi.")), reply(text_block("Hi again."))]
         made = self.make(script, console=console, conversational=True)
         self.assertEqual(made.run(), "completed")
-        self.assertEqual(made.messages[2]["content"], "again")
+        self.assertEqual(len(self.client.requests), 1)
+        self.assertEqual(console.replies, ["again", None])
+        self.assertIn("Conversation ended.", console.out.getvalue())
 
     def test_at_a_terminal_a_reply_with_no_text_still_prompts(self):
         console = TerminalConsole(["are you there?", None])

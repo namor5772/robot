@@ -201,22 +201,15 @@ def show_banner(console, settings, skills):
         if parts:
             console.note("Skills: " + "; ".join(parts))
     if settings.conversational and console.tty:
-        console.note("Type quit, stop or exit to end. Ctrl-C stops a reply.")
+        console.note("Type quit, stop or exit, or send nothing, to end. Ctrl-C stops a reply.")
 
 
 def first_message(console) -> str:
-    """Ask for the task. Empty when the person leaves instead."""
-    while True:
-        reply = console.ask()
-        if reply is INTERRUPTED or reply is None:
-            return ""
-        if reply == "":
-            if console.skips_empty:
-                continue
-            return ""
-        if convo_end_word(reply):
-            return ""
-        return reply
+    """Ask for the task. Empty when the person leaves instead: an empty line does that too."""
+    reply = console.ask()
+    if reply is INTERRUPTED or reply is None or convo_end_word(reply):
+        return ""
+    return reply
 
 
 def fold_in_unfinished_runs(datadir, console):

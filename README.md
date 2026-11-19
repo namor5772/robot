@@ -24,8 +24,10 @@ bash ~/robot/scripts/chat.sh
 
 You get a `you>` prompt straight away. What you type first is the task, and
 after every reply you are asked for the next message. `quit`, `stop`, `exit`,
-`bye` or Ctrl-D end the chat. Ctrl-C stops the reply or command in progress
-and returns to the prompt.
+`bye` or Ctrl-D end the chat, and so does Enter on an empty line, as in
+MyAgent: nothing sent means you are done. (When the robot has asked you a
+question, an empty line stops the run.) Ctrl-C stops the reply or command in
+progress and returns to the prompt.
 
 `chat.sh` runs the chat inside tmux, so it belongs to the Pi and not to your
 SSH connection. If the laptop sleeps or the connection drops, the chat keeps
@@ -37,7 +39,8 @@ running, and the same command brings you back to it.
 - If a line such as `11;rgb:0c0c/0c0c/0c0c` or `61;4;6;7c0;10;1c` shows up at
   `you>` without you typing it, it is your terminal's answer to a question
   from tmux that slipped through. Press Enter before typing anything else: it
-  is ignored, not sent.
+  is ignored, not sent, and the prompt comes back. It is the one line that is
+  ignored; it does not end the chat the way an empty line does.
 - While a chat is starting, such answers are thrown away, and so is anything
   you type before the first `you>` appears.
 
@@ -103,8 +106,8 @@ What the main window has:
 - **Your message** takes the cursor whenever the robot waits for you. Enter
   sends; Ctrl+J starts a new line. `quit`, `exit`, `stop` or `bye` on its own
   ends a conversation, as in the chat. Enter on an empty box ends it too, as
-  in MyAgent (the chat ignores an empty line): a conversation ends, and when
-  the robot has asked a question the run stops.
+  in MyAgent and in the chat: a conversation ends, and when the robot has
+  asked a question the run stops.
 - **Instruction** (F4) opens the Instruction Editor: a list of the saved
   instructions and a form for the one selected (name, model, thinking level,
   Fast, Meta, Convo, notes, blocked tools, skills, upgrade model, text).

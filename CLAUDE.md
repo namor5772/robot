@@ -165,6 +165,14 @@ show the user the output. The user does not want to be asked to test things.
   was timing-dependent on a busy Pi and was fixed on 2026-11-16; if a test
   fails once and then passes, find the race instead of rerunning until green
   (running the suite with all four cores loaded brought that one out).
+- A race found that way on 2026-11-19, on the laptop only:
+  `test_without_answers_the_person_at_this_terminal_is_asked` failed once in
+  a full run. On Windows a file that another process has open for reading
+  can be neither replaced nor removed, and the two sides of a relay folder
+  read each other's files all the time, so the stand-in child died in
+  `relay.clear`. `relay._while_not_in_use` now tries again for up to two
+  seconds on a `PermissionError`. Linux has no such rule; on the Pi the first
+  try is the only one.
 - On this laptop, long heredocs with quotes passed to the Bash tool have
   broken several times, and backslashes in them are rewritten (a `\x11` in a
   heredoc reached the file as the control character itself). Use the Write
@@ -240,7 +248,7 @@ show the user the output. The user does not want to be asked to test things.
 - Because one skill is on demand, every run now also offers `get_skill`.
 - `.venv/bin/python -m robot.main --skills` and `--list` on the Pi show the
   current skills and instructions; check there instead of trusting this list.
-- 1,250 tests pass (counted on 2026-11-19). On the Pi 2 are skipped, on the
+- 1,256 tests pass (counted on 2026-11-19). On the Pi 2 are skipped, on the
   laptop 31, among them the 8 real-terminal tests (they need curses), the 19
   launcher tests (they need bash) and 3 that build a real tree of child runs
   (they need the kernel's list of processes). `tests/test_spawn.py` starts real
@@ -298,9 +306,10 @@ show the user the output. The user does not want to be asked to test things.
   is 10 ms; a 100 ms gap reproduced the leak with 10 and not with 500. The
   Pi's Wi-Fi has power saving on, which delivers packets in bunches. A gap of
   more than half a second still gets through.
-- For that case `Console._ask_terminal` treats a line that is nothing but such
-  answers as a bare Enter (`console.only_terminal_replies`): it says so and
-  the prompt comes back. Whole lines only: the same characters inside a
+- For that case `Console._ask_terminal` does not take a line that is nothing
+  but such answers for a reply (`console.only_terminal_replies`): it says so
+  and puts the prompt up again itself. It is not handed on as an empty reply,
+  which ends a conversation. Whole lines only: the same characters inside a
   sentence are sent as typed, so the person can ask about them.
 - A second way in, seen on 2026-11-18: tmux asks for the terminal's type once
   and keeps one answer. Any further answer is passed into the pane whole,
@@ -464,12 +473,20 @@ show the user the output. The user does not want to be asked to test things.
 - Input modes: a terminal (readline `input()`), piped stdin (lines are replies,
   end of input means nobody is there), `--headless` (never reads stdin: a relay
   folder answers, or nobody does).
-- At a terminal the chat is forgiving, unlike MyAgent's dialog: an empty line is
-  ignored (not so in the windowed interface, see "A run and the screen"; and so is a line that came from the terminal itself, see "Terminal
-  answers that reach the prompt"), Ctrl-C cancels the reply or command and
-  returns to `you>`, an API error returns to `you>`. Everywhere else MyAgent's rules hold: an empty reply
-  ends a conversation, and an empty reply or `exit` to `user_prompt` stops the
-  run (`quit` and `stop` there go to the model).
+- At a terminal the chat is forgiving in two ways, unlike MyAgent's dialog:
+  Ctrl-C cancels the reply or command and returns to `you>`, and an API error
+  returns to `you>`.
+- An empty reply is an answer everywhere, as in MyAgent: it ends a
+  conversation, and an empty reply or `exit` to `user_prompt` stops the run
+  (`quit` and `stop` there go to the model). At the first `you>` it means no
+  task, and the chat ends. Until 2026-11-19 the chat at a terminal ignored an
+  empty line and asked again; the owner asked for MyAgent's rule in the
+  interface and then in the chat ("ignore nothing"). Do not bring the
+  skipping back unasked.
+- The one line still ignored at a terminal is one that came from the terminal
+  itself (see "Terminal answers that reach the prompt"). `_ask_terminal` asks
+  again by itself for that, so the agent never sees it: returned as an empty
+  reply it would now end the chat.
 - `Interrupts`: the loop runs on the main thread. The SIGINT handler sets a
   flag and raises `KeyboardInterrupt` only inside `raisable()` regions (the
   stream, backoff waits, `input()`, sequential tools), so bookkeeping is never
@@ -612,15 +629,13 @@ underneath is the same code the chat runs; only the console differs.
   chat's nameless run exists only in `robot.main`.
 - `UiConsole` is a `Console` whose `_show` posts to the screen and whose
   `_read_reply` waits for the reply box. `tty` is True, so the forgiving
-  rules of a chat at a terminal apply, with one exception. The transcript is
-  written as before.
-- The exception (since 2026-11-19, at the owner's request, to match MyAgent's
-  dialog): Enter on an empty reply box is an answer. It ends a conversation,
-  stops the run when the model had asked through `user_prompt`, and at the
-  first message of an instruction without text nothing is run. The chat still
-  ignores an empty line. `Console.skips_empty` is what the agent asks (`tty
-  and not empty_is_answer`); `UiConsole` sets `empty_is_answer`. Only the
-  reply box sends: Enter with the focus elsewhere presses what is focused.
+  rules of a chat at a terminal apply. The transcript is written as before.
+- Enter on an empty reply box is an answer, as in MyAgent's dialog and in the
+  chat (see "Input, output and Ctrl-C"): it ends a conversation, stops the
+  run when the model had asked through `user_prompt`, and at the first
+  message of an instruction without text nothing is run. Until 2026-11-19
+  the box refused an empty message. Only the reply box sends: Enter with the
+  focus elsewhere presses what is focused.
 - STOP is `UiInterrupts.press()`: it sets the flag and sends the main thread
   a real SIGINT (`signal.pthread_kill`). The flag alone would not do: the
   agent may be blocked in a network read or a 60 s shell command, and only a

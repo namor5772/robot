@@ -188,9 +188,6 @@ class UiConsole(Console):
                          **flags)
         self.bridge = bridge
         self.tty = True  # a person is there: STOP and an API error return to the reply box
-        # But an empty message is an answer here, as in MyAgent's dialog: the
-        # reply box takes Enter only while it has the focus, so it is no slip.
-        self.empty_is_answer = True
 
     def _show(self, text, dim):
         self.bridge.events.put(("out", text, dim))

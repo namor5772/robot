@@ -201,11 +201,22 @@ class TerminalInput(unittest.TestCase):
         self.assertEqual(reply, "how hot are you?")
         self.assertNotIn("ignored", shown)
 
-    def test_a_line_from_the_terminal_itself_counts_as_a_bare_enter(self):
-        reply, shown = self.typed("11;rgb:0c0c/0c0c/0c0c")
+    def test_a_line_from_the_terminal_itself_brings_the_prompt_back(self):
+        # Not the empty reply: that one ends a conversation, and nobody typed this.
+        console, out = piped_console("")
+        console.tty = True
+        typed = ["11;rgb:0c0c/0c0c/0c0c", "61;4;6c", "hello"]
+        with mock.patch("builtins.input", side_effect=typed) as asked:
+            reply = console.ask()
+        self.assertEqual(reply, "hello")
+        self.assertEqual(asked.call_count, 3)
+        self.assertEqual(out.getvalue().count(
+            "(ignored: that line came from your terminal, not from the keyboard)\n"), 2)
+
+    def test_a_bare_enter_is_the_empty_reply(self):
+        reply, shown = self.typed("   ")
         self.assertEqual(reply, "")
-        self.assertIn("(ignored: that line came from your terminal, not from the keyboard)\n",
-                      shown)
+        self.assertNotIn("ignored", shown)
 
     def test_a_sentence_that_quotes_such_a_line_is_sent_whole(self):
         line = "why did 11;rgb:0c0c/0c0c/0c0c appear at the prompt?"
@@ -220,14 +231,15 @@ class TerminalInput(unittest.TestCase):
             console.tty = True
             transcript = Transcript(path)
             console.set_transcript(transcript)
-            with mock.patch("builtins.input", return_value="0;10;1c"):
+            with mock.patch("builtins.input", side_effect=["0;10;1c", "hi"]):
                 console.ask()
             console.set_transcript(None)
             transcript.close()
             self.assertEqual(
                 path.read_text(encoding="utf-8"),
                 "\nyou> 0;10;1c\n"
-                "(ignored: that line came from your terminal, not from the keyboard)\n")
+                "(ignored: that line came from your terminal, not from the keyboard)\n"
+                "\nyou> hi\n")
 
 
 class StartupInput(unittest.TestCase):

@@ -276,8 +276,8 @@ class Agent:
         """A conversation with a person at the keyboard.
 
         There the chat forgives: Ctrl-C and API errors return to the prompt
-        instead of ending the run. (Whether an empty line is ignored as well
-        is the console's skips_empty: yes at a prompt, no in the windows.)
+        instead of ending the run. An empty reply is not forgiven: it ends
+        the conversation, as it does everywhere.
         """
         return self.settings.conversational and self.console.tty
 
@@ -410,9 +410,7 @@ class Agent:
             if reply is None:
                 break  # nobody is there to answer
             if reply == "":
-                if console.skips_empty:
-                    continue  # a stray Enter at a terminal is not an answer
-                break
+                break  # the empty reply ends a conversation, typed or not
             if convo_end_word(reply):
                 break
             self.messages.append({"role": "user", "content": reply})
@@ -552,13 +550,9 @@ class Agent:
                 return
             reply = None
             try:
-                while True:
-                    reply = console.ask(question=question)
-                    if reply is INTERRUPTED:
-                        reply = None
-                    if reply == "" and console.skips_empty:
-                        continue  # a stray Enter at a terminal is not an answer
-                    break
+                reply = console.ask(question=question)
+                if reply is INTERRUPTED:
+                    reply = None
             finally:
                 box["reply"] = reply or None
                 box["done"].set()
@@ -576,13 +570,9 @@ class Agent:
         """The user_prompt tool: ask the person and return their reply."""
         console = self.console
         message = str(tool_input.get("message", ""))
-        while True:
-            reply = console.ask(question=message, preface=self._turn_text)
-            if reply is INTERRUPTED:
-                reply = None
-            if reply == "" and console.skips_empty:
-                continue  # a stray Enter at a terminal is not an answer
-            break
+        reply = console.ask(question=message, preface=self._turn_text)
+        if reply is INTERRUPTED:
+            reply = None
         if not reply:
             self._stop_run = True
             return "[User submitted empty response - stopping agent]"
