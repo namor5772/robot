@@ -97,7 +97,8 @@ What the main window has:
   here. A name too long for the window is shortened with `...`, so that the
   settings after it always stay in view.
 - **START** (F2) runs it. What the run shows appears under *Output*, the same
-  lines the chat prints. **STOP** (F3 or Ctrl+C) stops the reply or command in
+  lines the chat prints. Each START clears *Output* first, as in MyAgent; the
+  earlier run's lines are in its saved chat. **STOP** (F3 or Ctrl+C) stops the reply or command in
   progress; while the robot is waiting for your message, it ends the run.
 - **Your message** takes the cursor whenever the robot waits for you. Enter
   sends; Ctrl+J starts a new line. `quit`, `exit`, `stop` or `bye` on its own

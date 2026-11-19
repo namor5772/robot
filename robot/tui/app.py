@@ -79,7 +79,8 @@ GETTING AROUND
                    text with the mouse, hold Shift while dragging.
 
 THE MAIN WINDOW
-  F2   START       run the instruction named in the top line
+  F2   START       run the instruction named in the top line.
+                   The output of the run before it is cleared.
   F3   STOP        (or Ctrl+C) stop the reply or the command in
                    progress. While the robot waits for your
                    message, it ends the run.
@@ -89,7 +90,7 @@ THE MAIN WINDOW
   Ctrl+L           draw the screen again
 
   Output: Up, Down, PgUp, PgDn and Home look back through what
-  was shown. End returns to the newest line.
+  the run has shown. End returns to the newest line.
 
   Your message: Enter sends it. Ctrl+J or Alt+Enter starts a new
   line. quit, exit, stop or bye on its own ends a conversation.
@@ -316,7 +317,7 @@ _WHOLE_LINES = (("warning: ", "warn"), ("error: ", "error"))
 
 
 class OutputBuffer:
-    """What the runs have shown, line by line, and which part of it is on view."""
+    """What the run has shown, line by line, and which part of it is on view."""
 
     LIMIT = 5000   # lines kept; older ones are dropped
     _SLACK = 500
@@ -472,6 +473,14 @@ class OutputBuffer:
     def to_end(self):
         self.follow = True
 
+    def clear(self):
+        """Empty it, as for a new run: the view is back on the newest lines."""
+        self.lines = []
+        self.first = 0
+        self.follow = True
+        self.anchor = (0, 0)
+        self._open = False
+
 
 class OutputPane(Widget):
     """The framed, scrolling view of what the runs show."""
@@ -606,10 +615,9 @@ class MainWindow(Window):
     def run_started(self):
         self.start.enabled = False
         self.stop.enabled = True
-        buffer = self.output.buffer
-        if buffer.lines:
-            buffer.add("\n")
-        buffer.to_end()
+        # A new run starts on an empty pane, as in MyAgent. What the run before
+        # it showed is in that run's saved chat.
+        self.output.buffer.clear()
         if self.focus is self.start:
             self.focus = self.output
 

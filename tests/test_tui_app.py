@@ -370,11 +370,50 @@ class SingleTask(MainCase):
         client = self.run_with(
             "Task", [reply(text_block("First answer.")), reply(text_block("Second answer."))],
             "f2", self.ended(), "f2", self.ended(), self.shows("robot> Second answer."))
-        shown = " | ".join(line.text for line in self.app.main.output.buffer.lines)
-        self.assertIn("robot> First answer.", shown)        # further back in the output
-        self.assertEqual(shown.count("--- run ended: completed"), 2)
         self.assertEqual(len(client.requests), 2)
         self.assertEqual(len(list(self.datadir.chats_dir.glob("*.json"))), 2)
+
+    def test_start_clears_the_output_of_the_run_before(self):
+        self.run_with(
+            "Task", [reply(text_block("First answer.")), reply(text_block("Second answer."))],
+            "f2", self.ended(), self.shows("robot> First answer."),
+            "f2", self.ended(), self.shows("robot> Second answer."),
+            self.lacks("robot> First answer."))
+        shown = " | ".join(line.text for line in self.app.main.output.buffer.lines)
+        self.assertNotIn("First answer.", shown)        # gone, not just scrolled away
+        self.assertEqual(shown.count("--- run ended: completed"), 1)
+        self.assertFalse(shown.startswith(" | "), shown)  # no empty line left at the top
+
+    def test_start_while_looking_back_shows_the_new_run(self):
+        self.run_with(
+            "Task", [reply(text_block("First answer.")), reply(text_block("Second answer."))],
+            "f2", self.ended(), Check(lambda screen: self.look_back()),
+            "f2", self.ended(), self.shows("robot> Second answer."))
+        self.assertTrue(self.app.main.output.buffer.follow)
+
+    def look_back(self):
+        buffer = self.app.main.output.buffer
+        buffer.follow = False
+        buffer.anchor = (buffer.first, 0)
+
+    def test_a_refused_start_leaves_the_output_alone(self):
+        def forget(screen):
+            self.app.instruction = "Nobody"
+        self.run_with(
+            "Task", [reply(text_block("First answer."))],
+            "f2", self.ended(), Check(forget), "f2",
+            self.shows("There is no saved instruction"), "enter",
+            self.shows("robot> First answer."))
+
+    def test_a_cleared_buffer_starts_afresh(self):
+        buffer = OutputBuffer()
+        buffer.add("one\ntwo\nunfinished")
+        buffer.scroll(40, 2, -1)
+        buffer.clear()
+        self.assertEqual(buffer.view(40, 5), [])
+        buffer.add("new\n")
+        self.assertEqual([line.text for line in buffer.lines], ["new"])
+        self.assertTrue(buffer.follow)
 
     def test_a_question_from_the_model_is_answered_in_the_reply_box(self):
         client = self.run_with(

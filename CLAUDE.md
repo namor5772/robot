@@ -240,7 +240,7 @@ show the user the output. The user does not want to be asked to test things.
 - Because one skill is on demand, every run now also offers `get_skill`.
 - `.venv/bin/python -m robot.main --skills` and `--list` on the Pi show the
   current skills and instructions; check there instead of trusting this list.
-- 1,242 tests pass (counted on 2026-11-19). On the Pi 2 are skipped, on the
+- 1,246 tests pass (counted on 2026-11-19). On the Pi 2 are skipped, on the
   laptop 31, among them the 8 real-terminal tests (they need curses), the 19
   launcher tests (they need bash) and 3 that build a real tree of child runs
   (they need the kernel's list of processes). `tests/test_spawn.py` starts real
@@ -669,6 +669,12 @@ underneath is the same code the chat runs; only the console differs.
 - The focus is never left on START: Enter presses the focused button, and a
   stray Enter must not start a run that costs money. It starts on Instruction
   (as in MyAgent) and goes to the output pane when a run ends.
+- START empties the output pane before the run begins
+  (`OutputBuffer.clear`, called from `MainWindow.run_started`), as MyAgent
+  empties its display. Until 2026-11-19 a run's lines were added under the
+  earlier run's; the owner asked for MyAgent's behaviour. A START that is
+  refused (no such instruction) leaves the pane as it was. The earlier run's
+  lines are in its saved chat.
 - A letter typed without Alt presses nothing, except in a message box (y, n).
   Typing while the robot waits goes to the reply box wherever the focus is.
 - A `Choice` changes only through its list. Arrow keys never change a
