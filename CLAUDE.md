@@ -299,6 +299,15 @@ show the user the output. The user does not want to be asked to test things.
   detached, must put the Wi-Fi back by hand at its end whatever happened, and
   must not start while a run is in progress (`~/robot-data/runs` holds a file
   then).
+- Only the network in everyday use has ever been joined. The Pi also has two
+  saved profiles for a second network (one had a wrong letter in the
+  network's name until 2026-11-20), and a join tried with each that day
+  failed before any password was looked at: the access point did not answer
+  the Pi's request to authenticate ("Authentication ... timed out", then
+  NetworkManager's "no-secrets"). It announces WPA2 with WPA3 and Wi-Fi 6.
+  The cause is not known and may lie in the access point's settings. While
+  that network is in range and the first one is not, both NetworkManager and
+  `robot-wifi` keep trying it and failing.
 - The Wi-Fi monitor the robot made (`~/wifimon`, see "State on 2026-11-18")
   is separate and only writes down changes: it pings the gateway, so its log
   also shows short losses during which the Pi never left the network.
