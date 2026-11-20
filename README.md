@@ -362,7 +362,6 @@ Each skill has a mode:
 |---|---|---|
 | `run_shell_command` | always | Runs any bash command on the Pi as its user, with sudo. |
 | `get_current_datetime` | always | Reads the Pi's clock. |
-| `get_cpu_temperature` | if the sensor can be read | Reads the CPU temperature. |
 | `user_prompt` | always | Asks you a question and waits for the answer. |
 | `get_skill` | if a skill is on demand | Fetches an on-demand skill's text. |
 | `web_search` | always | Searches the web on Anthropic's servers, up to 5 searches per request. |
@@ -374,9 +373,13 @@ Each skill has a mode:
 Meta is the only group of tools. It is one switch on an instruction, and it
 turns the last four on together: the tools with which the robot works on its
 own setup. Their descriptions add about 3,000 tokens to every request. The
-first six are not grouped: each is offered on its own, whenever it can work.
+first five are not grouped: each is offered on its own, whenever it can work.
 
-Any of the ten can be switched off for one instruction. In the Instruction
+There is no tool for the CPU temperature any more (there was one until
+2026-11-20). Asked how hot it is, the robot reads the Pi's sensor with the
+shell tool.
+
+Any of the nine can be switched off for one instruction. In the Instruction
 Editor the Tools button shows this list, in this order, with a tick beside
 each tool the instruction may use. A cleared tool is blocked for that
 instruction only (`blocked_tools` in the file), and a Meta tool needs both

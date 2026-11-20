@@ -259,7 +259,12 @@ show the user the output. The user does not want to be asked to test things.
   from the laptop and at the Pi's own screen.
 - On 2026-11-19 the Pi moved from its 16 GB card to a 32 GB one (see "Target
   device"), and the owner ran three interfaces at once at its own screen.
-- No hardware tools exist yet beyond the CPU temperature reading.
+- No hardware tools exist. The one there was, `get_cpu_temperature`, was
+  removed on 2026-11-20 at the owner's request: the model reads the sensor
+  with the shell tool when asked (`/sys/class/thermal/thermal_zone0/temp`,
+  or `vcgencmd measure_temp`). An instruction that still has the name in its
+  `blocked_tools` is unharmed: the Instruction Editor keeps a blocked name it
+  does not know.
 
 ## Getting back on the Wi-Fi
 
@@ -519,8 +524,8 @@ show the user the output. The user does not want to be asked to test things.
 
 ### Tools
 
-- Always: `run_shell_command`, `get_current_datetime`, `get_cpu_temperature`
-  (only if the sensor reads at start), `user_prompt`, server-side `web_search`
+- Always: `run_shell_command`, `get_current_datetime`, `user_prompt`,
+  server-side `web_search`
   (`models.web_search_tool`: `web_search_20260209`, `max_uses` 5; its
   definition alone is about 6,000 tokens of every request).
 - `get_skill` when a skill is on demand. Its result adds the skill's folder
@@ -797,9 +802,9 @@ underneath is the same code the chat runs; only the console differs.
 - `~/robot-data/tui_state.json` holds the instruction in use and the five
   display boxes (`tui_state_NAME.json` for a copy started with a session
   name). Nothing a run needs is in it.
-- The Tools dialog lists `editor.TOOL_NAMES`: the six ordinary tools first,
+- The Tools dialog lists `editor.TOOL_NAMES`: the five ordinary tools first,
   the four Meta tools last, then any blocked name the program does not know
-  (one copied in from MyAgent), so that such a block is not lost on saving.
+  (one copied in from MyAgent, or one of a tool since removed), so that such a block is not lost on saving.
   The README's tool table is in the same order. Nothing marks where the Meta
   group starts. `meta` in the top row stands for that group of four.
 

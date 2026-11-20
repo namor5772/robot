@@ -9,10 +9,6 @@ from datetime import datetime
 from pathlib import Path
 from typing import Callable
 
-# The kernel reports the SoC temperature here, in thousandths of a degree C.
-CPU_TEMP_FILE = Path("/sys/class/thermal/thermal_zone0/temp")
-
-
 @dataclass
 class Tool:
     definition: dict  # what the model is told about the tool
@@ -21,19 +17,6 @@ class Tool:
     # Safe to run alongside other calls of the same turn: it only reads, and
     # needs nothing from the person at the keyboard.
     parallel_safe: bool = False
-
-
-def read_cpu_temperature() -> float:
-    """Return the CPU temperature in degrees Celsius."""
-    return int(CPU_TEMP_FILE.read_text().strip()) / 1000
-
-
-def _cpu_temperature_available() -> bool:
-    try:
-        read_cpu_temperature()
-    except (OSError, ValueError):
-        return False
-    return True
 
 
 def read_current_datetime() -> str:
@@ -155,24 +138,6 @@ ALL_TOOLS = [
         },
         run=lambda _input: read_current_datetime(),
         is_available=lambda: True,
-        parallel_safe=True,
-    ),
-    Tool(
-        definition={
-            "name": "get_cpu_temperature",
-            "description": (
-                "Read the current temperature of the CPU of the Raspberry Pi this "
-                "program is running on, in degrees Celsius. Call this whenever the "
-                "user asks how hot or warm the Pi, the CPU or the robot is."
-            ),
-            "input_schema": {
-                "type": "object",
-                "properties": {},
-                "additionalProperties": False,
-            },
-        },
-        run=lambda _input: f"{read_cpu_temperature():.1f} degrees Celsius",
-        is_available=_cpu_temperature_available,
         parallel_safe=True,
     ),
 ]

@@ -566,7 +566,7 @@ class SerializeSafetyTests(unittest.TestCase):
                         content=[{"type": "web_search_result", "url": "https://example.com",
                                   "title": "T", "encrypted_content": "ENC"}]),
                 Obj(type="text", text="Checking the sensor too."),
-                Obj(type="tool_use", id="toolu_1", name="get_cpu_temperature", input={}),
+                Obj(type="tool_use", id="toolu_1", name="read_sensor", input={}),
             ]},
             {"role": "user", "content": [
                 {"type": "tool_result", "tool_use_id": "toolu_1", "content": "41.2 degrees"}]},
@@ -651,7 +651,7 @@ class SerializeSafetyTests(unittest.TestCase):
 
 class ChatPayloadTests(unittest.TestCase):
 
-    TOOLS = [{"name": "get_cpu_temperature", "description": "d",
+    TOOLS = [{"name": "read_sensor", "description": "d",
               "input_schema": {"type": "object", "properties": {}}},
              {"type": "web_search_20260209", "name": "web_search", "max_uses": 5}]
 

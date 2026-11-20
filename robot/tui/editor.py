@@ -14,9 +14,8 @@ from robot.tui.widgets import (
 
 # Every tool a run can be offered, for the list of tools an instruction may use.
 TOOL_NAMES = (
-    "run_shell_command", "get_current_datetime", "get_cpu_temperature", "user_prompt",
-    "get_skill", "web_search", "manage_instructions", "manage_skills", "run_instruction",
-    "upgrade_model",
+    "run_shell_command", "get_current_datetime", "user_prompt", "get_skill", "web_search",
+    "manage_instructions", "manage_skills", "run_instruction", "upgrade_model",
 )
 
 SKILL_MARKS = {"enabled": "[ON]", "on_demand": "[OD]", "disabled": "[  ]"}
