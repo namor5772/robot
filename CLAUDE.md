@@ -245,13 +245,14 @@ show the user the output. The user does not want to be asked to test things.
     repo: a bash loop in `~/wifimon` that pings the gateway every 10 s, logs
     each change to `~/wifimon/wifi.log`, and starts at boot from the user's
     crontab.
-- A third skill since 2026-11-20, `cpu-temp` (enabled), made at the owner's
+- A third skill since 2026-11-20, `cpu-temp` (on demand), made at the owner's
   request to stand in for the removed `get_cpu_temperature` tool: it gives
   the model the one shell command that prints the CPU temperature the way
   the tool did ("45.1 degrees Celsius"), and says when to run it. It was
-  created with a script fed over stdin that calls `manage_skills`. It is
-  enabled, not on demand, so that a reading takes one tool call as before
-  and not a `get_skill` first. It needs `run_shell_command`: an instruction
+  created with a script fed over stdin that calls `manage_skills`. It was
+  made enabled, and the owner had it set to on demand the same day: a
+  reading now takes a `get_skill` call and then the shell command (three
+  model calls in all, where the tool took two). It needs `run_shell_command`: an instruction
   that blocks that tool cannot read the temperature.
 - Because one skill is on demand, every run now also offers `get_skill`.
 - `.venv/bin/python -m robot.main --skills` and `--list` on the Pi show the
