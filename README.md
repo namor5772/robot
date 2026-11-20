@@ -70,17 +70,19 @@ bash ~/robot/scripts/ui.sh
 ┌─ Output ─────────────────────────────────────────────────────────────────────┐
 │This instruction has no saved task. Type it as your message.                  ▲
 │you> Say hello in exactly five words.                                         │
+│  Starting up...                                                              │
 │robot> Hello there, friend, nice to meet you.                                 │
-│  call 1: $0.0010 this call  |  $0.0010 total  (in:4  out:17                  │
-│cache_write:7,604)                                                            │
-│you> How hot is your CPU right now? Use your tool, then answer in one         │
-│sentence.                                                                     │
-│  call 2: $0.0001 this call  |  $0.0011 total  (in:4  out:32  cache_write:45  │
-│cache_read:7,604)                                                             │
-│[tool: get_cpu_temperature]                                                   │
-│robot> My CPU is running at 45.6 degrees Celsius right now.                   │
-│  call 3: $0.0001 this call  |  $0.0012 total  (in:2  out:24  cache_write:50  │
-│cache_read:7,649)                                                             │
+│  call 1: $0.0010 this call  |  $0.0010 total  (in:4  out:15                  │
+│cache_write:7,579)                                                            │
+│you> How hot is your CPU right now? Check, then answer in one sentence.       │
+│  call 2: $0.0001 this call  |  $0.0011 total  (in:4  out:71  cache_write:40  │
+│cache_read:7,579)                                                             │
+│[tool: run_shell_command: {"command": "cat                                    │
+│/sys/class/thermal/thermal_zone0/temp"}]                                      │
+│robot> My CPU is currently at about 49.4 °C (49388 millidegrees from the Pi's │
+│thermal sensor).                                                              │
+│  call 3: $0.0001 this call  |  $0.0012 total  (in:2  out:40  cache_write:93  │
+│cache_read:7,619)                                                             │
 └──────────────────────────────────────────────────────────────────────────────┘
 ┌─ Your message (Enter sends, empty Enter ends, Ctrl+J new line) ──────────────┐
 │                                                                              │
@@ -408,12 +410,14 @@ together: the first run's children and the children those started.
 
 ```
 you> How hot are you, and how long have you been up? Check both.
-  call 1: $0.0541 this call  |  $0.05 total  (in:4  out:83  cache_write:10,478)
-[tool: get_cpu_temperature]
-[tool: run_shell_command: {"command": "uptime -p"}]
-robot> My CPU is at 45.1°C, which is a comfortable temperature. I've been up for 3 hours and 13 minutes.
-  call 2: $0.0039 this call  |  $0.06 total  (in:2  out:44  cache_write:187  cache_read:10,478)
+  call 1: $0.0014 this call  |  $0.0014 total  (in:4  out:188  cache_write:10,665)
+[tool: run_shell_command: {"command": "cat /sys/class/thermal/thermal_zone0/temp; uptime -p; uptime -s"}]
+robot> I'm running at about 49.4°C, which is comfortably cool for this Pi. I've been up for 2 hours and 25 minutes, since 08:56:35 on 2026-11-20.
+  call 2: $0.0002 this call  |  $0.0016 total  (in:2  out:117  cache_write:237  cache_read:10,665)
 ```
+
+(That chat ran on `claude-haiku-5-5`. On the default model the first call costs
+about 5 cents.)
 
 Each `call` line is one request to the model and what it cost. The first call
 of a chat costs the most, because the system prompt and tool list (about
