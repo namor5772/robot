@@ -218,6 +218,44 @@ class SmallWindows(EditorCase):
                     "w", " ", "alt+o", "alt+s")
         self.assertEqual(self.saved("Report")["blocked_tools"], ["send_mail"])
 
+    def test_without_meta_its_four_tools_are_shown_switched_off(self):
+        # Report has Meta off. A tick would promise a tool that no run of it gets.
+        self.editor("down", "alt+l", self.shows(
+            "[-] manage_instructions  (needs Meta)", "[-] manage_skills  (needs Meta)",
+            "[-] run_instruction  (needs Meta)", "[-] upgrade_model  (needs Meta)",
+            "[x] run_shell_command", "[x] get_skill", "[x] web_search",
+            "[-] needs the Meta box ticked."),
+            self.lacks("[x] manage_skills", "A cleared tool is blocked."),
+            "m", " ", "down", " ",              # Space does nothing on those rows
+            self.shows("[-] manage_instructions", "[-] manage_skills"),
+            "alt+o", self.shows("Tools: all allowed."), self.lacks("(changed)"))
+
+    def test_with_meta_its_four_tools_can_be_ticked_and_cleared(self):
+        # Zebra has Meta on.
+        self.editor("down", "down", "alt+l", self.shows(
+            "[x] manage_instructions", "[x] manage_skills", "[x] run_instruction",
+            "[x] upgrade_model", "A cleared tool is blocked."),
+            self.lacks("(needs Meta)", "[-]"),
+            "end", " ", self.shows("[ ] upgrade_model"), "alt+o", "alt+s")
+        self.assertEqual(self.saved("Zebra")["blocked_tools"], ["upgrade_model"])
+
+    def test_the_tools_window_goes_by_the_meta_box_as_it_is_on_the_form(self):
+        # Ticked, not yet saved: the four can be used by what would be saved.
+        self.editor("down", "alt+e", "alt+l", self.shows("[x] manage_skills"),
+                    self.lacks("(needs Meta)"), "esc",
+                    "alt+e", "alt+l", self.shows("[-] manage_skills  (needs Meta)"), "esc")
+
+    def test_a_block_on_a_meta_tool_is_kept_while_meta_is_off(self):
+        self.library(Report=dict(REPORT, blocked_tools=["run_instruction"]))
+        self.editor("down", "alt+l", self.shows("[-] run_instruction  (needs Meta)"),
+                    "r", " ",                   # on run_instruction: nothing happens
+                    "w", " ", "alt+o", self.shows("Tools: 2 blocked."), "alt+s",
+                    # With Meta ticked the block is there to see, and to lift.
+                    "alt+e", "alt+l", self.shows("[ ] run_instruction", "[x] manage_skills"),
+                    "esc")
+        self.assertEqual(self.saved("Report")["blocked_tools"],
+                         ["run_instruction", "web_search"])
+
     def test_cancelling_a_small_window_changes_nothing(self):
         self.editor("down", "alt+l", " ", "esc", "alt+t", typed("x"), "esc", "y",
                     self.shows("Tools: all allowed.", "Notes: none."),

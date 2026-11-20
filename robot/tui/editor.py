@@ -12,11 +12,14 @@ from robot.tui.dialogs import ChecklistDialog, _place_buttons_right
 from robot.tui.widgets import (
     Button, Checkbox, Choice, Label, ListBox, TextArea, TextField, Window, flow)
 
+# The tools that the Meta switch offers together. Without it none of them is
+# offered, whatever the instruction's own list of blocked tools says.
+META_TOOL_NAMES = ("manage_instructions", "manage_skills", "run_instruction", "upgrade_model")
+
 # Every tool a run can be offered, for the list of tools an instruction may use.
 TOOL_NAMES = (
     "run_shell_command", "get_current_datetime", "user_prompt", "get_skill", "web_search",
-    "manage_instructions", "manage_skills", "run_instruction", "upgrade_model",
-)
+) + META_TOOL_NAMES
 
 SKILL_MARKS = {"enabled": "[ON]", "on_demand": "[OD]", "disabled": "[  ]"}
 
@@ -329,10 +332,19 @@ class InstructionEditor(Window):
 
     def _edit_tools(self):
         names = list(TOOL_NAMES) + [name for name in self.blocked if name not in TOOL_NAMES]
+        # A tick only says "not blocked". With the Meta box clear its four
+        # tools are not offered at all, so a tick there would promise what a
+        # run does not get: those rows are shown switched off instead, and
+        # whether each is blocked is kept as it is for when Meta is ticked.
+        without_meta = [index for index, name in enumerate(names)
+                        if name in META_TOOL_NAMES and not self.meta.value]
+        labels = [f"{name}  (needs Meta)" if index in without_meta else name
+                  for index, name in enumerate(names)]
+        hint = ("Space ticks or clears. [-] needs the Meta box ticked." if without_meta
+                else "Space ticks or clears. A cleared tool is blocked.")
         ticks = self.app.run_modal(ChecklistDialog(
-            self.app, "Tools this instruction may use", names,
-            [name not in self.blocked for name in names],
-            hint="Space ticks or clears. A cleared tool is blocked."))
+            self.app, "Tools this instruction may use", labels,
+            [name not in self.blocked for name in names], hint=hint, locked=without_meta))
         if ticks is not None:
             self.blocked = sorted(name for name, allowed in zip(names, ticks) if not allowed)
             self._refresh_summary()

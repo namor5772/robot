@@ -385,7 +385,10 @@ Any of the nine can be switched off for one instruction. In the Instruction
 Editor the Tools button shows this list, in this order, with a tick beside
 each tool the instruction may use. A cleared tool is blocked for that
 instruction only (`blocked_tools` in the file), and a Meta tool needs both
-the Meta switch and its tick.
+the Meta switch and its tick. While the instruction's Meta box is not ticked,
+the four Meta tools show `[-]` and "(needs Meta)" there in place of a box and
+cannot be ticked or cleared: no run would get them either way. A block set on
+one of them earlier is kept, and shows again once Meta is ticked.
 
 The shell tool is deliberately unrestricted: no confirmation, no allowlist, no
 blocked commands, and the Pi has passwordless sudo, so the agent has root. It

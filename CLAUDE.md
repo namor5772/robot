@@ -257,7 +257,7 @@ show the user the output. The user does not want to be asked to test things.
 - Because one skill is on demand, every run now also offers `get_skill`.
 - `.venv/bin/python -m robot.main --skills` and `--list` on the Pi show the
   current skills and instructions; check there instead of trusting this list.
-- 1,269 tests pass (counted on 2026-11-20). On the Pi 2 are skipped, on the
+- 1,274 tests pass (counted on 2026-11-20). On the Pi 2 are skipped, on the
   laptop 44, among them the 13 of the Wi-Fi service (bash), the 8 real-terminal tests (they need curses), the 19
   launcher tests (they need bash) and 3 that build a real tree of child runs
   (they need the kernel's list of processes). `tests/test_spawn.py` starts real
@@ -816,6 +816,14 @@ underneath is the same code the chat runs; only the console differs.
   (one copied in from MyAgent, or one of a tool since removed), so that such a block is not lost on saving.
   The README's tool table is in the same order. Nothing marks where the Meta
   group starts. `meta` in the top row stands for that group of four.
+- A tick in that dialog says only "not blocked". With the form's Meta box
+  clear, the four Meta tools (`editor.META_TOOL_NAMES`) are therefore shown
+  as `[-] name  (needs Meta)` and are locked (`ChecklistDialog`'s `locked`):
+  until 2026-11-20 they showed ticked, which the owner took, fairly, for
+  "offered". They are not shown unticked, because a cleared box is saved as
+  a block, and the tools would then stay blocked after Meta is ticked. A
+  block already set on one of them is kept as it is. The dialog goes by the
+  box as it is on the form, saved or not.
 
 ### Several screens, several interfaces
 

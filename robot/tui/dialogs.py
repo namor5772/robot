@@ -110,13 +110,19 @@ class TextDialog(Window):
 
 
 class ChecklistDialog(Window):
-    """A list of boxes to tick. Its result is the list of ticks, or None."""
+    """A list of boxes to tick. Its result is the list of ticks, or None.
 
-    def __init__(self, app, title, labels, checked, hint=""):
+    `locked` holds the positions of rows that something else has switched
+    off: they show [-] in place of a box, cannot be ticked or cleared, and
+    come back in the result as they went in.
+    """
+
+    def __init__(self, app, title, labels, checked, hint="", locked=()):
         super().__init__(app)
         self.title = title
         self.labels = list(labels)
         self.checked = [bool(value) for value in checked]
+        self.locked = set(locked)
         self.list = self.add(ListBox("", on_activate=self._toggle, on_space=self._toggle))
         self.list.search_from = 4
         self.note = self.add(Label(hint, "dim"))
@@ -126,11 +132,12 @@ class ChecklistDialog(Window):
         self.focus = self.list
 
     def _refresh(self):
-        self.list.set_items([f"[{'x' if ticked else ' '}] {label}"
-                             for label, ticked in zip(self.labels, self.checked)])
+        self.list.set_items([
+            f"[{'-' if index in self.locked else 'x' if ticked else ' '}] {label}"
+            for index, (label, ticked) in enumerate(zip(self.labels, self.checked))])
 
     def _toggle(self):
-        if self.labels:
+        if self.labels and self.list.index not in self.locked:
             self.checked[self.list.index] = not self.checked[self.list.index]
             self._refresh()
 

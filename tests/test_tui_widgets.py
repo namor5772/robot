@@ -449,6 +449,17 @@ class Checklists(WidgetCase):
             " ", "down", "down", " ", "alt+o")
         self.assertEqual(dialog.result, [False, True, True])
 
+    def test_a_locked_row_shows_a_dash_and_keeps_what_it_had(self):
+        dialog = ChecklistDialog(self.make_app(), "Tools", ["hammer", "saw", "drill"],
+                                 [True, True, False], locked=[1, 2])
+        self.show(dialog, Check(lambda screen: (
+            self.assertIsNotNone(screen.find("[x] hammer")),
+            self.assertIsNotNone(screen.find("[-] saw")),
+            self.assertIsNotNone(screen.find("[-] drill")))),
+            "down", " ", "enter", "down", " ",
+            Check(lambda screen: self.assertIsNotNone(screen.find("[-] drill"))), "alt+o")
+        self.assertEqual(dialog.result, [True, True, False])
+
     def test_cancel_and_escape_give_nothing_back(self):
         for key in ("alt+c", "esc"):
             dialog = ChecklistDialog(self.make_app(), "Tools", ["hammer"], [True])
