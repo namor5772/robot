@@ -39,6 +39,10 @@ def estimate_content_tokens(content) -> int:
     for block in content:
         if _get(block, "type") == "image":
             total += _IMAGE_TOKENS
+        elif (_get(block, "type") == "tool_result"
+              and isinstance(_get(block, "content"), list)):
+            # A tool's result can hold a picture too (view_image).
+            total += estimate_content_tokens(_get(block, "content"))
         elif isinstance(block, dict):
             try:
                 total += len(json.dumps(block, default=str)) // 4

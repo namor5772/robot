@@ -189,9 +189,29 @@ def _plain(value):
     return str(value)
 
 
+def _without_image_data(value):
+    """A copy of request data in which a picture's encoded bytes are only counted.
+
+    A photo is hundreds of thousands of characters of base64: printed, it
+    would bury everything else in the request.
+    """
+    if isinstance(value, list):
+        return [_without_image_data(item) for item in value]
+    if not isinstance(value, dict):
+        return value
+    if value.get("type") == "base64" and isinstance(value.get("data"), str):
+        return {**value, "data": f"<{len(value['data']):,} characters of base64 not shown>"}
+    return {name: _without_image_data(item) for name, item in value.items()}
+
+
 def describe_request(kwargs, betas) -> str:
-    """The request exactly as it is sent, as readable JSON (--debug, --dry-run)."""
+    """The request as it is sent, as readable JSON (--debug, --dry-run).
+
+    All of it, except the encoded bytes of pictures, which are only counted.
+    """
     shown = dict(kwargs)
+    if "messages" in shown:
+        shown["messages"] = _without_image_data(shown["messages"])
     if betas:
         shown["betas"] = list(betas)
     return json.dumps(shown, indent=2, ensure_ascii=False, default=_plain)

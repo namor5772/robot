@@ -364,6 +364,7 @@ Each skill has a mode:
 |---|---|---|
 | `run_shell_command` | always | Runs any bash command on the Pi as its user, with sudo. |
 | `get_current_datetime` | always | Reads the Pi's clock. |
+| `view_image` | always | Shows the model an image file on the Pi (a photo it took, for instance), so that it can say what is in it. |
 | `user_prompt` | always | Asks you a question and waits for the answer. |
 | `get_skill` | if a skill is on demand | Fetches an on-demand skill's text. |
 | `web_search` | always | Searches the web on Anthropic's servers, up to 5 searches per request. |
@@ -375,13 +376,22 @@ Each skill has a mode:
 Meta is the only group of tools. It is one switch on an instruction, and it
 turns the last four on together: the tools with which the robot works on its
 own setup. Their descriptions add about 3,000 tokens to every request. The
-first five are not grouped: each is offered on its own, whenever it can work.
+first six are not grouped: each is offered on its own, whenever it can work.
 
 There is no tool for the CPU temperature any more (there was one until
 2026-11-20). Asked how hot it is, the robot reads the Pi's sensor with the
 shell tool.
 
-Any of the nine can be switched off for one instruction. In the Instruction
+`view_image` is how the robot sees. It takes a photo with the shell tool (a
+webcam on the Pi's USB port, and a skill that says how), then looks at the
+file with `view_image` and describes it. The tool takes JPEG, PNG, GIF and
+WebP files of up to 3.5 MB. A picture costs by its size in pixels, not in
+bytes: a 1920 x 1080 photo is a few thousand tokens, about a cent on the
+default model, and it stays in the conversation for the rest of the run. The
+saved chat keeps a note in place of each picture, and `--debug` shows only
+how long its data was.
+
+Any of the ten can be switched off for one instruction. In the Instruction
 Editor the Tools button shows this list, in this order, with a tick beside
 each tool the instruction may use. A cleared tool is blocked for that
 instruction only (`blocked_tools` in the file), and a Meta tool needs both

@@ -1,5 +1,6 @@
 """Tools the model can call. Each one runs here on the Pi."""
 
+import base64
 import os
 import shutil
 import signal
@@ -12,7 +13,9 @@ from typing import Callable
 @dataclass
 class Tool:
     definition: dict  # what the model is told about the tool
-    run: Callable[[dict], str]  # takes the model's input, returns the result text
+    # Takes the model's input and returns the result: text, or a list of
+    # content blocks when the result is more than text (view_image's picture).
+    run: Callable[[dict], object]
     is_available: Callable[[], bool]  # checked once at startup
     # Safe to run alongside other calls of the same turn: it only reads, and
     # needs nothing from the person at the keyboard.
@@ -79,6 +82,55 @@ def run_shell_command(tool_input: dict) -> str:
     return "\n".join(parts)
 
 
+# What the API takes as a picture, told by the first bytes of the file, not by
+# its name: a photo saved as "shot.jpg" is whatever its content says it is.
+MAX_IMAGE_BYTES = 3_500_000  # the API's limit is 5 MB once encoded, a third larger
+
+
+def _image_media_type(head: bytes):
+    if head.startswith(b"\xff\xd8\xff"):
+        return "image/jpeg"
+    if head.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "image/png"
+    if head[:6] in (b"GIF87a", b"GIF89a"):
+        return "image/gif"
+    if head[:4] == b"RIFF" and head[8:12] == b"WEBP":
+        return "image/webp"
+    return None
+
+
+def view_image(tool_input: dict) -> list:
+    """Hand an image file on the Pi to the model, as a picture it can see.
+
+    The result is a list, not text: a line that says which file it is, then
+    the image itself. The agent passes such a list on as the tool's result.
+    """
+    path_text = tool_input.get("path")
+    if not isinstance(path_text, str) or not path_text.strip():
+        raise ValueError("'path' must be the path of an image file")
+    path = Path(path_text.strip()).expanduser()
+    if not path.is_absolute():
+        path = Path.home() / path  # as in the shell tool, which starts in the home folder
+    if not path.is_file():
+        raise ValueError(f"there is no file at {path}")
+    size = path.stat().st_size
+    if size == 0:
+        raise ValueError(f"{path} is empty")
+    if size > MAX_IMAGE_BYTES:
+        raise ValueError(
+            f"{path} is {size:,} bytes, more than the {MAX_IMAGE_BYTES:,} that can be sent. "
+            "Make a smaller copy first, for example a photo at a lower resolution.")
+    data = path.read_bytes()
+    media_type = _image_media_type(data[:16])
+    if media_type is None:
+        raise ValueError(f"{path} is not a JPEG, PNG, GIF or WebP image")
+    return [
+        {"type": "text", "text": f"The image {path} ({media_type}, {size:,} bytes):"},
+        {"type": "image", "source": {"type": "base64", "media_type": media_type,
+                                     "data": base64.standard_b64encode(data).decode("ascii")}},
+    ]
+
+
 ALL_TOOLS = [
     Tool(
         definition={
@@ -137,6 +189,40 @@ ALL_TOOLS = [
             },
         },
         run=lambda _input: read_current_datetime(),
+        is_available=lambda: True,
+        parallel_safe=True,
+    ),
+    Tool(
+        definition={
+            "name": "view_image",
+            "description": (
+                "Look at an image file stored on the Raspberry Pi this program is "
+                "running on. This is how you see: the picture itself comes back to "
+                "you, so you can describe it, read what is written in it or answer "
+                "questions about it. Use it on a photo you have just taken with the "
+                "camera, or on any other image file, whenever the person wants to "
+                "know what a picture shows. Never describe an image you have not "
+                "looked at with this tool. It takes JPEG, PNG, GIF and WebP files of "
+                "up to 3.5 MB. Every image you look at stays in the conversation and "
+                "costs a few thousand tokens, so look at the ones that are needed."
+            ),
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "path": {
+                        "type": "string",
+                        "description": (
+                            "The path of the image file, for example "
+                            "/home/user/robot-photos/photo.jpg. '~' and paths "
+                            "relative to the home directory work too."
+                        ),
+                    },
+                },
+                "required": ["path"],
+                "additionalProperties": False,
+            },
+        },
+        run=view_image,
         is_available=lambda: True,
         parallel_safe=True,
     ),
