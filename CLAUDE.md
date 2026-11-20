@@ -236,7 +236,7 @@ show the user the output. The user does not want to be asked to test things.
   Meta on) and `Zero state chat` (Opus, Medium, Convo on, Meta off, no text).
   The owner moved both from Low to Medium that evening, in the Instruction
   Editor.
-- The Pi has two skills, both made by the owner in chats, in
+- The Pi had two skills on that day, both made by the owner in chats, in
   `~/robot-data/skills`:
   - `robot-identity` (enabled, so its text is in every run's system prompt):
     the robot's name and one sentence on what it is.
@@ -245,6 +245,14 @@ show the user the output. The user does not want to be asked to test things.
     repo: a bash loop in `~/wifimon` that pings the gateway every 10 s, logs
     each change to `~/wifimon/wifi.log`, and starts at boot from the user's
     crontab.
+- A third skill since 2026-11-20, `cpu-temp` (enabled), made at the owner's
+  request to stand in for the removed `get_cpu_temperature` tool: it gives
+  the model the one shell command that prints the CPU temperature the way
+  the tool did ("45.1 degrees Celsius"), and says when to run it. It was
+  created with a script fed over stdin that calls `manage_skills`. It is
+  enabled, not on demand, so that a reading takes one tool call as before
+  and not a `get_skill` first. It needs `run_shell_command`: an instruction
+  that blocks that tool cannot read the temperature.
 - Because one skill is on demand, every run now also offers `get_skill`.
 - `.venv/bin/python -m robot.main --skills` and `--list` on the Pi show the
   current skills and instructions; check there instead of trusting this list.
