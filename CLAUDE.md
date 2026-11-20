@@ -254,6 +254,14 @@ show the user the output. The user does not want to be asked to test things.
   reading now takes a `get_skill` call and then the shell command (three
   model calls in all, where the tool took two). It needs `run_shell_command`: an instruction
   that blocks that tool cannot read the temperature.
+- A fourth skill since 2026-11-20, `take-photo` (on demand), made the same
+  way at the owner's request: one shell command that takes a 1920 x 1080
+  photo with the webcam (see "Conventions") and saves it as
+  `~/robot-photos/photo_<date>_<time>.jpg` on the Pi, printing "saved PATH"
+  or "no photo". The skill also tells the model that it cannot look at a
+  photo: this program sends the model no pictures, so it must never describe
+  one. Asked what a photo showed, it said that it could not see it (checked
+  on Haiku).
 - Because one skill is on demand, every run now also offers `get_skill`.
 - `.venv/bin/python -m robot.main --skills` and `--list` on the Pi show the
   current skills and instructions; check there instead of trusting this list.
