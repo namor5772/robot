@@ -258,14 +258,19 @@ show the user the output. The user does not want to be asked to test things.
   way at the owner's request: one shell command that takes a 1920 x 1080
   photo with the webcam (see "Conventions") and saves it as
   `~/robot-photos/photo_<date>_<time>.jpg` on the Pi, printing "saved PATH"
-  or "no photo". The skill also tells the model that it cannot look at a
-  photo: this program sends the model no pictures, so it must never describe
-  one. Asked what a photo showed, it said that it could not see it (checked
-  on Haiku).
+  or "no photo". Its second step is the `view_image` tool (see "Pictures"),
+  with the path the command printed: that is how the robot sees. The skill
+  tells the model to describe only what it has looked at, and to take a new
+  photo to see what is in front of it now. Its first version, from before
+  that tool existed, said that the robot could not look at photos.
+- The owner's instruction `WebcamTest` ("Take a photo and tell me what you
+  see", Sonnet 5.5, with `take-photo` and `cpu-temp` enabled for its runs)
+  was run on 2026-11-20: a photo, `view_image`, and a description that
+  matched the picture, in three calls for $0.04.
 - Because one skill is on demand, every run now also offers `get_skill`.
 - `.venv/bin/python -m robot.main --skills` and `--list` on the Pi show the
   current skills and instructions; check there instead of trusting this list.
-- 1,274 tests pass (counted on 2026-11-20). On the Pi 2 are skipped, on the
+- 1,289 tests pass (counted on 2026-11-20). On the Pi 2 are skipped, on the
   laptop 44, among them the 13 of the Wi-Fi service (bash), the 8 real-terminal tests (they need curses), the 19
   launcher tests (they need bash) and 3 that build a real tree of child runs
   (they need the kernel's list of processes). `tests/test_spawn.py` starts real
@@ -541,8 +546,8 @@ show the user the output. The user does not want to be asked to test things.
 
 ### Tools
 
-- Always: `run_shell_command`, `get_current_datetime`, `user_prompt`,
-  server-side `web_search`
+- Always: `run_shell_command`, `get_current_datetime`, `view_image` (see
+  "Pictures"), `user_prompt`, server-side `web_search`
   (`models.web_search_tool`: `web_search_20260209`, `max_uses` 5; its
   definition alone is about 6,000 tokens of every request).
 - `get_skill` when a skill is on demand. Its result adds the skill's folder
@@ -558,6 +563,36 @@ show the user the output. The user does not want to be asked to test things.
   would make `git pull --ff-only` refuse), act as root on text from a web
   search, and write skills that later runs load. The banner lists the skills
   in use for that reason.
+
+### Pictures
+
+- `view_image` (in `tools.py`, since 2026-11-20, at the owner's request) is
+  the one way a picture reaches the model. Its result is not text but a list
+  of two blocks: a line naming the file, and an `image` block with the
+  file's bytes in base64. `Agent._run_tool` passes a list on as the
+  `tool_result`'s content. The API takes that (checked on Haiku with SDK
+  2.8.0; no beta header).
+- The kind of picture is read from the file's first bytes, not from its
+  name: JPEG, PNG, GIF, WebP. A file over `MAX_IMAGE_BYTES` (3.5 MB) is
+  refused with the reason, because the API's limit is 5 MB after encoding.
+  A path may be absolute, start with `~`, or be relative to the home
+  folder, where the shell tool also starts. Nothing is resized: there is no
+  image library on the Pi, and none is wanted (see "Conventions").
+- A picture is billed by its pixels. A 1920 x 1080 photo was about 2,800
+  input tokens on Haiku and on Sonnet 5.5. It stays in the history, so every
+  later call of the run carries it (read from the cache).
+- Three places must not treat it as text, and do not: the saved chat's
+  `.json` keeps a note in its place (`chats._clean_result_content`, which
+  was there already; the line naming the file is kept), `--debug` and
+  `--dry-run` print only how long its data is (`api._without_image_data`),
+  and the history's size estimate counts it as a picture inside a tool
+  result too (`history.estimate_content_tokens`). The transcript `.txt`
+  never held tool results.
+- The tool's description is model-facing text: it says that this is how the
+  robot sees, and never to describe an image it has not looked at.
+- MyAgent attaches images to an instruction or a message. That is still not
+  here: a picture gets in only as a file on the Pi that the model asks to
+  see.
 
 ### Input, output and Ctrl-C
 
@@ -819,7 +854,7 @@ underneath is the same code the chat runs; only the console differs.
 - `~/robot-data/tui_state.json` holds the instruction in use and the five
   display boxes (`tui_state_NAME.json` for a copy started with a session
   name). Nothing a run needs is in it.
-- The Tools dialog lists `editor.TOOL_NAMES`: the five ordinary tools first,
+- The Tools dialog lists `editor.TOOL_NAMES`: the six ordinary tools first,
   the four Meta tools last, then any blocked name the program does not know
   (one copied in from MyAgent, or one of a tool since removed), so that such a block is not lost on saving.
   The README's tool table is in the same order. Nothing marks where the Meta
@@ -965,7 +1000,9 @@ underneath is the same code the chat runs; only the console differs.
   kernel's `uvcvideo` driver takes it as `/dev/video0` (`/dev/video1` is its
   metadata; the `/dev/video10` and up are the Pi's own codecs, not cameras),
   and its microphone as a USB sound card. It offers YUYV and MJPG up to
-  1920 x 1080. No program in the repo uses it. A photo needs nothing
+  1920 x 1080. Nothing in the repo takes photos: the robot does that with
+  the shell tool, told how by its `take-photo` skill, and looks at the file
+  with the `view_image` tool. A photo needs nothing
   installed, since an MJPG frame is a JPEG file as it comes:
   `v4l2-ctl -d /dev/video0
   --set-fmt-video=width=1920,height=1080,pixelformat=MJPG --stream-mmap
