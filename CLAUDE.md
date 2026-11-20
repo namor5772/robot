@@ -951,5 +951,18 @@ underneath is the same code the chat runs; only the console differs.
   and request shapes change often. Test what the API accepts with a paid check
   on Haiku before relying on it.
 - No hardware beyond the Pi itself (motors, sensors, camera, speaker) is wired
-  into the code, and what is attached to the robot has not been recorded here.
-  Ask before assuming any.
+  into the code. Ask before assuming any that is not listed here.
+- Attached since 2026-11-20: a Logitech Brio 100 webcam on the Pi's USB data
+  port (the port is in host mode: `dtoverlay=dwc2,dr_mode=host`). The
+  kernel's `uvcvideo` driver takes it as `/dev/video0` (`/dev/video1` is its
+  metadata; the `/dev/video10` and up are the Pi's own codecs, not cameras),
+  and its microphone as a USB sound card. It offers YUYV and MJPG up to
+  1920 x 1080. No program in the repo uses it. A photo needs nothing
+  installed, since an MJPG frame is a JPEG file as it comes:
+  `v4l2-ctl -d /dev/video0
+  --set-fmt-video=width=1920,height=1080,pixelformat=MJPG --stream-mmap
+  --stream-skip=30 --stream-count=1 --stream-to=/tmp/photo.jpg` (the 30
+  frames skipped give the camera a second to set its exposure). The user is
+  in the `video` group. Photos are personal: never put one in the repo, and
+  on the laptop keep them out of folders that OneDrive copies (Pictures is
+  one); the first went to `RobotPhotos` in the user's home folder.
