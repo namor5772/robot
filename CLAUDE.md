@@ -348,7 +348,7 @@ show the user the output. The user does not want to be asked to test things.
 - Because one skill is on demand, every run now also offers `get_skill`.
 - `.venv/bin/python -m robot.main --skills` and `--list` on the Pi show the
   current skills and instructions; check there instead of trusting this list.
-- 1,289 tests pass (counted on 2026-11-20, and on the desktop on 2026-11-22).
+- 1,310 tests pass (counted on 2026-11-22, on the desktop and on the Pi).
   On the Pi 2 are skipped, on Windows 44, among them the 13 of the Wi-Fi
   service (bash), the 8 real-terminal tests (they need curses), the 19
   launcher tests (they need bash) and 3 that build a real tree of child runs
@@ -588,6 +588,8 @@ show the user the output. The user does not want to be asked to test things.
   up the `robot-wifi` service; its body is in a `main` function so the pull
   can replace the file safely), `scripts/wifi-reconnect.sh` (that service),
   `scripts/chat.sh`, `scripts/ui.sh`, `scripts/tmux.conf`.
+- `scripts/pi_photo.py` runs on a PC, not on the Pi: it fetches a photo from
+  the Pi and opens it in the PC's viewer (see "Pictures").
 - `requirements.txt`: `anthropic==2.8.0`, `python-dotenv==1.2.4`. Pinned on
   purpose: 2.8.0 sends API version 2026-10-21, has no `temperature`
   parameter, sends the key as a Bearer token, and is built on `httpx2`.
@@ -700,6 +702,29 @@ show the user the output. The user does not want to be asked to test things.
 - MyAgent attaches images to an instruction or a message. That is still not
   here: a picture gets in only as a file on the Pi that the model asks to
   see.
+- When the owner asks to see a photo the Pi took, on a PC, run
+  `.venv/Scripts/python.exe scripts/pi_photo.py` there (since 2026-11-22).
+  It copies the Pi's newest photo to `~/RobotPhotos` on the PC and opens it
+  in the PC's own viewer. `NAME.jpg` after it takes that photo instead,
+  `--file F.jpg` one that is already on the PC, `--no-open` leaves the
+  viewer shut.
+  - Why a script and not a copy: a frame of the webcam's MJPG stream is a
+    JPEG file without its Huffman tables (it has no `FF C4` segment). The
+    stream's convention is that the standard tables are meant. The API and
+    lenient decoders fill them in. Windows' decoder does not: the viewer
+    opened and showed no picture, and GDI+ said "A generic error occurred".
+  - So the script writes `NAME_viewable.jpg` beside the copy, with the
+    standard tables (420 bytes) put in front of the picture data, and opens
+    that. The picture data is not touched and the photo as it came is kept.
+  - It will not put photos inside the checkout or inside a folder that
+    OneDrive copies. It only reads from the Pi (`ssh` for the newest name,
+    `scp` for the file).
+  - Nothing was changed on the Pi, at the owner's word ("no stuff needed on
+    the Pi"): the `take-photo` skill still saves frames as they come, so
+    every photo needs this on Windows.
+  - `tests/test_pi_photo.py` (21 tests, on every machine) gives it a
+    stand-in for `ssh` and `scp`. No test decodes a picture: that was looked
+    at by hand, on the desktop, with two photos.
 
 ### Input, output and Ctrl-C
 
@@ -1118,4 +1143,5 @@ underneath is the same code the chat runs; only the console differs.
   in the `video` group. Photos are personal: never put one in the repo, and
   on a PC keep them out of folders that OneDrive copies (on the laptop
   Pictures is one; the first went to `RobotPhotos` in the user's home folder
-  there).
+  there). `scripts/pi_photo.py` fetches one to `~/RobotPhotos` on either PC
+  and makes it viewable on Windows (see "Pictures").

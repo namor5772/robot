@@ -391,6 +391,19 @@ default model, and it stays in the conversation for the rest of the run. The
 saved chat keeps a note in place of each picture, and `--debug` shows only
 how long its data was.
 
+To look at one of the robot's photos yourself, on a PC, in the checkout:
+
+```powershell
+.venv\Scripts\python.exe scripts\pi_photo.py
+```
+
+It copies the Pi's newest photo to `RobotPhotos` in your home folder and
+opens it in the PC's viewer. Put a photo's file name after it for another
+one. The file it opens is `NAME_viewable.jpg`: the webcam's photos leave out
+a part that Windows insists on, and opened as they come the viewer shows
+nothing. The photo as it came is kept beside it, and nothing on the Pi is
+changed.
+
 Any of the ten can be switched off for one instruction. In the Instruction
 Editor the Tools button shows this list, in this order, with a tick beside
 each tool the instruction may use. A cleared tool is blocked for that
@@ -621,7 +634,7 @@ differ: the desktop has PowerShell only, the laptop also Git Bash.
 - `robot/prompts.py`: the system prompt's wording.
 - `robot/models.py`: model and price tables. `robot/costs.py`, `robot/chats.py`, `robot/history.py`, `robot/datastore.py`, `robot/relay.py`: supporting parts.
 - `robot/tui/`: the windowed interface. `app.py`: the main window and how a run and the screen work side by side. `editor.py`, `skillsui.py`: the Instruction Editor and the Skills Manager. `widgets.py`, `dialogs.py`: buttons, lists, text boxes and small windows. `screen.py`: the screen and the keyboard (curses). `text.py`: wrapping and editing text.
-- `scripts/chat.sh`, `scripts/ui.sh`, `scripts/tmux.conf`: the tmux launchers for the chat and the windowed interface. `scripts/deploy.sh`: run on the Pi to update it. `scripts/wifi-reconnect.sh`: the `robot-wifi` service, which puts the Pi back on the Wi-Fi.
+- `scripts/chat.sh`, `scripts/ui.sh`, `scripts/tmux.conf`: the tmux launchers for the chat and the windowed interface. `scripts/deploy.sh`: run on the Pi to update it. `scripts/wifi-reconnect.sh`: the `robot-wifi` service, which puts the Pi back on the Wi-Fi. `scripts/pi_photo.py`: run on a PC, fetches a photo from the Pi and opens it.
 - `tests/`: the test suite. `CLAUDE.md`: detailed notes for Claude Code sessions.
 
 ## Setup on the Pi
