@@ -1,8 +1,9 @@
 # CLAUDE.md
 
 This repo is the Anthropic-API agent "brain" for a small robot. It is developed
-on a Windows laptop and runs on a Raspberry Pi. Since 2026-11-16 the program is
-a terminal port of the owner's MyAgent harness (see "Where it comes from").
+on the owner's two Windows PCs, a laptop and a desktop (see "The two PCs"), and
+runs on a Raspberry Pi. Since 2026-11-16 the program is a terminal port of the
+owner's MyAgent harness (see "Where it comes from").
 Since 2026-11-18 it has two faces: the line-by-line chat (`python -m
 robot.main`) and a windowed interface drawn with curses (`python -m robot.tui`,
 see "The windowed interface").
@@ -69,22 +70,77 @@ see "The windowed interface").
   console (tty1) of 240 columns by 67 rows on 1920 x 1080, in UTF-8, with the
   kernel's own font and no mouse service.
 
+## The two PCs
+
+- The repo is checked out on two Windows PCs of the owner's: a laptop, where
+  all the work up to 2026-11-20 was done, and since 2026-11-22 a desktop. The
+  work goes the same way on both: tests, commit, push, deploy, check on the
+  Pi.
+- This file is the same on both, so it cannot say which PC a session is on.
+  Look: the desktop's key, `~/.ssh/id_ed25519.pub`, ends in `robot-desktop`.
+  Where this file says "the laptop" or "the desktop" it means that PC and not
+  the other; what holds on both says "a PC" or "Windows".
+- Start every piece of work with `git pull --ff-only`: the other PC may have
+  pushed since. End it with a push. What is not pushed is on one PC only.
+  That goes for Claude's own notes as well (its memory folder is kept per
+  PC): what both PCs must know belongs in this file.
+- What a PC needs for this repo, and both have:
+  - A key of its own that the Pi accepts, and `pi` and `pi-local` in its
+    `~/.ssh/config` (see "Reaching the Pi"). The Pi's
+    `~/.ssh/authorized_keys` holds two keys, one per PC; the desktop's is
+    marked `robot-desktop`. A key there decides who gets into the Pi: one is
+    added only when the owner asks, and the owner does the adding. The
+    desktop's was made and added on 2026-11-22.
+  - `.venv` in the checkout, for the unit tests. The desktop's was made with
+    `py -3.13 -m venv .venv` and `.venv/Scripts/python.exe -m pip install -r
+    requirements.txt`; it has Python 3.13.5, as the Pi has, and the laptop's
+    has 3.12.
+- What differs: Git Bash does not work on the desktop, and so neither does
+  the Bash tool. Its tries end in `dofork: child -1 - forked process ...
+  died unexpectedly, ... exit code 0xC0000142`, or in an exit code and
+  nothing else: Git Bash cannot start a second process there. `git` itself
+  works, and PowerShell does everything else (see "Running and testing").
+  The reason, as far as it was looked into on 2026-11-22: Windows is set there
+  to load every program at a random address, for the whole system ("Force
+  randomization for images (Mandatory ASLR)" under Exploit protection;
+  `(Get-ProcessMitigation -System).ASLR` says `ForceRelocateImages : ON`), and
+  Git Bash is known to fail in just this way with that. It was not switched
+  off to prove it: it is a security setting of that PC, not to be changed
+  unasked.
+
 ## Reaching the Pi
 
-- `ssh pi` (no password). The `pi` alias in the laptop's `~/.ssh/config` points
-  at the Pi's IP address, `10.42.199.40`, with `HostKeyAlias robot.local`. It
-  works from both PowerShell and Git Bash.
-- That address is assigned by DHCP and can change. If `ssh pi` times out, use
-  `ssh pi-local` (same Pi via `robot.local`, PowerShell only), read the new
-  address with `hostname -I`, and update `HostName` under `Host pi`.
+- `ssh pi` (no password), from either PC. Each has a `pi` entry in its own
+  `~/.ssh/config`: the Pi's IP address as `HostName`, `User grobliro`, and
+  `HostKeyAlias robot.local`, which has ssh look the Pi's host key up under
+  that name whatever the address is. On the laptop it works from both
+  PowerShell and Git Bash; the desktop has PowerShell only.
+- That address is given out by the router of the network the Pi is on (DHCP).
+  It can change there, and on another network it is a different one. A PC's
+  entry holds the address the Pi had when the entry was last put right, so
+  after the Pi has moved to another network (as on 2026-11-22, see "Getting
+  back on the Wi-Fi") `ssh pi` times out on a PC not used since. The
+  addresses are not written down here.
+- If `ssh pi` times out, use `ssh pi-local` (same Pi via `robot.local`,
+  PowerShell only), read the new address with `hostname -I`, and update
+  `HostName` under `Host pi` on that PC.
 - `pi-local` uses mDNS, which Git Bash's ssh cannot resolve and which fails
   intermittently from PowerShell; retrying usually works.
-- For scripted commands add `-o BatchMode=yes -o ConnectTimeout=15`.
+- For scripted commands add `-o BatchMode=yes -o ConnectTimeout=15`. A
+  session's command can neither type a password nor answer a question: with
+  these two, a login that is not set up fails at once instead of waiting.
+- A PC is set up for this once, as the desktop was on 2026-11-22: a key
+  (`ssh-keygen -t ed25519`), the two entries in `~/.ssh/config`, and the
+  Pi's host keys in `~/.ssh/known_hosts` under the name `robot.local`,
+  copied from the lines of the address at which the owner had accepted
+  them. Then the owner adds the public key on the Pi; until then every
+  login from that PC's sessions is refused.
 
 ## Workflow
 
-1. Develop here on Windows. Run the tests (below).
-2. Commit and push to GitHub (`origin`, branch `main`). The laptop remote is
+1. Develop here on Windows, on either PC, after a `git pull --ff-only` (see
+   "The two PCs"). Run the tests (below).
+2. Commit and push to GitHub (`origin`, branch `main`). The PCs' remotes are
    HTTPS; the Pi's remote is SSH.
 3. Deploy: `ssh pi "bash ~/robot/scripts/deploy.sh"`
 4. Run on the Pi: `ssh -t pi "bash ~/robot/scripts/chat.sh"` for the chat, or
@@ -113,19 +169,20 @@ show the user the output. The user does not want to be asked to test things.
 
 ## Running and testing
 
-- Unit tests, no network and no cost, on the laptop (Git Bash):
+- Unit tests, no network and no cost, on a PC (Git Bash or PowerShell):
   `.venv/Scripts/python.exe -m unittest discover -s tests -t .`
   and on the Pi: `.venv/bin/python -m unittest discover -s tests -t .`
-  Run both: the Pi has a different Python and real process groups.
+  Run both: the Pi has real process groups, curses and bash, and its Python
+  (3.13.5) is not the laptop's (3.12).
 - `tests/fakes.py` has a fake client that scripts the model's replies
   (`FakeClient`, `reply`, `tool_use`, ...), a piped console and a terminal
   console. `tests/test_wire.py` drives the real SDK over a mock network with
   recorded replies in `tests/fixtures/*.sse`; `tests/record_fixtures.py`
   re-records them (paid, a few cents; it scrubs signatures and ids).
 - Tests write only into temp folders, never into the repo or `~/robot-data`.
-- The laptop DOES have an `ANTHROPIC_API_KEY` in its environment. So
-  `python -m robot.main` on the laptop makes real, billed calls. Paid checks
-  are done on the Pi; on the laptop use the unit tests or `--dry-run`, and set
+- Both PCs DO have an `ANTHROPIC_API_KEY` in their environment. So
+  `python -m robot.main` on a PC makes real, billed calls. Paid checks
+  are done on the Pi; on a PC use the unit tests or `--dry-run`, and set
   `ROBOT_DATA_DIR` to a temp folder so nothing lands in `~/robot-data` there.
 - A paid check on the Pi without a terminal: pipe lines in.
   `ssh pi "cd ~/robot && printf 'first\nsecond\n' | .venv/bin/python -m robot.main --model claude-haiku-5-5"`
@@ -151,7 +208,8 @@ show the user the output. The user does not want to be asked to test things.
   kill-server`.
 - To run a script on the Pi without writing a file there, feed it over stdin:
   `ssh pi "cd ~/robot && .venv/bin/python -" < script.py` or `bash -s`. An
-  `ssh` command inside such a script needs `-n`.
+  `ssh` command inside such a script needs `-n`. That is Git Bash's way;
+  PowerShell's is in the point "On the desktop" below.
 - `--dry-run` prints the exact first request; `--debug` prints every request.
 - Paid checks that need saved instructions or skills create them in
   `~/robot-data` with names starting `ZZ ` (instructions) and `zz-` (skills),
@@ -165,7 +223,7 @@ show the user the output. The user does not want to be asked to test things.
   was timing-dependent on a busy Pi and was fixed on 2026-11-16; if a test
   fails once and then passes, find the race instead of rerunning until green
   (running the suite with all four cores loaded brought that one out).
-- A race found that way on 2026-11-19, on the laptop only:
+- A race found that way on 2026-11-19, on Windows only (on the laptop):
   `test_without_answers_the_person_at_this_terminal_is_asked` failed once in
   a full run. On Windows a file that another process has open for reading
   can be neither replaced nor removed, and the two sides of a relay folder
@@ -173,15 +231,35 @@ show the user the output. The user does not want to be asked to test things.
   `relay.clear`. `relay._while_not_in_use` now tries again for up to two
   seconds on a `PermissionError`. Linux has no such rule; on the Pi the first
   try is the only one.
-- On this laptop, long heredocs with quotes passed to the Bash tool have
+- On the laptop, long heredocs with quotes passed to the Bash tool have
   broken several times, and backslashes in them are rewritten (a `\x11` in a
   heredoc reached the file as the control character itself). Use the Write
   and Edit tools for file content, scripts included.
+- On the desktop the Bash tool does not work (see "The two PCs") and the
+  PowerShell tool does its job. What was tried there on 2026-11-22, with
+  PowerShell 7.7:
+  - The unit tests, `ssh pi "..."` and the deploy are typed as they stand in
+    this file.
+  - PowerShell has no `<`. A script is fed to the Pi with `Get-Content -Raw
+    script.sh | ssh pi "tr -d '\r' | bash -s"`, a Python one with `... | ssh
+    pi "cd ~/robot && tr -d '\r' | .venv/bin/python -"`. The `tr` takes the
+    carriage returns out: PowerShell ends what it pipes with one, and a file
+    written on Windows can have one on every line.
+  - The `tar` pipe further down works as it stands: Windows has a `tar`, and
+    this PowerShell hands bytes from one program to the next unchanged. The
+    files arrive as they are in the working tree. With git's `autocrlf` on,
+    as it is there, `.py` files have CRLF line ends in the working tree,
+    which Python on the Pi does not mind; `.sh`, `.conf` and `.sse` have LF
+    through `.gitattributes`.
+  - The tool refused one whole command before running it: a remote command
+    quoted in it held an `rm -rf`, and the tool's safety check spoke of a
+    local `Remove-Item`. Steps that remove something on the Pi go into the
+    script that is fed over stdin.
 - The Write and Edit tools turn a `\uXXXX` in the text they are given into
   the character itself. To keep a source file plain ASCII, spell such a
   character as `chr(0x2500)`.
 - The windowed interface has three kinds of test:
-  - `tests/test_tui_*.py` except `_terminal` run everywhere, the laptop
+  - `tests/test_tui_*.py` except `_terminal` run everywhere, the PCs
     included, on a screen that lives in memory (`tests/tui_fakes.py`:
     `FakeScreen`, and `AppCase` with `drive(...)`). A test is a script of key
     names, `typed("text")`, `Check(function)` to look at the screen so far and
@@ -190,12 +268,12 @@ show the user the output. The user does not want to be asked to test things.
     is gone, so a second call starts again at the main window.
   - `tests/test_tui_terminal.py` starts the real program on a pseudo-terminal
     and sends it real bytes. It needs curses, so it runs on the Pi only (8
-    tests, about 30 s) and is skipped on the laptop. It gives the program an
+    tests, about 30 s) and is skipped on Windows. It gives the program an
     empty API key, with which nothing can be sent.
   - `tests/test_launchers.py` runs `chat.sh` and `ui.sh` with a stand-in for
     tmux that only writes down how it was called: which socket, which
     session, which program with which arguments. Nothing is started. bash
-    scripts for the Pi, so it is skipped on the laptop too (19 tests).
+    scripts for the Pi, so it is skipped on Windows too (19 tests).
   - By hand on the Pi, in a tmux of the check's own (see above: never the
     owner's `robot-ui`). `ui.sh` takes another socket from the environment:
     `ROBOT_SOCKET=zz-ui ROBOT_TMUX_DETACHED=1 bash scripts/ui.sh`. The
@@ -216,9 +294,9 @@ show the user the output. The user does not want to be asked to test things.
 - A job on the Pi that outlasts an ssh command (the card test of 2026-11-19
   took 50 minutes) is started detached, `setsid nohup python3 -u /tmp/x.py >
   /tmp/x.log 2>&1 < /dev/null &`, and ends its log with a line that says so
-  (`FINISHED: ...`). A background loop on the laptop asks once a minute
+  (`FINISHED: ...`). A background loop on the PC asks once a minute
   whether that line is there. The job then survives a dropped connection and
-  a laptop that sleeps. Rehearse such a job small first, and once with a
+  a PC that sleeps. Rehearse such a job small first, and once with a
   fault put in on purpose: a check that cannot fail proves nothing.
 - `pgrep -f name` run over ssh also finds the shell that ssh started for the
   command, because the name is in that shell's own command line. Write the
@@ -270,17 +348,22 @@ show the user the output. The user does not want to be asked to test things.
 - Because one skill is on demand, every run now also offers `get_skill`.
 - `.venv/bin/python -m robot.main --skills` and `--list` on the Pi show the
   current skills and instructions; check there instead of trusting this list.
-- 1,289 tests pass (counted on 2026-11-20). On the Pi 2 are skipped, on the
-  laptop 44, among them the 13 of the Wi-Fi service (bash), the 8 real-terminal tests (they need curses), the 19
+- 1,289 tests pass (counted on 2026-11-20, and on the desktop on 2026-11-22).
+  On the Pi 2 are skipped, on Windows 44, among them the 13 of the Wi-Fi
+  service (bash), the 8 real-terminal tests (they need curses), the 19
   launcher tests (they need bash) and 3 that build a real tree of child runs
   (they need the kernel's list of processes). `tests/test_spawn.py` starts real
   processes and is the slow one on the laptop, where starting and stopping a
-  process takes a second or so: about a minute there, 12 s on the Pi.
+  process takes a second or so: about a minute there, 12 s on the Pi. On the
+  desktop the whole suite takes 35 s.
 - The windowed interface was added on this day. Its state is in
   `~/robot-data/tui_state.json`. The owner used it the same evening, over SSH
   from the laptop and at the Pi's own screen.
 - On 2026-11-19 the Pi moved from its 16 GB card to a 32 GB one (see "Target
   device"), and the owner ran three interfaces at once at its own screen.
+- On 2026-11-22 the Pi was put on another Wi-Fi network (see "Getting back on
+  the Wi-Fi"), and the desktop became the second PC the repo is worked on
+  from (see "The two PCs").
 - No hardware tools exist. The one there was, `get_cpu_temperature`, was
   removed on 2026-11-20 at the owner's request: the model reads the sensor
   with the shell tool when asked (`/sys/class/thermal/thermal_zone0/temp`,
@@ -321,14 +404,14 @@ show the user the output. The user does not want to be asked to test things.
   NetworkManager is when it has given up. With the service stopped it stayed
   off for the 100 s that were watched; once the service was started it was
   back after 34 s. `tests/test_wifi_reconnect.py` runs the script against a
-  stand-in for `nmcli` (13 tests, bash, so skipped on the laptop).
+  stand-in for `nmcli` (13 tests, bash, so skipped on Windows).
 - Such a check takes the Pi off the network for minutes. It must run
   detached, must put the Wi-Fi back by hand at its end whatever happened, and
   must not start while a run is in progress (`~/robot-data/runs` holds a file
   then).
-- Only the network in everyday use has ever been joined. The Pi also has two
-  saved profiles for a second network (one had a wrong letter in the
-  network's name until 2026-11-20), and a join tried with each that day
+- Until 2026-11-22 only the network in everyday use had ever been joined. The
+  Pi also has two saved profiles for a second network (one had a wrong letter
+  in the network's name until 2026-11-20), and a join tried with each that day
   failed before any password was looked at: the access point did not answer
   the Pi's request to authenticate ("Authentication ... timed out", then
   NetworkManager's "no-secrets"). It announces WPA2 with WPA3 and Wi-Fi 6.
@@ -341,6 +424,29 @@ show the user the output. The user does not want to be asked to test things.
   network can be joined, `connection.autoconnect yes` brings them back.
 - That makes the opening of this section out of date in one point: not all
   saved Wi-Fi networks connect automatically any more.
+- A network the Pi has never joined is added at its own console (keyboard
+  and screen), which needs no network: `sudo nmcli device wifi list --rescan
+  yes` shows what the Pi sees, and `sudo nmcli --ask device wifi connect
+  "NAME"` joins one, asking for the password without showing it (`sudo
+  nmtui` does the same with menus). The Pi's radio has the 2.4 GHz band only
+  (`iw list` shows one band), so a network sent on 5 GHz alone is not in
+  that list. The owner did this on 2026-11-22, at a router the Pi had never
+  seen.
+- The profile made that way connects automatically, with priority 0; the first
+  network has 10 and so wins where both are in range. Four profiles are
+  saved now: these two, and the two that do not connect automatically. Power
+  saving is off on the new network as well, the setting being for every
+  network. `robot-wifi` did as it should that morning: with no network it
+  knew in range it said so once and waited, and it noted the join. The
+  robot's own monitor reads the gateway from the routing table, so it
+  follows the Pi to another network.
+- The Pi has no clock of its own. Started with no network, it goes on from
+  about where its clock stood when it was last shut down, until a network
+  gives it the time: on 2026-11-22 it started at 06:27 thinking it was 20:09
+  on the 20th, and was put right at 06:48, on joining. What `robot-wifi`,
+  the monitor and the journal wrote in between carries the old date. `sudo
+  journalctl -b | grep timesyncd` shows when the clock was set, and `uptime
+  -s` when the Pi really started.
 - The Wi-Fi monitor the robot made (`~/wifimon`, see "State on 2026-11-18")
   is separate and only writes down changes: it pings the gateway, so its log
   also shows short losses during which the Pi never left the network.
@@ -361,8 +467,8 @@ show the user the output. The user does not want to be asked to test things.
 
 ## When the SSH connection drops
 
-- Without tmux the chat belongs to the SSH session: if the laptop sleeps or
-  its Wi-Fi drops, the session is reset and the chat dies with it. `chat.sh`
+- Without tmux the chat belongs to the SSH session: if the PC sleeps or
+  its network drops, the session is reset and the chat dies with it. `chat.sh`
   avoids that by running the chat inside tmux, on its own socket and session,
   both named `robot` (`tmux -L robot ...`), with `scripts/tmux.conf`. Run
   again, it reattaches and ignores its arguments. Detach is Ctrl-B then D.
@@ -388,8 +494,8 @@ show the user the output. The user does not want to be asked to test things.
 - After a normal Quit the interface's window closes at once. After a crash it
   waits for Enter, so that the traceback can be read.
 - To see why an SSH session ended: `sudo journalctl -t sshd-session --since today`
-  on the Pi (not `-u ssh`). On the laptop, standby shows as Kernel-Power events
-  506 and 507 in the System log.
+  on the Pi (not `-u ssh`). On a PC, standby shows as Kernel-Power events
+  506 and 507 in the System log (seen on the laptop).
 - A hang-up or SIGTERM winds the run down properly (cost logged, chat saved).
 
 ## Terminal answers that reach the prompt
@@ -485,7 +591,8 @@ show the user the output. The user does not want to be asked to test things.
 - `requirements.txt`: `anthropic==2.8.0`, `python-dotenv==1.2.4`. Pinned on
   purpose: 2.8.0 sends API version 2026-10-21, has no `temperature`
   parameter, sends the key as a Bearer token, and is built on `httpx2`.
-- `.venv/` on the laptop (gitignored): Python 3.12 with the same packages.
+- `.venv/` on each PC (gitignored): the same packages, under Python 3.12 on
+  the laptop and 3.13.5 on the desktop.
 - `.gitattributes`: LF line endings for `*.sh`, `*.conf`, `*.sse`.
 
 ## How the agent works
@@ -726,9 +833,9 @@ show the user the output. The user does not want to be asked to test things.
     child does not inherit the hold.
   - Off Linux none of this can be read, and a program counts its own
     children, as before. `tests/test_spawn.py` builds made-up `/proc` trees
-    for the laptop, and on the Pi a real tree: its stand-in child `Family`
-    starts children of its own (3 tests, skipped on the laptop).
-  - Where the free memory cannot be read (anywhere but Linux: the laptop's
+    for Windows, and on the Pi a real tree: its stand-in child `Family`
+    starts children of its own (3 tests, skipped on Windows).
+  - Where the free memory cannot be read (anywhere but Linux: the PCs'
     tests), `FALLBACK_MAX_CHILDREN` (2) applies.
   - The tool's description in `meta.py` said "at most two can run at the same
     time". It now says that the number depends on the memory that is free and
@@ -788,7 +895,7 @@ underneath is the same code the chat runs; only the console differs.
 - Everything draws on a `Screen`: `put`, `fill`, `box`, clipped at the edges.
   `CursesScreen` is the real one. Tests use `FakeScreen`, a grid in memory,
   because Python on Windows has no curses. Keep curses out of every other
-  module, or the laptop's tests stop importing.
+  module, or the tests on Windows stop importing.
 - Drawing is immediate: each frame erases, draws every open window in order,
   and lets curses send only what changed. A frame is drawn only when
   something happened (`App.dirty`). There are no curses sub-windows.
@@ -883,7 +990,7 @@ underneath is the same code the chat runs; only the console differs.
   costs nothing here: the interface's F-keys are used without Alt.
 - There is no mouse at the Pi's own screen. The kernel sees the owner's
   mouse, but the text console hands no clicks to a program: over SSH it is
-  the laptop's terminal that reports them. `gpm` (not installed) would not
+  the PC's terminal that reports them. `gpm` (not installed) would not
   change that, because tmux takes the mouse only from a terminal that
   reports it. The interface could read `/dev/input/mice` itself and draw a
   pointer (the user is in the `input` group). The owner was asked on
@@ -917,7 +1024,7 @@ underneath is the same code the chat runs; only the console differs.
   - `--session` has no string default in `build_parser`: argparse puts a
     default that is a string through the option's `type`, and `session_name`
     refuses an empty name. With `default=""` the program did not start at
-    all. The tests caught it; the laptop cannot run the program to show it.
+    all. The tests caught it; a Windows PC cannot run the program to show it.
   - Tried for real on the Pi on 2026-11-19, on a socket of the check's own:
     two interfaces, a terminal that joined one and went to the other and back
     with tmux's keys, and a settings file each.
@@ -953,7 +1060,7 @@ underneath is the same code the chat runs; only the console differs.
 ## Where it comes from
 
 - MyAgent is the owner's tkinter agent app, in the folder
-  `Claude_Python_Testbed` next to this one on the laptop. Its package cannot
+  `Claude_Python_Testbed` next to this one on both PCs. Its package cannot
   be imported on the Pi (every module imports tkinter), so its engine logic
   was copied and adapted here. That repo documents itself in its `CLAUDE.md`
   and `docs/claude/myagent/`.
@@ -1009,5 +1116,6 @@ underneath is the same code the chat runs; only the console differs.
   --stream-skip=30 --stream-count=1 --stream-to=/tmp/photo.jpg` (the 30
   frames skipped give the camera a second to set its exposure). The user is
   in the `video` group. Photos are personal: never put one in the repo, and
-  on the laptop keep them out of folders that OneDrive copies (Pictures is
-  one); the first went to `RobotPhotos` in the user's home folder.
+  on a PC keep them out of folders that OneDrive copies (on the laptop
+  Pictures is one; the first went to `RobotPhotos` in the user's home folder
+  there).
