@@ -563,8 +563,26 @@ screen, which need no network.
 4. On each PC, put that address under `Host pi` in `~/.ssh/config` (see
    "Working on it").
 
+`sudo nmtui`, then "Activate a connection", does steps 1 and 2 with menus.
+
 The network is saved: from then on the Pi joins it by itself, and
 `robot-wifi` brings the Pi back onto it like the other saved networks.
+
+If it does not work:
+
+- The network is not in the list. The Pi's Wi-Fi has the 2.4 GHz band only,
+  so a network that is sent on 5 GHz alone is not shown. Switch on the
+  router's 2.4 GHz band.
+- The password is refused. Try once with it visible, to see what the
+  keyboard really produces: `sudo nmcli device wifi connect "Network Name"
+  password 'the password'`.
+- A failed try has left the network among the saved ones (`nmcli connection
+  show` lists them). Remove it with `sudo nmcli connection delete "Network
+  Name"` and join again; otherwise `robot-wifi` keeps trying it.
+- The times in the logs look wrong. The Pi has no clock of its own: after a
+  start it goes on from where its clock stood at the last shutdown, until a
+  network gives it the time. What was logged before the join carries that
+  old time.
 
 ## Working on it
 
