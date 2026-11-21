@@ -10,7 +10,7 @@ system and every provider other than Anthropic.
 
 ## Starting a chat
 
-From the laptop:
+From a PC (the laptop or the desktop, see "Working on it"):
 
 ```powershell
 ssh -t pi "bash ~/robot/scripts/chat.sh"
@@ -30,7 +30,7 @@ question, an empty line stops the run.) Ctrl-C stops the reply or command in
 progress and returns to the prompt.
 
 `chat.sh` runs the chat inside tmux, so it belongs to the Pi and not to your
-SSH connection. If the laptop sleeps or the connection drops, the chat keeps
+SSH connection. If the PC sleeps or the connection drops, the chat keeps
 running, and the same command brings you back to it.
 
 - To leave a chat running on purpose, press Ctrl-B, then D.
@@ -52,7 +52,7 @@ The same agent behind buttons, lists, text boxes and dialogs, all drawn with
 characters. It needs no graphical desktop: it works over SSH and on the Pi's
 own screen and keyboard.
 
-From the laptop:
+From a PC:
 
 ```powershell
 ssh -t pi "bash ~/robot/scripts/ui.sh"
@@ -144,7 +144,7 @@ Good to know:
   same command brings you back, and Ctrl-B then D leaves it running. It has a
   tmux of its own, so a chat can be open as well.
 - Starting it again joins it. If the interface is already running, the
-  command does not start a second one, whether you type it on the laptop or
+  command does not start a second one, whether you type it on a PC or
   at the Pi. There is then one program with several screens: each shows the
   same windows, and any of the keyboards drives them. The window takes the
   size of the screen that was used last.
@@ -174,7 +174,7 @@ have a tmux of their own. For a second interface, give it a session name:
 bash ~/robot/scripts/ui.sh --session 2
 ```
 
-From the laptop that is `ssh -t pi "bash ~/robot/scripts/ui.sh --session 2"`.
+From a PC that is `ssh -t pi "bash ~/robot/scripts/ui.sh --session 2"`.
 
 At the Pi's own screen every interface can have a text terminal to itself.
 Hold Alt and press F2 for the second terminal, log in there (it asks the
@@ -461,7 +461,8 @@ see the next section.
 
 ## Backing up the Pi
 
-There are two kinds of backup, and both are kept on the laptop.
+There are two kinds of backup, and both are kept on a PC. Either PC can make
+them; so far they are on the laptop.
 
 **The data that changes every day.** Instructions, skills, chats and the cost
 log are in `~/robot-data`, a few megabytes. From PowerShell, in the folder
@@ -477,7 +478,7 @@ key. (The code alone is on GitHub.)
 
 1. Shut the Pi down with `sudo poweroff`, wait until the green light stays
    off, and take the card out.
-2. Put the card in the laptop. If Windows offers to format a disk, cancel.
+2. Put the card in the PC. If Windows offers to format a disk, cancel.
 3. In Win32 Disk Imager, name a new image file, choose the card's drive
    letter (the drive called `bootfs`) and press **Read**. Write would
    overwrite the card with the file.
@@ -533,10 +534,13 @@ sudo systemctl disable --now robot-wifi   # switch it off for good
 
 ## Working on it
 
-Develop on the laptop, push to GitHub, deploy to the Pi. Never edit files on
-the Pi.
+Develop on a PC, push to GitHub, deploy to the Pi. Never edit files on the
+Pi. The repo is on two Windows PCs, a laptop and a desktop, and the work is
+the same on both. Start with a pull, because the other PC may have pushed
+since, and end with a push: what is not pushed is on one PC only.
 
 ```powershell
+git pull --ff-only
 .venv\Scripts\python.exe -m unittest discover -s tests -t .
 git push
 ssh pi "bash ~/robot/scripts/deploy.sh"
@@ -545,8 +549,15 @@ ssh pi "bash ~/robot/scripts/deploy.sh"
 The tests need no API key and make no network calls: a fake client scripts the
 model's replies, and recorded API replies are replayed through the real SDK.
 
-`ssh pi` is an alias in the laptop's `~/.ssh/config` pointing at the Pi's IP
-address. If it times out, the address has changed; see `CLAUDE.md`.
+`ssh pi` is an alias in each PC's own `~/.ssh/config` pointing at the Pi's IP
+address. That address comes from the router, so it changes when the Pi moves
+to another network, and each PC's alias has to be put right separately. If
+`ssh pi` times out, the address has changed; see `CLAUDE.md`.
+
+A PC needs three things for this: a key of its own that the Pi accepts, the
+`pi` alias, and a `.venv` in its checkout for the tests. Both PCs have them.
+`CLAUDE.md` ("The two PCs") says how they were set up and where the two
+differ: the desktop has PowerShell only, the laptop also Git Bash.
 
 ## Files
 
