@@ -532,6 +532,40 @@ sudo systemctl stop robot-wifi       # stop it until the Pi is next started
 sudo systemctl disable --now robot-wifi   # switch it off for good
 ```
 
+### Joining a new network
+
+A network the Pi has never joined is added at the Pi's own keyboard and
+screen, which need no network.
+
+1. List the networks the Pi can see. Press `q` if the list waits at the
+   bottom.
+
+   ```bash
+   sudo nmcli device wifi list --rescan yes
+   ```
+
+2. Join one. Type its name exactly as the list shows it, capitals and spaces
+   included, in quotes. The password is asked for and not shown.
+
+   ```bash
+   sudo nmcli --ask device wifi connect "Network Name"
+   ```
+
+3. Check. `wlan0` should say `connected`, and `hostname -I` prints the Pi's
+   address on this network.
+
+   ```bash
+   nmcli device status
+   hostname -I
+   ping -c 3 1.1.1.1
+   ```
+
+4. On each PC, put that address under `Host pi` in `~/.ssh/config` (see
+   "Working on it").
+
+The network is saved: from then on the Pi joins it by itself, and
+`robot-wifi` brings the Pi back onto it like the other saved networks.
+
 ## Working on it
 
 Develop on a PC, push to GitHub, deploy to the Pi. Never edit files on the
