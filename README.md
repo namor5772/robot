@@ -217,6 +217,38 @@ So three open interfaces left more room than two. Whether a run can start
 child runs (110 MB must be free) depends on the memory at that moment, not on
 how many interfaces are open.
 
+### On the Pi's screen with no keyboard there
+
+The Pi 3 A+ has one USB port, so with the webcam in it there is no keyboard
+at the Pi. Its screen can still show what you do from a PC. Over SSH, this
+puts the interface on the Pi's screen:
+
+```bash
+sudo openvt -c 8 -s -- sudo -u $USER env TERM=linux bash ~/robot/scripts/ui.sh
+```
+
+Then `bash ~/robot/scripts/ui.sh` in the same SSH terminal joins it: the
+screen and your terminal show the same windows, and your keyboard drives
+them. If the interface was running already, the first line joins it too.
+
+For a plain terminal in place of the interface, start a tmux session and put
+that on the screen:
+
+```bash
+tmux new -A -s shared
+sudo openvt -c 8 -s -- sudo -u $USER env TERM=linux tmux attach -t shared
+```
+
+- The picture takes the size of your SSH window, as always with two screens.
+  The Pi's screen has 240 columns and 67 rows, so a smaller window sits in
+  its top left corner. `sudo setfont -C /dev/tty8
+  /usr/share/consolefonts/Uni3-TerminusBold32x16.psf.gz` doubles the letters
+  on that screen, which then has 120 columns and 33 rows.
+- `sudo chvt 1` puts the screen back on its usual terminal, and `sudo chvt
+  8` shows the other one again. Whatever runs keeps running.
+- `openvt -c 8` uses the Pi's eighth text terminal, which nothing else uses,
+  and `-s` switches the screen to it.
+
 ## Saved instructions
 
 An instruction is a saved task together with the settings to run it with:

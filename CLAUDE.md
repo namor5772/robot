@@ -1331,6 +1331,39 @@ underneath is the same code the chat runs; only the console differs.
   terminal's line handling, and the kernel goes on reading the keyboard
   itself (`kbd_mode -C /dev/tty1` says Unicode with the interface up). On
   2026-11-19 the owner ran three that way, on tty1, tty2 and tty3.
+- With no keyboard at the Pi (the 3 A+'s one USB port has the webcam), an
+  ssh login puts something on its screen with `openvt`: `sudo openvt -c 8
+  -s -- sudo -u $USER env TERM=linux bash ~/robot/scripts/ui.sh` starts or
+  joins the interface on console 8 and switches the screen to it, and `tmux
+  attach -t NAME` in place of the script shows any tmux session. Tried on
+  2026-11-23, at the owner's question, on sockets of the check's own:
+  - `TERM=linux` has to be given: the command inherits the ssh terminal's
+    type. Console 8, because 2 to 6 ask for a login when they are shown
+    (see above) and nothing uses 7 and up.
+  - tmux lists the client on a pty, not on `/dev/tty8`: this sudo runs its
+    command in a pty of its own and passes everything on, the console's
+    size too, also when that changes.
+  - A second terminal that joined (110 x 30, as over ssh) opened the Help
+    window, and console 8 showed it: one program, two screens, as above.
+    The window took the size of the terminal used last and sat in the top
+    left corner of the screen's 240 x 67.
+  - `sudo setfont -C /dev/tty8
+    /usr/share/consolefonts/Uni3-TerminusBold32x16.psf.gz` doubles the font
+    on that console alone: it had 33 rows of 120 columns then, console 1
+    still 67 of 240, and the client followed.
+  - `sudo chvt 1` puts the screen back on console 1, and `sudo deallocvt 8`
+    frees console 8 once nothing runs on it. `sudo fgconsole` says which
+    console the screen shows.
+  - A session cannot see the screen, but it can read it. `sudo cat
+    /dev/vcs8 | fold -w 240` is the text on console 8, row by row (the
+    width is the console's own), with other bytes for what is not ASCII.
+    `/dev/vcsu8` has every cell as four bytes of Unicode: read that way,
+    the interface's frame was the proper line characters. Started through
+    `sudo` like this, the interface had the login's `LANG`, `TERM=linux`
+    and the user's home folder.
+  - That day console 1 held a `bash` of the owner's own login, from before
+    the keyboard's receiver came out. Nothing can type into it without a
+    keyboard, and the tries left it alone.
 - A second, separate interface: `ui.sh --session 2` (added 2026-11-19). The
   name is 1 to 12 letters, digits, `-` or `_`; `ui.sh` checks it before
   anything starts, because it becomes part of a tmux session name and of a
