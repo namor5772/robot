@@ -363,7 +363,10 @@ show the user the output. The user does not want to be asked to test things.
   Python: `tar -cf - --exclude=.venv --exclude=.git . | ssh pi "mkdir -p
   /tmp/robot-try && tar -xf - -C /tmp/robot-try"`, then `cd /tmp/robot-try &&
   ~/robot/.venv/bin/python -m unittest ...`. Give it `ROBOT_DATA_DIR` of its
-  own. It finds no `.env` there, so it cannot make paid calls.
+  own. It finds no `.env` there, so it cannot make paid calls. The suite
+  skips 4 tests there where the checkout skips 2: two launcher tests need
+  the checkout's own Python, and the copy has no `.venv` (their reason says
+  so with `-v`).
 
 ## State on 2026-11-18
 
