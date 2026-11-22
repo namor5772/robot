@@ -345,10 +345,17 @@ show the user the output. The user does not want to be asked to test things.
   see", Sonnet 5.5, with `take-photo` and `cpu-temp` enabled for its runs)
   was run on 2026-11-20: a photo, `view_image`, and a description that
   matched the picture, in three calls for $0.04.
+- A fifth skill, `record-sound` (enabled, so its text is in every run's
+  system prompt), was on the Pi on 2026-11-22: one shell command that
+  records with the webcam's microphone (see "Sound") and saves
+  `~/robot-sound/sound_<date>_<time>.wav` on the Pi, printing "saved PATH"
+  with the length and size, or "no recording". It tells the model that it
+  can record but not listen, and never to describe or guess what a
+  recording holds.
 - Because one skill is on demand, every run now also offers `get_skill`.
 - `.venv/bin/python -m robot.main --skills` and `--list` on the Pi show the
   current skills and instructions; check there instead of trusting this list.
-- 1,310 tests pass (counted on 2026-11-22, on the desktop and on the Pi).
+- 1,349 tests pass (counted on 2026-11-22, on the desktop and on the Pi).
   On the Pi 2 are skipped, on Windows 44, among them the 13 of the Wi-Fi
   service (bash), the 8 real-terminal tests (they need curses), the 19
   launcher tests (they need bash) and 3 that build a real tree of child runs
@@ -590,6 +597,9 @@ show the user the output. The user does not want to be asked to test things.
   `scripts/chat.sh`, `scripts/ui.sh`, `scripts/tmux.conf`.
 - `scripts/pi_photo.py` runs on a PC, not on the Pi: it fetches a photo from
   the Pi and opens it in the PC's viewer (see "Pictures").
+  `scripts/pi_sound.py` does the same for a sound recording and plays it
+  (see "Sound"); it takes the copying, and the rule about where such files
+  may go, from `pi_photo.py`.
 - `requirements.txt`: `anthropic==2.8.0`, `python-dotenv==1.2.4`. Pinned on
   purpose: 2.8.0 sends API version 2026-10-21, has no `temperature`
   parameter, sends the key as a Bearer token, and is built on `httpx2`.
@@ -725,6 +735,53 @@ show the user the output. The user does not want to be asked to test things.
   - `tests/test_pi_photo.py` (21 tests, on every machine) gives it a
     stand-in for `ssh` and `scp`. No test decodes a picture: that was looked
     at by hand, on the desktop, with two photos.
+
+### Sound
+
+- The robot can record sound and cannot hear it. Nothing in the repo
+  records: the model does it with the shell tool, told how by its
+  `record-sound` skill (see "State on 2026-11-18"), and there is no tool
+  that takes a sound file in, as `view_image` takes a picture. So a run can
+  say that it made a recording and where the file is, and nothing about what
+  is on it.
+- The microphone is the webcam's (see "Conventions"). The Pi has it as sound
+  card `B100`, with `arecord` installed and the user in the `audio` group,
+  so recording needs nothing installed. It gives mono, 16 bit, at 16,000 to
+  48,000 samples a second (`arecord -D hw:CARD=B100 --dump-hw-params`), and
+  its switch and level are `amixer -c B100 sget Mic` (on, 75%, on
+  2026-11-22).
+- The skill's recordings are WAV files in `~/robot-sound` on the Pi,
+  `sound_<date>_<time>.wav`, mono, 16 bit, 16 kHz: 32 KB a second. Its
+  command first records one second that it throws away, because the
+  microphone wakes with a thump after a few seconds of rest (the skill's
+  words, not measured here).
+- When the owner asks to hear a recording the Pi made, on a PC, run
+  `.venv/Scripts/python.exe scripts/pi_sound.py` there (since 2026-11-22).
+  It copies the Pi's newest recording to `~/RobotSound` on the PC, says what
+  it holds and plays it to its end through the PC's speakers. `NAME.wav`
+  after it takes that recording instead, `--file F.wav` one that is already
+  on the PC, `--no-play` only says what it holds.
+  - It returns when the recording has been played to its end, so give the
+    command more time than the recording is long. It plays with Python's
+    `winsound`, which Windows alone has: elsewhere it copies, describes and
+    says where the file is.
+  - A session cannot hear what was played. What it can go by is the line
+    about the level, which the script prints before playing: the loudest
+    sample and the average, as parts of full scale. It says so when every
+    sample is 0 (silent), when the loudest reaches full scale (probably
+    distorted there), and when the file is shorter than its header says (a
+    recording that was cut off). The four recordings of 2026-11-22 had
+    averages of 1.2% to 3.8% and loudest samples of 4% to 100%. What a
+    quiet room reads was not measured, so a low figure is not proof of
+    silence: ask the owner what they heard.
+  - Unlike the photos, a recording needs no repair: Windows plays the WAV
+    file as it comes.
+  - It will not put recordings inside the checkout or inside a folder that
+    OneDrive copies (`pi_photo.safe_folder`), and it only reads from the Pi.
+    Recordings are personal, as photos are.
+  - `tests/test_pi_sound.py` (39 tests, on every machine) gives it stand-ins
+    for `ssh`, `scp` and the speakers, and makes its own WAV files. That a
+    recording is heard was tried by hand, on the desktop.
 
 ### Input, output and Ctrl-C
 
@@ -1144,4 +1201,6 @@ underneath is the same code the chat runs; only the console differs.
   on a PC keep them out of folders that OneDrive copies (on the laptop
   Pictures is one; the first went to `RobotPhotos` in the user's home folder
   there). `scripts/pi_photo.py` fetches one to `~/RobotPhotos` on either PC
-  and makes it viewable on Windows (see "Pictures").
+  and makes it viewable on Windows (see "Pictures"). The same goes for
+  sound recordings from its microphone: `scripts/pi_sound.py` fetches one to
+  `~/RobotSound` and plays it (see "Sound").

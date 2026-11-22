@@ -404,6 +404,21 @@ a part that Windows insists on, and opened as they come the viewer shows
 nothing. The photo as it came is kept beside it, and nothing on the Pi is
 changed.
 
+The webcam has a microphone as well, and with a skill that says how, the
+robot records sound with the shell tool: WAV files in `robot-sound` in the
+Pi's home folder. It can record but not listen. No tool takes a sound file
+in, so it can say that it made a recording and where the file is, and
+nothing about what is on it. To hear one yourself, on a PC, in the checkout:
+
+```powershell
+.venv\Scripts\python.exe scripts\pi_sound.py
+```
+
+It copies the Pi's newest recording to `RobotSound` in your home folder,
+says how long and how loud it is, and plays it to its end through the PC's
+speakers. Put a recording's file name after it for another one, or
+`--no-play` to have it only described. Nothing on the Pi is changed.
+
 Any of the ten can be switched off for one instruction. In the Instruction
 Editor the Tools button shows this list, in this order, with a tick beside
 each tool the instruction may use. A cleared tool is blocked for that
@@ -634,7 +649,7 @@ differ: the desktop has PowerShell only, the laptop also Git Bash.
 - `robot/prompts.py`: the system prompt's wording.
 - `robot/models.py`: model and price tables. `robot/costs.py`, `robot/chats.py`, `robot/history.py`, `robot/datastore.py`, `robot/relay.py`: supporting parts.
 - `robot/tui/`: the windowed interface. `app.py`: the main window and how a run and the screen work side by side. `editor.py`, `skillsui.py`: the Instruction Editor and the Skills Manager. `widgets.py`, `dialogs.py`: buttons, lists, text boxes and small windows. `screen.py`: the screen and the keyboard (curses). `text.py`: wrapping and editing text.
-- `scripts/chat.sh`, `scripts/ui.sh`, `scripts/tmux.conf`: the tmux launchers for the chat and the windowed interface. `scripts/deploy.sh`: run on the Pi to update it. `scripts/wifi-reconnect.sh`: the `robot-wifi` service, which puts the Pi back on the Wi-Fi. `scripts/pi_photo.py`: run on a PC, fetches a photo from the Pi and opens it.
+- `scripts/chat.sh`, `scripts/ui.sh`, `scripts/tmux.conf`: the tmux launchers for the chat and the windowed interface. `scripts/deploy.sh`: run on the Pi to update it. `scripts/wifi-reconnect.sh`: the `robot-wifi` service, which puts the Pi back on the Wi-Fi. `scripts/pi_photo.py`: run on a PC, fetches a photo from the Pi and opens it. `scripts/pi_sound.py`: the same for a sound recording, which it plays.
 - `tests/`: the test suite. `CLAUDE.md`: detailed notes for Claude Code sessions.
 
 ## Setup on the Pi
