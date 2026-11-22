@@ -10,7 +10,47 @@ see "The windowed interface").
 
 ## Target device
 
-- Raspberry Pi Zero 2 W, 512 MB RAM (about 415 MB usable), 4 cores
+- Raspberry Pi 3 Model A+ since the evening of 2026-11-22: 512 MB RAM (about
+  415 MB usable), 4 cores at up to 1.4 GHz. Until then a Raspberry Pi Zero
+  2 W: the same memory, 1.0 GHz. The owner moved the SD card from the one
+  board to the other and changed nothing else. What the move showed:
+  - The card started on the other board as the same machine: same name, same
+    keys, same user, checkout and data as they were, `ssh` without a
+    warning. cloud-init ran its stages and set nothing up again (it is the
+    same instance, see the card's own move below).
+  - It joined the Wi-Fi by itself, at the second start of that evening
+    within a minute. The saved networks are tied to `wlan0`, not to a
+    radio's own address. The other board has another radio, though, and the
+    router gave it another IP address: `ssh pi` timed out on the PC and
+    `ssh pi-local` worked at the first try (see "Reaching the Pi").
+  - Memory is the same (415 MB, and 414 MB of compressed swap), so the
+    memory figures in this file hold, and with them the rule for child runs.
+    Times do not: importing the SDK takes 10 s here (15 on the Zero), and
+    the test suite 70 s in the checkout (80). What this file dates before
+    that evening was measured on the Zero 2 W.
+  - The radio has both bands here: `iw list` shows 13 channels from
+    2,412 MHz and 19 from 5,180 MHz, and a scan found 10 networks on the one
+    band and 6 on the other. The Zero had the first band only. The Pi stayed
+    on the network and the band it was on, with power saving off as before.
+  - The board has ONE USB port, a full-size one, and it is a host port as
+    built (`lsusb -t`: a `dwc_otg` root hub with one port). The webcam and
+    the keyboard's receiver cannot both be in it without a hub: that evening
+    the receiver was in it at the start and the webcam from 21:19 (`sudo
+    dmesg -T | grep usb`).
+  - The webcam is `/dev/video0` as before. Its microphone is still the sound
+    card NAMED `B100`, but its number went from 1 to 2: this board has a
+    headphone socket, which is card 0 (`bcm2835 Headphones`). The skills
+    name the card, so they work unchanged: all four commands of
+    `take-photo` and `record-sound` were run on this board, and so were two
+    runs of the owner's with a photo and a recording.
+  - That headphone socket is a way to make sound that the Zero did not
+    have. Nothing uses it.
+  - `vcgencmd get_throttled` said `0x80000` from the first look, 37 minutes
+    after the start: bit 19, "soft temperature limit has occurred". The
+    limit is 60 degrees by default, where the firmware lowers the clock
+    (from 1.4 to 1.2 GHz, as documented for the 3 B+). It was not seen to
+    happen: 44 to 46 degrees idle, 50.5 at the hottest during the test
+    suite, the clock at 1,400 MHz. No bit for low voltage was set.
 - 64-bit Raspberry Pi OS Lite (Trixie), Python 3.13.5, no tkinter
 - Hostname `robot.local`, user `grobliro`, repo checkout at `~/robot`
 - Virtual environment: `~/robot/.venv` (created with `--system-site-packages`)
@@ -19,8 +59,8 @@ see "The windowed interface").
 - The program's data: `~/robot-data` (outside the checkout on purpose).
 - Passwordless sudo is enabled for `grobliro` (the user set it up on
   2026-11-15 in `/etc/sudoers.d/010_grobliro-nopasswd`).
-- `/tmp` is a RAM disk. Importing the Anthropic SDK takes about 15 s and one
-  process uses about 77 MB.
+- `/tmp` is a RAM disk. Importing the Anthropic SDK takes about 10 s (15 s
+  on the Zero 2 W) and one process uses about 77 MB.
 - Swap is compressed memory, not the SD card: a zram device of 415 MB with
   zstd, set up by the `rpi-swap` package, swappiness 60. What sits idle is
   squeezed to about a quarter of its size once memory gets short (121 MB
@@ -68,7 +108,9 @@ see "The windowed interface").
     messages of an earlier start cannot be read afterwards.
 - The Pi also has a keyboard and screen attached. The screen is a text
   console (tty1) of 240 columns by 67 rows on 1920 x 1080, in UTF-8, with the
-  kernel's own font and no mouse service.
+  kernel's own font and no mouse service. The screen is the same on the
+  3 A+; the keyboard's receiver shares that board's one USB port with the
+  webcam (see above).
 
 ## The two PCs
 
@@ -119,8 +161,11 @@ see "The windowed interface").
   It can change there, and on another network it is a different one. A PC's
   entry holds the address the Pi had when the entry was last put right, so
   after the Pi has moved to another network (as on 2026-11-22, see "Getting
-  back on the Wi-Fi") `ssh pi` times out on a PC not used since. The
-  addresses are not written down here.
+  back on the Wi-Fi") `ssh pi` times out on a PC not used since. The same
+  happens when the SD card moves to another board, as on the evening of
+  that day: the router goes by the radio's own address, which belongs to
+  the board, and gives the Pi another one. The addresses are not written
+  down here.
 - If `ssh pi` times out, use `ssh pi-local` (same Pi via `robot.local`,
   PowerShell only), read the new address with `hostname -I`, and update
   `HostName` under `Host pi` on that PC.
@@ -206,6 +251,18 @@ show the user the output. The user does not want to be asked to test things.
   `tmux -L zz-chat capture-pane -p -t zz-chat` to read the screen. Wait for
   the last line to be `you>` before typing. End with `tmux -L zz-chat
   kill-server`.
+- The webcam is one device, and the owner's runs use it too. A check that
+  records or takes a photo can collide with a run that does the same. On
+  2026-11-22 a test's recording started in the second in which a run of the
+  owner's was taking a photo: `arecord` said "Unable to install hw params"
+  and the kernel `usb_set_interface failed (-71)`. The run's photo was
+  unharmed, the kernel reset the webcam at its next use, and 24 further
+  tries with nothing else going on all worked. An empty `~/robot-data/runs`
+  at the start of a check says nothing about the minute after: say
+  beforehand that the camera and the microphone are about to be used, keep
+  such a check to seconds, and when one fails look at the times of the
+  newest files in `~/robot-photos`, `~/robot-sound` and
+  `~/robot-data/saved_chats` before blaming the hardware.
 - To run a script on the Pi without writing a file there, feed it over stdin:
   `ssh pi "cd ~/robot && .venv/bin/python -" < script.py` or `bash -s`. An
   `ssh` command inside such a script needs `-n`. That is Git Bash's way;
@@ -362,8 +419,9 @@ show the user the output. The user does not want to be asked to test things.
   launcher tests (they need bash) and 3 that build a real tree of child runs
   (they need the kernel's list of processes). `tests/test_spawn.py` starts real
   processes and is the slow one on the laptop, where starting and stopping a
-  process takes a second or so: about a minute there, 12 s on the Pi. On the
-  desktop the whole suite takes 35 s.
+  process takes a second or so: about a minute there, 12 s on the Pi (the
+  Zero 2 W). The whole suite takes 35 s on the desktop, and on the Pi 80 s
+  on the Zero 2 W and 70 s on the 3 A+.
 - The windowed interface was added on this day. Its state is in
   `~/robot-data/tui_state.json`. The owner used it the same evening, over SSH
   from the laptop and at the Pi's own screen.
@@ -371,7 +429,8 @@ show the user the output. The user does not want to be asked to test things.
   device"), and the owner ran three interfaces at once at its own screen.
 - On 2026-11-22 the Pi was put on another Wi-Fi network (see "Getting back on
   the Wi-Fi"), and the desktop became the second PC the repo is worked on
-  from (see "The two PCs").
+  from (see "The two PCs"). In the evening of that day the SD card went from
+  the Pi Zero 2 W into a Raspberry Pi 3 Model A+ (see "Target device").
 - No hardware tools exist. The one there was, `get_cpu_temperature`, was
   removed on 2026-11-20 at the owner's request: the model reads the sensor
   with the shell tool when asked (`/sys/class/thermal/thermal_zone0/temp`,
@@ -436,10 +495,11 @@ show the user the output. The user does not want to be asked to test things.
   and screen), which needs no network: `sudo nmcli device wifi list --rescan
   yes` shows what the Pi sees, and `sudo nmcli --ask device wifi connect
   "NAME"` joins one, asking for the password without showing it (`sudo
-  nmtui` does the same with menus). The Pi's radio has the 2.4 GHz band only
-  (`iw list` shows one band), so a network sent on 5 GHz alone is not in
-  that list. The owner did this on 2026-11-22, at a router the Pi had never
-  seen.
+  nmtui` does the same with menus). The Zero 2 W's radio had the 2.4 GHz
+  band only (`iw list` showed one band), so a network sent on 5 GHz alone
+  was not in that list; the 3 A+ has both bands (see "Target device"). The
+  owner did this on 2026-11-22, on the Zero 2 W, at a router the Pi had
+  never seen.
 - The profile made that way connects automatically, with priority 0; the first
   network has 10 and so wins where both are in range. Four profiles are
   saved now: these two, and the two that do not connect automatically. Power
@@ -754,8 +814,18 @@ show the user the output. The user does not want to be asked to test things.
 - The skill's recordings are WAV files in `~/robot-sound` on the Pi,
   `sound_<date>_<time>.wav`, mono, 16 bit, 16 kHz: 32 KB a second. Its
   command first records one second that it throws away, because the
-  microphone wakes with a thump after a few seconds of rest (the skill's
-  words, not measured here).
+  microphone wakes with a thump after a few seconds of rest.
+- That thump is the webcam waking from USB power saving (measured on
+  2026-11-22, on the 3 A+). The kernel puts the idle webcam to sleep two
+  seconds after its last use: in `/sys/bus/usb/devices/1-1/power`,
+  `control` is `auto`, `autosuspend_delay_ms` is 2000, and `runtime_status`
+  goes from `active` to `suspended`. A recording that starts while it is
+  asleep begins with a spike, about a third of full scale in the first
+  tenth of a second after five seconds of rest or more, and less after a
+  shorter sleep; one that starts while it is still awake has none (the room
+  was not quiet, so the smaller figures are rough). So the second that
+  is thrown away works by waking the webcam. Keeping it awake (`control`
+  set to `on`) should do the same: not tried, and a setting of the Pi.
 - A photo and a recording in one go is ONE shell command, and the skill has
   had two of them since 2026-11-22, added at the owner's request with a
   script fed over stdin that calls `manage_skills`. The owner had asked for
@@ -1212,8 +1282,11 @@ underneath is the same code the chat runs; only the console differs.
   on Haiku before relying on it.
 - No hardware beyond the Pi itself (motors, sensors, camera, speaker) is wired
   into the code. Ask before assuming any that is not listed here.
-- Attached since 2026-11-20: a Logitech Brio 100 webcam on the Pi's USB data
-  port (the port is in host mode: `dtoverlay=dwc2,dr_mode=host`). The
+- Attached since 2026-11-20: a Logitech Brio 100 webcam on the Pi's USB
+  port: the data port of the Zero 2 W, and since 2026-11-22 the one port of
+  the 3 A+ (see "Target device"). As `config.txt` stands, its
+  `dtoverlay=dwc2,dr_mode=host` is under `[cm5]` and applies to neither
+  board. The
   kernel's `uvcvideo` driver takes it as `/dev/video0` (`/dev/video1` is its
   metadata; the `/dev/video10` and up are the Pi's own codecs, not cameras),
   and its microphone as a USB sound card. It offers YUYV and MJPG up to

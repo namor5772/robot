@@ -1,7 +1,8 @@
 # robot
 
-The agent "brain" for a small robot running on a Raspberry Pi Zero 2 W. It
-talks to Anthropic's Claude models and can act on the Pi through tools.
+The agent "brain" for a small robot running on a Raspberry Pi 3 Model A+
+(until 2026-11-22 a Pi Zero 2 W: the same SD card runs on both). It talks to
+Anthropic's Claude models and can act on the Pi through tools.
 
 The program is a terminal port of the MyAgent harness: the same way of running
 saved instructions, the same skills format, the same Meta tools and Convo
@@ -436,11 +437,12 @@ picked up can outlast a session: the start banner lists the skills in use. To
 take root away, run `sudo rm /etc/sudoers.d/010_grobliro-nopasswd` on the Pi.
 An instruction's `blocked_tools` list removes tools from its runs.
 
-A child run is a second copy of the program. On the Pi Zero it takes about 15
-seconds to start and about 80 MB of memory. How many run at once is decided
-by the memory that is free, not by a fixed number: a child is started only
-while 110 MB is free (80 for it, 30 to spare), and memory that children still
-starting have yet to take counts as taken. On the Pi Zero that comes to two at
+A child run is a second copy of the program. It takes about 10 seconds to
+start on the Pi 3 A+ (15 on the Pi Zero 2 W) and about 80 MB of memory. How
+many run at once is decided by the memory that is free, not by a fixed
+number: a child is started only while 110 MB is free (80 for it, 30 to
+spare), and memory that children still starting have yet to take counts as
+taken. With the 512 MB that both of these boards have, that comes to two at
 once, as before. A computer with more memory, such as a Pi 5, runs as many as
 fit, with no change to the program, up to a ceiling of 8 at once: every child
 is a run that is paid for. The 8 is for the whole tree of runs. A child may
@@ -598,9 +600,9 @@ The network is saved: from then on the Pi joins it by itself, and
 
 If it does not work:
 
-- The network is not in the list. The Pi's Wi-Fi has the 2.4 GHz band only,
-  so a network that is sent on 5 GHz alone is not shown. Switch on the
-  router's 2.4 GHz band.
+- The network is not in the list. The Pi 3 A+ sees both Wi-Fi bands. A Pi
+  Zero 2 W has the 2.4 GHz band only: there a network that is sent on 5 GHz
+  alone is not shown. Switch on the router's 2.4 GHz band.
 - The password is refused. Try once with it visible, to see what the
   keyboard really produces: `sudo nmcli device wifi connect "Network Name"
   password 'the password'`.
@@ -659,3 +661,16 @@ differ: the desktop has PowerShell only, the laptop also Git Bash.
 - Passwordless sudo for the Pi's user, if the agent should have root.
 - `deploy.sh` installs the pinned Python packages and tmux, and sets up the
   `robot-wifi` service (it needs sudo for that).
+
+### Another board
+
+On 2026-11-22 the SD card went from the Pi Zero 2 W into a Pi 3 Model A+ as
+it was, and started there as the same machine, on the Wi-Fi by itself. Two
+things to know when the card moves:
+
+- The router gives the other board another address, so `ssh pi` times out on
+  the PCs. `ssh pi-local` still works: `hostname -I` there prints the new
+  address, which goes under `Host pi` in `~/.ssh/config` on each PC (see
+  "Working on it").
+- The Pi 3 A+ has one USB port. The webcam and the keyboard's receiver need
+  a hub to be in at the same time.
