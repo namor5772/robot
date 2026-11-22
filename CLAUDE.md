@@ -410,6 +410,19 @@ show the user the output. The user does not want to be asked to test things.
   can record but not listen, and never to describe or guess what a
   recording holds. It also has two commands that take a photo and record in
   one go (see "Sound").
+- A sixth skill since 2026-11-23, `play-sound` (on demand), made at the
+  owner's request with a script fed over stdin that calls `manage_skills`:
+  one shell command that plays a WAV file through the speakers on the
+  headphone socket (see "Sound"), printing "played PATH in N seconds" or
+  "nothing played" with the reason. It tells the model that it cannot hear
+  what it plays, and that "played" only means that the sound was sent.
+  - `WebcamTest` carries a skill list of its own, and a skill made after
+    such a list was saved is off in that instruction's runs. So the skill
+    was added to that list as enabled, through `manage_instructions`. That
+    was not asked for in so many words: the owner was told.
+  - The three other instructions with a list of their own were left alone.
+    The skill is off in their runs, and by the code such a run says so in
+    a warning at its start, as for any skill its list does not name.
 - Because one skill is on demand, every run now also offers `get_skill`.
 - `.venv/bin/python -m robot.main --skills` and `--list` on the Pi show the
   current skills and instructions; check there instead of trusting this list.
@@ -883,16 +896,28 @@ show the user the output. The user does not want to be asked to test things.
 - The Pi can make sound as well, since the evening of 2026-11-22: the owner
   plugged USB-powered stereo speakers into the 3 A+'s headphone socket.
   Their power comes from elsewhere, the Pi's one USB port having the
-  webcam. Nothing in the repo plays sound, and no skill does yet.
+  webcam. Nothing in the repo plays sound: the robot does it with the shell
+  tool, told how by its `play-sound` skill (since 2026-11-23, see the next
+  point).
   - A WAV file is played with `aplay -q -D plughw:CARD=Headphones,DEV=0
     FILE.wav`. `plughw` converts what the file has into what the socket
     takes, so the robot's own recordings (16 kHz, mono) play as they are;
     files of 44.1 and 48 kHz, mono and stereo, played too. The Pi has no
     sound server: `aplay` goes straight to the card.
   - The socket's own volume is `amixer -c Headphones sget PCM`: 0 dB, which
-    it shows as 96%, and not muted, on that day. The speakers have a knob
-    of their own. At those settings a recording played back reached the
-    microphone's limit.
+    it shows as 96%, and not muted, on that day. `amixer -c Headphones sset
+    PCM 6dB-` lowers it by 6 dB and `6dB+` raises it again; `mute` and
+    `unmute` in place of the figure switch it (tried on 2026-11-23: three
+    steps down made a tone 17.7 dB quieter at the microphone). The speakers
+    have a knob of their own.
+  - How strong the speakers are at the microphone, with the socket at 0 dB
+    and the knob where the owner had it: a tone came back at 1.6 to 2.2
+    times the strength it was sent with that first evening (two pitches),
+    and at 0.8 to 1.4 times on 2026-11-23 (four pitches). So a recording
+    played back is about as strong there as the sound it holds was, or
+    stronger. Captures held samples at the microphone's limit on both days.
+    That alone does not show that the speakers are too loud: in one capture
+    of 2026-11-23 a burst showed a second before anything was played.
   - `aplay` ends with code 0 whether or not anything sounds: it cannot know
     if speakers are plugged in, powered or turned up. The first tries that
     evening all "worked" that way while the speakers had no power.
@@ -914,6 +939,52 @@ show the user the output. The user does not want to be asked to test things.
   - The scripts were fed over stdin and are not in the repo. They used the
     microphone for up to 20 s: see "Running and testing" on checks that
     use the webcam.
+- Playing is ONE shell command as well, in the `play-sound` skill (since
+  2026-11-23, see "State on 2026-11-18"). `f=""` at its start names the
+  file: a path, a name alone for a recording in `~/robot-sound`, or nothing
+  for the newest recording there. It plays the file to its end and prints
+  "played PATH in N seconds", or "nothing played" with the reason.
+  - It refuses a file that does not begin as a WAV file does (`RIFF`, four
+    bytes of length, `WAVE`). `aplay` takes a file it does not know for raw
+    samples, which would be noise from the speakers (its known behaviour,
+    not tried here). A WAV file that `aplay` cannot play and a sound card
+    that is not there come back as "nothing played" with `aplay`'s message.
+  - Because it returns only at the file's end, the shell tool's limit of
+    60 seconds matters: the skill has the model set `timeout_seconds` to
+    600, and it did in both paid checks.
+  - A play that is killed (that limit, STOP, Ctrl-C) stops at once. The
+    kernel then logs `bcm2835-audio: failed to close VCHI service
+    connection (status=-11)`, every time, and nothing is wrong: the audio
+    service is gone from `/sys/kernel/debug/vchiq/state` as it is after a
+    play that ended by itself, and what was played next was heard. `aplay`
+    ended with SIGTERM leaves no such line.
+  - Two plays at once are mixed. The socket has eight sub-devices (`aplay
+    -l`): two files started 0.3 s apart were both heard, and neither
+    waited for the other.
+  - Tried through `tools.run_shell_command` with `HOME` set to a scratch
+    folder, as the recording commands were, while the microphone listened.
+    The files were soft beeps, each file with a pitch of its own, so that
+    what was heard says WHICH file was played: the newest, the one named,
+    one with spaces in its path. Each stood 52 to 63 dB above the room, the
+    refused files left silence, and a file cut off by the tool's limit was
+    heard up to there.
+  - Then two paid checks on Haiku ($0.0026 and $0.0024), the real program
+    on the real data folder (`ROBOT_DATA_DIR`) with `HOME` a scratch
+    folder. A plain chat, "Play the newest recording": `get_skill`, then
+    the skill's command to the letter, and the beeps of the newest file
+    were heard. And an instruction with the skill list of `WebcamTest`,
+    "Record sound for 5 seconds, then play that recording back": beeps
+    were played while it recorded, and they were heard a second time when
+    it played its recording. Both times the robot said that it could not
+    hear what it had played.
+  - The first try that morning heard nothing at all, while every command
+    said "played": the speakers had no power, as on the evening they came.
+    A test that hears nothing asks first whether they are on.
+  - Strength in one pitch is a weaker proof than the pattern of the
+    evening before. With people in the room its own noise reached 29 dB
+    above the quiet level in a narrow filter, and a burst once 39 dB,
+    where the test tones stood at 52 to 63. The times at which a pitch
+    should and should not sound tell more.
 
 ### Input, output and Ctrl-C
 
@@ -1341,4 +1412,5 @@ underneath is the same code the chat runs; only the console differs.
   `~/RobotSound` and plays it (see "Sound").
 - Attached since the evening of 2026-11-22: USB-powered stereo speakers on
   the headphone socket of the 3 A+ (see "Sound"). Nothing in the repo uses
-  them.
+  them: the robot plays through them with the shell tool, told how by its
+  `play-sound` skill.

@@ -420,6 +420,12 @@ says how long and how loud it is, and plays it to its end through the PC's
 speakers. Put a recording's file name after it for another one, or
 `--no-play` to have it only described. Nothing on the Pi is changed.
 
+With speakers on the Pi's headphone socket (the Pi 3 A+ has one, the Zero
+2 W does not) and a skill that says how, the robot also plays sound with the
+shell tool: one of its recordings, or any other WAV file. It cannot hear what
+it plays, and it cannot tell whether the speakers are switched on: when it
+says that it played a file, the sound was sent to them.
+
 Any of the ten can be switched off for one instruction. In the Instruction
 Editor the Tools button shows this list, in this order, with a tick beside
 each tool the instruction may use. A cleared tool is blocked for that
