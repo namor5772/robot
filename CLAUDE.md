@@ -285,6 +285,14 @@ show the user the output. The user does not want to be asked to test things.
   through a small script fed over stdin that uses `robot.instructions` and
   `robot.skills`, and remove them afterwards. The chats and cost-log lines of
   those checks are left in place: they are a true record of what was spent.
+- A paid check whose shell commands must not touch the owner's folders (a
+  recording, a photo, a file to play) runs the real program with `HOME` set
+  to a scratch folder and `ROBOT_DATA_DIR` to the real data folder. The key
+  is still found (`.env` is looked for beside the code, not in the home
+  folder), the real skills and instructions are used, and the chat and its
+  cost are recorded as for any run. Only the `~` of the shell tool leads
+  elsewhere: `~/robot-sound` and `~/robot-photos` are then the scratch
+  folder's. Done on 2026-11-23 for the `play-sound` skill (see "Sound").
 - To check that two runs share the prompt cache, start them within five
   minutes of each other: the second one's first `call 1:` line should show a
   large `cache_read` and a small `cache_write`.

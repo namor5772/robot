@@ -671,7 +671,7 @@ differ: the desktop has PowerShell only, the laptop also Git Bash.
 ### Another board
 
 On 2026-11-22 the SD card went from the Pi Zero 2 W into a Pi 3 Model A+ as
-it was, and started there as the same machine, on the Wi-Fi by itself. Two
+it was, and started there as the same machine, on the Wi-Fi by itself. Three
 things to know when the card moves:
 
 - The router gives the other board another address, so `ssh pi` times out on
@@ -680,3 +680,11 @@ things to know when the card moves:
   "Working on it").
 - The Pi 3 A+ has one USB port. The webcam and the keyboard's receiver need
   a hub to be in at the same time.
+- Two texts tell the robot about its board, and neither follows the card by
+  itself. The first sentence of the system prompt names the Pi it runs on
+  (`robot/prompts.py`: a change in the repo, then a deploy). And the
+  `cpu-temp` skill on the Pi says how hot is hot: the 3 A+ lowers its clock
+  from 1.4 to 1.2 GHz at 60 degrees already (measured), while a Zero 2 W
+  slows down only from 80 (by Raspberry Pi's documentation). Both texts
+  still described the Zero 2 W the morning after the move and were put right
+  on 2026-11-23.
