@@ -48,9 +48,21 @@ see "The windowed interface").
   - `vcgencmd get_throttled` said `0x80000` from the first look, 37 minutes
     after the start: bit 19, "soft temperature limit has occurred". The
     limit is 60 degrees by default, where the firmware lowers the clock
-    (from 1.4 to 1.2 GHz, as documented for the 3 B+). It was not seen to
-    happen: 44 to 46 degrees idle, 50.5 at the hottest during the test
-    suite, the clock at 1,400 MHz. No bit for low voltage was set.
+    (from 1.4 to 1.2 GHz; the documentation's text names the 3 B+, and its
+    `temp_soft_limit` entry says "3A+/3B+ only"). That evening it was not
+    seen to happen: 44 to 46 degrees idle, 50.5 at the hottest during the
+    test suite, the clock at 1,400 MHz. No bit for low voltage was set.
+  - It was seen on 2026-11-23, with all four cores loaded (`sha256sum
+    /dev/zero` four times): from 41 degrees the Pi was at 60 within 20
+    seconds. There bit 3 came on ("soft temperature limit active",
+    `0x80008`), `vcgencmd measure_clock arm` went from 1,400 to 1,200 MHz
+    and the core's voltage from 1.365 to 1.26 V. For the 20 seconds
+    watched it switched on and off about once a second and the temperature
+    stayed at 59 to 60; with one core loaded it was back at full speed at
+    58. So one busy half minute is enough to set bit 19. Stronger
+    throttling, by the documentation, comes between 80 and 85 degrees on
+    every model, 85 being the limit: not reached here. The kernel's own
+    trip point is 110 degrees (`critical`).
 - 64-bit Raspberry Pi OS Lite (Trixie), Python 3.13.5, no tkinter
 - Hostname `robot.local`, user `grobliro`, repo checkout at `~/robot`
 - Virtual environment: `~/robot/.venv` (created with `--system-site-packages`)
@@ -392,6 +404,16 @@ show the user the output. The user does not want to be asked to test things.
   reading now takes a `get_skill` call and then the shell command (three
   model calls in all, where the tool took two). It needs `run_shell_command`: an instruction
   that blocks that tool cannot read the temperature.
+  - Its one sentence "for scale" gives the board's own figures. Since
+    2026-11-23, at the owner's request, it says that the 3 A+ starts to
+    slow down at 60 degrees, its clock dropping from 1.4 to 1.2 GHz
+    (measured, see "Target device"), and further from 80, with 85 as the
+    limit (the documentation). Until then it said 80, as on the Zero 2 W.
+  - The change was one line, made through `manage_skills` with a script
+    fed over stdin that left the rest as it was, and tried with a paid
+    question on Haiku ("How hot are you right now, and is that hot for
+    you?"): a reading of 45.1 degrees, "comfortably cool", and that the
+    clock does not slow down until about 60.
 - A fourth skill since 2026-11-20, `take-photo` (on demand), made the same
   way at the owner's request: one shell command that takes a 1920 x 1080
   photo with the webcam (see "Conventions") and saves it as
@@ -734,9 +756,8 @@ show the user the output. The user does not want to be asked to test things.
   showed it and the owner had it changed. When the card moves to another
   board, look at this sentence, and at what the skills on the Pi say about
   the board: the `cpu-temp` skill's "this Pi starts to slow itself down at
-  80 degrees" was the Zero 2 W's figure, and the 3 A+ lowers its clock at
-  60 already. The owner was told of that one the same day; the skills are
-  theirs to change.
+  80 degrees" was the Zero 2 W's figure, and the owner had that changed the
+  same day as well (see "State on 2026-11-18").
 - The last thing in the system prompt is the "About this run" paragraph
   (`prompts.run_paragraph`, wording also approved on 2026-11-16): the
   instruction's name, or that it is a plain chat on the `Default` settings, and
