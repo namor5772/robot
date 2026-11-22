@@ -426,7 +426,7 @@ show the user the output. The user does not want to be asked to test things.
 - Because one skill is on demand, every run now also offers `get_skill`.
 - `.venv/bin/python -m robot.main --skills` and `--list` on the Pi show the
   current skills and instructions; check there instead of trusting this list.
-- 1,349 tests pass (counted on 2026-11-22, on the desktop and on the Pi).
+- 1,350 tests pass (counted on 2026-11-23, on the desktop and on the Pi).
   On the Pi 2 are skipped, on Windows 44, among them the 13 of the Wi-Fi
   service (bash), the 8 real-terminal tests (they need curses), the 19
   launcher tests (they need bash) and 3 that build a real tree of child runs
@@ -724,6 +724,16 @@ show the user the output. The user does not want to be asked to test things.
   reply; in a single task: you must ask through `user_prompt`), and a
   plain-text rule. Enabled skills and the on-demand skill list are appended by
   `SkillStore.compose_system_prompt`.
+- Its first sentence names the board ("You run as a program on a Raspberry
+  Pi 3 Model A+"), and the program does not find the board out: the text is
+  fixed. It went on saying "Zero 2 W" from the evening the SD card moved
+  (see "Target device") until the next morning, 2026-11-23, when a dry run
+  showed it and the owner had it changed. When the card moves to another
+  board, look at this sentence, and at what the skills on the Pi say about
+  the board: the `cpu-temp` skill's "this Pi starts to slow itself down at
+  80 degrees" was the Zero 2 W's figure, and the 3 A+ lowers its clock at
+  60 already. The owner was told of that one the same day; the skills are
+  theirs to change.
 - The last thing in the system prompt is the "About this run" paragraph
   (`prompts.run_paragraph`, wording also approved on 2026-11-16): the
   instruction's name, or that it is a plain chat on the `Default` settings, and

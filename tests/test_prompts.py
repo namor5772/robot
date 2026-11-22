@@ -17,6 +17,15 @@ class BasePrompt(unittest.TestCase):
             self.assertTrue(one_line(prompt).endswith("shown in a plain terminal."))
             self.assertIn("Your task is given in the first user message.", prompt)
 
+    def test_it_names_the_board_the_robot_runs_on(self):
+        # The program does not find the board out: the sentence is changed by
+        # hand when the SD card moves to another one, at the owner's word.
+        for conversational in (True, False):
+            prompt = one_line(base_system_prompt(conversational))
+            self.assertIn("You run as a program on a Raspberry Pi 3 Model A+, which is "
+                          "your body's onboard computer.", prompt)
+            self.assertNotIn("Zero", prompt)
+
     def test_a_conversation_is_told_to_just_reply(self):
         prompt = base_system_prompt(True)
         self.assertIn("This is a conversation.", prompt)
