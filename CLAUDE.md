@@ -44,7 +44,7 @@ see "The windowed interface").
     `take-photo` and `record-sound` were run on this board, and so were two
     runs of the owner's with a photo and a recording.
   - That headphone socket is a way to make sound that the Zero did not
-    have. Nothing uses it.
+    have. Later that evening the owner put speakers on it (see "Sound").
   - `vcgencmd get_throttled` said `0x80000` from the first look, 37 minutes
     after the start: bit 19, "soft temperature limit has occurred". The
     limit is 60 degrees by default, where the firmware lowers the clock
@@ -880,6 +880,40 @@ show the user the output. The user does not want to be asked to test things.
   - `tests/test_pi_sound.py` (39 tests, on every machine) gives it stand-ins
     for `ssh`, `scp` and the speakers, and makes its own WAV files. That a
     recording is heard was tried by hand, on the desktop.
+- The Pi can make sound as well, since the evening of 2026-11-22: the owner
+  plugged USB-powered stereo speakers into the 3 A+'s headphone socket.
+  Their power comes from elsewhere, the Pi's one USB port having the
+  webcam. Nothing in the repo plays sound, and no skill does yet.
+  - A WAV file is played with `aplay -q -D plughw:CARD=Headphones,DEV=0
+    FILE.wav`. `plughw` converts what the file has into what the socket
+    takes, so the robot's own recordings (16 kHz, mono) play as they are;
+    files of 44.1 and 48 kHz, mono and stereo, played too. The Pi has no
+    sound server: `aplay` goes straight to the card.
+  - The socket's own volume is `amixer -c Headphones sget PCM`: 0 dB, which
+    it shows as 96%, and not muted, on that day. The speakers have a knob
+    of their own. At those settings a recording played back reached the
+    microphone's limit.
+  - `aplay` ends with code 0 whether or not anything sounds: it cannot know
+    if speakers are plugged in, powered or turned up. The first tries that
+    evening all "worked" that way while the speakers had no power.
+  - A session cannot hear the speakers, but the Pi can: its microphone is
+    in the same room. The test that settled it played a stereo file made
+    on the spot (beeps of 880 and 1320 Hz in turn for six seconds, then
+    660 Hz on the left channel alone and 1760 Hz on the right alone) while
+    `arecord` listened, and then measured each pitch, in tenths of a
+    second, at the times it should sound and at the times it should not.
+    Without power every pitch stayed where the room's noise was (3 dB at
+    most between the two); with power they stood 48 to 69 dB above it, both
+    channels and every beep from the first. Typing and talking cannot make
+    such a pattern.
+  - A simpler test before it proved nothing: one tone, a spoken sample and
+    a recording, judged by loudness alone. The owner was typing, and the
+    bursts of that could have been taken for the speakers. Comparing the
+    rise and fall of what was heard with that of the file told them apart
+    (0.73 and 1.00 for the two real files once the speakers had power).
+  - The scripts were fed over stdin and are not in the repo. They used the
+    microphone for up to 20 s: see "Running and testing" on checks that
+    use the webcam.
 
 ### Input, output and Ctrl-C
 
@@ -1305,3 +1339,6 @@ underneath is the same code the chat runs; only the console differs.
   and makes it viewable on Windows (see "Pictures"). The same goes for
   sound recordings from its microphone: `scripts/pi_sound.py` fetches one to
   `~/RobotSound` and plays it (see "Sound").
+- Attached since the evening of 2026-11-22: USB-powered stereo speakers on
+  the headphone socket of the 3 A+ (see "Sound"). Nothing in the repo uses
+  them.
