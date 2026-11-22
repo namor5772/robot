@@ -351,7 +351,8 @@ show the user the output. The user does not want to be asked to test things.
   `~/robot-sound/sound_<date>_<time>.wav` on the Pi, printing "saved PATH"
   with the length and size, or "no recording". It tells the model that it
   can record but not listen, and never to describe or guess what a
-  recording holds.
+  recording holds. It also has two commands that take a photo and record in
+  one go (see "Sound").
 - Because one skill is on demand, every run now also offers `get_skill`.
 - `.venv/bin/python -m robot.main --skills` and `--list` on the Pi show the
   current skills and instructions; check there instead of trusting this list.
@@ -755,6 +756,33 @@ show the user the output. The user does not want to be asked to test things.
   command first records one second that it throws away, because the
   microphone wakes with a thump after a few seconds of rest (the skill's
   words, not measured here).
+- A photo and a recording in one go is ONE shell command, and the skill has
+  had two of them since 2026-11-22, added at the owner's request with a
+  script fed over stdin that calls `manage_skills`. The owner had asked for
+  a photo and then a recording, and the recording began about 5 s after the
+  camera's light came on.
+  - Where that time went, by the transcript and the files' times: the photo
+    took 1.7 s, the model's next call 2.4 s (it had to be told the photo was
+    done before it asked for the recording), and the second that is thrown
+    away 1.2 s.
+  - Two shell calls in ONE turn are no cure: `run_shell_command` is not
+    `parallel_safe`, so they run one after the other. Asked for both "at the
+    same time", the model sent the recording and a photo with `sleep 3` in
+    front, expecting them side by side: the photo was taken two seconds
+    after the recording had ended.
+  - "A photo, then record": the thrown-away second runs in the background
+    while the photo is taken, and the recording starts when both are done.
+    Measured: 0.03 to 0.08 s from the photo's file to the recording's start.
+    "Both at the same time": the recording runs in the background and the
+    photo is taken meanwhile, 1.4 s into it. No thump at the start of
+    either.
+  - Tried through `tools.run_shell_command` with `HOME` set to a scratch
+    folder, so that the commands' `~` led there, and then with a paid check
+    on Haiku ("Take a photo and then record for 3 seconds"): one tool call,
+    two "saved" lines, $0.0023. The check's photo and recording were
+    removed.
+  - The skill's text grew from 2,763 to 5,399 characters, and it is in
+    every run's system prompt: about 650 tokens more.
 - When the owner asks to hear a recording the Pi made, on a PC, run
   `.venv/Scripts/python.exe scripts/pi_sound.py` there (since 2026-11-22).
   It copies the Pi's newest recording to `~/RobotSound` on the PC, says what
