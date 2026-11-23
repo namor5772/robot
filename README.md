@@ -2,7 +2,9 @@
 
 The agent "brain" for a small robot running on a Raspberry Pi 3 Model A+
 (until 2026-11-22 a Pi Zero 2 W: the same SD card runs on both). It talks to
-Anthropic's Claude models and can act on the Pi through tools.
+Anthropic's Claude models and can act on the Pi through tools. With a webcam
+and speakers attached it also sees, hears speech and talks out loud (see
+"Tools"); the hearing and the voice come from xAI's speech services.
 
 The program is a terminal port of the MyAgent harness: the same way of running
 saved instructions, the same skills format, the same Meta tools and Convo

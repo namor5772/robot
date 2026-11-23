@@ -6,7 +6,9 @@ runs on a Raspberry Pi. Since 2026-11-16 the program is a terminal port of the
 owner's MyAgent harness (see "Where it comes from").
 Since 2026-11-18 it has two faces: the line-by-line chat (`python -m
 robot.main`) and a windowed interface drawn with curses (`python -m robot.tui`,
-see "The windowed interface").
+see "The windowed interface"). Since 2026-11-20 it sees (a webcam and
+`view_image`), and since 2026-11-23 it hears speech and talks
+(`microphone_listen` and `speak`, through xAI's speech services).
 
 ## Target device
 
@@ -441,8 +443,9 @@ show the user the output. The user does not want to be asked to test things.
   records with the webcam's microphone (see "Sound") and saves
   `~/robot-sound/sound_<date>_<time>.wav` on the Pi, printing "saved PATH"
   with the length and size, or "no recording". It tells the model that it
-  can record but not listen, and never to describe or guess what a
-  recording holds. It also has two commands that take a photo and record in
+  cannot listen to a recording, and never to describe or guess what one
+  holds; since 2026-11-23 it sends the model to `microphone_listen` for
+  speech (see "Hearing"). It also has two commands that take a photo and record in
   one go (see "Sound").
 - A sixth skill since 2026-11-23, `play-sound` (on demand), made at the
   owner's request with a script fed over stdin that calls `manage_skills`:
@@ -478,8 +481,10 @@ show the user the output. The user does not want to be asked to test things.
   the Wi-Fi"), and the desktop became the second PC the repo is worked on
   from (see "The two PCs"). In the evening of that day the SD card went from
   the Pi Zero 2 W into a Raspberry Pi 3 Model A+ (see "Target device").
-- No hardware tools exist. The one there was, `get_cpu_temperature`, was
-  removed on 2026-11-20 at the owner's request: the model reads the sensor
+- Two tools use hardware since 2026-11-23: `microphone_listen` (the
+  webcam's microphone, see "Hearing") and `speak` (the speakers, see
+  "Speaking"). There is none for anything else. The one there was before,
+  `get_cpu_temperature`, was removed on 2026-11-20 at the owner's request: the model reads the sensor
   with the shell tool when asked (`/sys/class/thermal/thermal_zone0/temp`,
   or `vcgencmd measure_temp`). An instruction that still has the name in its
   `blocked_tools` is unharmed: the Instruction Editor keeps a blocked name it
@@ -1110,9 +1115,10 @@ show the user the output. The user does not want to be asked to test things.
 - The Pi can make sound as well, since the evening of 2026-11-22: the owner
   plugged USB-powered stereo speakers into the 3 A+'s headphone socket.
   Their power comes from elsewhere, the Pi's one USB port having the
-  webcam. Nothing in the repo plays sound: the robot does it with the shell
-  tool, told how by its `play-sound` skill (since 2026-11-23, see the next
-  point).
+  webcam. The robot plays a sound file with the shell tool, told how by
+  its `play-sound` skill (since 2026-11-23, see the next point). The one
+  thing in the repo that plays sound is the `speak` tool, which plays the
+  speech it has just made (see "Speaking").
   - A WAV file is played with `aplay -q -D plughw:CARD=Headphones,DEV=0
     FILE.wav`. `plughw` converts what the file has into what the socket
     takes, so the robot's own recordings (16 kHz, mono) play as they are;
@@ -1606,11 +1612,13 @@ underneath is the same code the chat runs; only the console differs.
   follows MyAgent's layout and habits (START / STOP / Instruction, the
   editor's list beside its form, the skill list's `[ON]` and `[OD]`, Cycle
   Mode, where the focus starts). MyAgent's sections in the instruction list,
-  its Apply of an unsaved draft, images, voice and window colours are not
-  there.
+  its Apply of an unsaved draft, images, the Mike button that dictates a
+  reply, and window colours are not there.
 - Left out on purpose: MyAgent's tkinter code, the safety confirm system,
   other providers, MyAgent's file, document, desktop, browser, mail and MCP
-  tools, OneDrive sharing, images, voice, the live model listing. MyAgent runs
+  tools, OneDrive sharing, images, voice input for replies (the Mike
+  button and Voice Setup; `microphone_listen` IS here, see "Hearing"), the
+  live model listing. MyAgent runs
   on SDK 0.84.0;
   this runs on 2.8.0, which is why temperature and several of MyAgent's
   workarounds are gone.
@@ -1632,8 +1640,12 @@ underneath is the same code the chat runs; only the console differs.
 - For any Anthropic API change, load the `claude-api` skill first; model IDs
   and request shapes change often. Test what the API accepts with a paid check
   on Haiku before relying on it.
-- No hardware beyond the Pi itself (motors, sensors, camera, speaker) is wired
-  into the code. Ask before assuming any that is not listed here.
+- The code knows two pieces of hardware beyond the Pi itself, and both
+  only through the Pi's own programs: a microphone (`arecord`, in
+  `hearing.py`) and speakers (`aplay`, in `speaking.py`). Neither is named
+  in the code: each is the first device its program lists. No motors,
+  sensors or camera are wired into the code. Ask before assuming any
+  hardware that is not listed here.
 - Attached since 2026-11-20: a Logitech Brio 100 webcam on the Pi's USB
   port: the data port of the Zero 2 W, and since 2026-11-22 the one port of
   the 3 A+ (see "Target device"). As `config.txt` stands, its
@@ -1656,8 +1668,9 @@ underneath is the same code the chat runs; only the console differs.
   there). `scripts/pi_photo.py` fetches one to `~/RobotPhotos` on either PC
   and makes it viewable on Windows (see "Pictures"). The same goes for
   sound recordings from its microphone: `scripts/pi_sound.py` fetches one to
-  `~/RobotSound` and plays it (see "Sound").
+  `~/RobotSound` and plays it (see "Sound"). The microphone is also what
+  the `microphone_listen` tool listens through (see "Hearing").
 - Attached since the evening of 2026-11-22: USB-powered stereo speakers on
-  the headphone socket of the 3 A+ (see "Sound"). Nothing in the repo uses
-  them: the robot plays through them with the shell tool, told how by its
-  `play-sound` skill.
+  the headphone socket of the 3 A+ (see "Sound"). The robot plays files
+  through them with the shell tool, told how by its `play-sound` skill, and
+  talks through them with the `speak` tool (see "Speaking").
