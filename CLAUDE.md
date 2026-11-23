@@ -463,7 +463,7 @@ show the user the output. The user does not want to be asked to test things.
 - Because one skill is on demand, every run now also offers `get_skill`.
 - `.venv/bin/python -m robot.main --skills` and `--list` on the Pi show the
   current skills and instructions; check there instead of trusting this list.
-- 1,426 tests pass (counted on 2026-11-23, on the laptop and on the Pi).
+- 1,449 tests pass (counted on 2026-11-24, on the laptop and on the Pi).
   On the Pi 2 are skipped, on Windows 44, among them the 13 of the Wi-Fi
   service (bash), the 8 real-terminal tests (they need curses), the 19
   launcher tests (they need bash) and 3 that build a real tree of child runs
@@ -822,8 +822,9 @@ show the user the output. The user does not want to be asked to test things.
   (`models.web_search_tool`: `web_search_20260209`, `max_uses` 5; its
   definition alone is about 6,000 tokens of every request).
 - `microphone_listen` where `arecord` exists and `XAI_API_KEY` is set (see
-  "Hearing"), and `speak` where `aplay` exists and the key is set (see
-  "Speaking"). On a PC neither is ever offered.
+  "Hearing"), and `speak` with `voice_settings` where `aplay` exists and
+  the key is set (see "Speaking"). On a PC none of the three is ever
+  offered.
 - `get_skill` when a skill is on demand. Its result adds the skill's folder
   path when the skill has bundled files, so they can be run with the shell.
 - With Meta on: `manage_instructions`, `manage_skills`, `run_instruction`,
@@ -976,8 +977,36 @@ show the user the output. The user does not want to be asked to test things.
   `sample_rate` 24000). The answer is the file's bytes. Read in xAI's REST
   reference that day; the limits there are 60,000 characters a request and
   26 voices (`GET /v1/tts/voices`), `eve` being the default.
-- The voice is `eve` unless `ROBOT_VOICE` in the Pi's `.env` names another.
-  An unknown voice is a 404, which the tool reports as such. The text may
+- The voice and the speed are settings the robot changes itself, since
+  2026-11-24, at the owner's request (they had asked whether the
+  `robot-identity` skill or the tool could do it; a skill is only text, so
+  it is the tool):
+  - They are kept in `~/robot-data/voice_settings.json` (`voice`, `speed`,
+    either may be missing). `speaking.voice()` and `speaking.speed()` read
+    the file at every call, so a change holds from the next sentence on, in
+    every run and interface on the Pi, with no restart. With no voice in
+    the file it is `ROBOT_VOICE` from the `.env`, else `eve`; the speed is
+    1.0. What makes no sense in the file is passed over.
+  - `voice_settings` is the tool. `list` gives the voice and speed in use
+    and the service's voices (`GET /v1/tts/voices`: 28 on that day, each
+    with `voice_id`, `name`, `gender` and `language`, the last being
+    "multilingual" for all). `set` saves a voice, a speed or both. A voice
+    is checked against that list first and refused with the names there
+    are; when the list cannot be had, nothing is saved.
+  - `speak` takes `voice` and `speed` for one call, which saves nothing:
+    that is how a voice is tried out.
+  - The speed is the service's `speed`, 0.7 to 1.5. It is sent only when it
+    is not 1.0. Tried: one sentence was 3.7 s at 0.7, 2.9 s at 1.0 and
+    1.95 s at 1.5; 2.0 is an HTTP 400.
+  - Tried on the Pi in a scratch copy with a data folder of its own: the
+    list, a refused name, `rex` at 1.3 saved, then a sentence in the saved
+    voice and one in `eve` at 0.8 for that call only, while the microphone
+    listened: both sentences came back word for word, and `rex` at 1.3 was
+    still what was saved.
+  - Listing is a second tool and not an action of `speak`, as the owner agreed to when it was put to
+    them, so that `speak`'s description stays about speaking. It adds
+    about 300 tokens to every request (an estimate).
+- An unknown voice is a 404, which the tool reports as such. The text may
   hold the service's speech tags (`[pause]`, `<whisper>...</whisper>` and
   so on); the tool's description does not mention them, and none was tried.
 - The WAV file as it comes states a length it does not have: its header
@@ -1024,7 +1053,7 @@ show the user the output. The user does not want to be asked to test things.
   anyone heard it. Listening and answering aloud in one run was not tried.
 - An interface that was open before the deploy keeps the old code: its
   runs get the tool once it has been quit and started again.
-- `tests/test_speaking.py` (36 tests, on every machine) gives it stand-ins
+- `tests/test_speaking.py` (59 tests, on every machine) gives it stand-ins
   for the service and for `aplay`, among them a file with the header the
   service really sends.
 
@@ -1466,7 +1495,7 @@ underneath is the same code the chat runs; only the console differs.
 - `~/robot-data/tui_state.json` holds the instruction in use and the five
   display boxes (`tui_state_NAME.json` for a copy started with a session
   name). Nothing a run needs is in it.
-- The Tools dialog lists `editor.TOOL_NAMES`: the eight ordinary tools first,
+- The Tools dialog lists `editor.TOOL_NAMES`: the nine ordinary tools first,
   the four Meta tools last, then any blocked name the program does not know
   (one copied in from MyAgent, or one of a tool since removed), so that such a block is not lost on saving.
   The README's tool table is in the same order. Nothing marks where the Meta

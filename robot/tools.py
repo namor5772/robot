@@ -299,6 +299,22 @@ ALL_TOOLS = [
                             "playing it. Defaults to true."
                         ),
                     },
+                    "voice": {
+                        "type": "string",
+                        "description": (
+                            "A voice for this one call, by its name from "
+                            "voice_settings. Leave it out to speak in the "
+                            "saved voice, which is what is usually wanted."
+                        ),
+                    },
+                    "speed": {
+                        "type": "number",
+                        "description": (
+                            "A speed for this one call, from 0.7 (slow) to 1.5 "
+                            "(fast); 1.0 is the usual speed. Leave it out to "
+                            "speak at the saved speed."
+                        ),
+                    },
                 },
                 "required": ["text"],
                 "additionalProperties": False,
@@ -307,6 +323,47 @@ ALL_TOOLS = [
         run=speaking.speak,
         # Not parallel_safe: on the main thread Ctrl-C and STOP cut the sound
         # off at once, and two voices at once would be mixed.
+        is_available=speaking.available,
+    ),
+    Tool(
+        definition={
+            "name": "voice_settings",
+            "description": (
+                "See or change the voice the speak tool talks in, and how fast it "
+                "talks. 'list' gives the voice and speed in use and the names of "
+                "all the voices there are. 'set' saves a voice, a speed or both: "
+                "it holds from the next thing spoken on, in this run and in every "
+                "later one, until it is changed again. Use 'set' when the person "
+                "asks for another voice or for faster or slower speech; to try a "
+                "voice out once, pass 'voice' to speak instead. The voices have "
+                "names and nothing more is known of them: to let the person "
+                "choose, speak a sentence in each one they want to hear."
+            ),
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "action": {
+                        "type": "string",
+                        "enum": ["list", "set"],
+                        "description": "What to do.",
+                    },
+                    "voice": {
+                        "type": "string",
+                        "description": "For 'set': the name of the voice to use from now on.",
+                    },
+                    "speed": {
+                        "type": "number",
+                        "description": (
+                            "For 'set': the speed to use from now on, from 0.7 "
+                            "(slow) to 1.5 (fast); 1.0 is the usual speed."
+                        ),
+                    },
+                },
+                "required": ["action"],
+                "additionalProperties": False,
+            },
+        },
+        run=speaking.voice_settings,
         is_available=speaking.available,
     ),
 ]

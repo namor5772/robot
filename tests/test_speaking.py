@@ -76,14 +76,16 @@ class FakePlayer:
 
 class WithKey(unittest.TestCase):
     def setUp(self):
-        patcher = mock.patch.dict("os.environ", {hearing.KEY_ENV: "test-key"})
+        folder = tempfile.TemporaryDirectory()
+        self.addCleanup(folder.cleanup)
+        self.home = Path(folder.name)
+        self.data = self.home / "robot-data"  # where the settings file goes
+        patcher = mock.patch.dict("os.environ", {hearing.KEY_ENV: "test-key",
+                                                 "ROBOT_DATA_DIR": str(self.data)})
         patcher.start()
         self.addCleanup(patcher.stop)
         for name in (speaking.VOICE_ENV, speaking.DEVICE_ENV):
             speaking.os.environ.pop(name, None)
-        folder = tempfile.TemporaryDirectory()
-        self.addCleanup(folder.cleanup)
-        self.home = Path(folder.name)
         home = mock.patch.object(speaking.Path, "home", return_value=self.home)
         home.start()
         self.addCleanup(home.stop)
@@ -169,7 +171,7 @@ class Synthesizing(WithKey):
 
     def test_an_unknown_voice_is_named(self):
         with mock.patch.dict("os.environ", {speaking.VOICE_ENV: "nobody"}):
-            with self.assertRaisesRegex(RuntimeError, "no voice called 'nobody'.*ROBOT_VOICE"):
+            with self.assertRaisesRegex(RuntimeError, "no voice called 'nobody'.*voice_settings"):
                 self.send(error=http_error(404, "voice not found"))
 
     def test_another_refusal_shows_what_the_service_said(self):
@@ -269,7 +271,7 @@ class Speaking(WithKey):
 
     def test_the_text_is_made_into_a_file_and_played(self):
         result = self.speak({"text": " Good evening. "})
-        self.synthesize.assert_called_once_with("Good evening.")
+        self.synthesize.assert_called_once_with("Good evening.", "eve", 1.0)
         (path,) = self.saved()
         self.assertEqual(path.read_bytes(), wav(3))
         self.play.assert_called_once_with(path, 3.0, "dev")
@@ -307,6 +309,157 @@ class Speaking(WithKey):
         self.play.assert_not_called()
 
 
+VOICES = {"voices": [
+    {"voice_id": "rex", "name": "Rex", "language": "multilingual", "gender": "male"},
+    {"voice_id": "Eve", "name": "Eve", "language": "multilingual", "gender": "female"},
+    {"voice_id": "luna"},
+]}
+
+
+class TheSettings(WithKey):
+    def write(self, content):
+        self.data.mkdir(parents=True, exist_ok=True)
+        (self.data / "voice_settings.json").write_text(content, encoding="utf-8")
+
+    def test_without_a_file_it_is_the_usual_voice_at_the_usual_speed(self):
+        self.assertEqual((speaking.voice(), speaking.speed()), ("eve", 1.0))
+        self.assertFalse(self.data.exists())  # asking creates nothing
+
+    def test_the_file_decides(self):
+        self.write('{"voice": "Rex", "speed": 1.25}')
+        self.assertEqual((speaking.voice(), speaking.speed()), ("rex", 1.25))
+
+    def test_the_environment_names_the_voice_only_where_the_file_names_none(self):
+        with mock.patch.dict("os.environ", {speaking.VOICE_ENV: "Luna"}):
+            self.assertEqual(speaking.voice(), "luna")
+            self.write('{"speed": 0.8}')
+            self.assertEqual((speaking.voice(), speaking.speed()), ("luna", 0.8))
+            self.write('{"voice": "rex"}')
+            self.assertEqual(speaking.voice(), "rex")
+
+    def test_what_makes_no_sense_in_the_file_is_passed_over(self):
+        for content in ("", "not json", "[1, 2]", '{"voice": 7, "speed": "fast"}',
+                        '{"voice": "  ", "speed": 9}', '{"speed": true}'):
+            with self.subTest(content=content):
+                self.write(content)
+                self.assertEqual((speaking.voice(), speaking.speed()), ("eve", 1.0))
+        self.write('{"voice": "rex", "speed": 9}')
+        self.assertEqual((speaking.voice(), speaking.speed()), ("rex", 1.0))
+
+    def test_the_saved_voice_and_speed_go_into_the_request(self):
+        self.write('{"voice": "rex", "speed": 1.3}')
+        with mock.patch.object(speaking.urllib.request, "urlopen",
+                               return_value=FakeAnswer(b"sound")) as opened:
+            speaking.synthesize("Hello.")
+            speaking.synthesize("Hello.", "luna", 1.0)
+        first, second = (json.loads(call.args[0].data) for call in opened.call_args_list)
+        self.assertEqual((first["voice_id"], first["speed"]), ("rex", 1.3))
+        self.assertEqual(second["voice_id"], "luna")
+        self.assertNotIn("speed", second)  # the usual speed is not stated
+
+
+class TheVoices(WithKey):
+    def listed(self, answer=None, error=None):
+        answer = json.dumps(VOICES).encode() if answer is None else answer
+        return mock.patch.object(speaking.urllib.request, "urlopen", side_effect=error,
+                                 return_value=FakeAnswer(answer))
+
+    def settings(self, tool_input, **listing):
+        with self.listed(**listing) as opened:
+            try:
+                return speaking.voice_settings(tool_input)
+            finally:
+                self.opened = opened
+
+    def saved(self):
+        return json.loads((self.data / "voice_settings.json").read_text(encoding="utf-8"))
+
+    def test_the_list_is_asked_of_the_service_with_the_key(self):
+        with self.listed() as opened:
+            voices = speaking.list_voices()
+        request = opened.call_args.args[0]
+        self.assertEqual(request.full_url, "https://api.x.ai/v1/tts/voices")
+        self.assertEqual(request.get_method(), "GET")
+        self.assertEqual(request.get_header("Authorization"), "Bearer test-key")
+        self.assertEqual([entry["voice_id"] for entry in voices], ["Eve", "luna", "rex"])
+
+    def test_a_list_that_cannot_be_read_is_an_error(self):
+        for answer in (b"<html>", b"{}", b'{"voices": []}', b'{"voices": [1, {"name": "x"}]}'):
+            with self.subTest(answer=answer):
+                with self.listed(answer=answer):
+                    with self.assertRaisesRegex(RuntimeError, "could not be read"):
+                        speaking.list_voices()
+
+    def test_listing_says_what_is_in_use_and_what_there_is(self):
+        self.assertEqual(self.settings({"action": "list"}), (
+            "The voice in use is 'eve', at speed 1 (1 is the usual speed).\n"
+            "The 3 voices there are:\n"
+            "eve (female, multilingual)\nluna\nrex (male, multilingual)\n"
+            "The speed can be set from 0.7 to 1.5."))
+        self.assertFalse(self.data.exists())  # listing saves nothing
+
+    def test_a_voice_is_saved_and_holds_from_then_on(self):
+        result = self.settings({"action": "set", "voice": " REX "})
+        self.assertEqual(self.saved(), {"voice": "rex"})
+        self.assertEqual(speaking.voice(), "rex")
+        self.assertIn("The voice in use is 'rex', at speed 1 ", result)
+
+    def test_a_speed_is_saved_beside_the_voice_and_needs_no_list(self):
+        self.settings({"action": "set", "voice": "luna"})
+        result = self.settings({"action": "set", "speed": 1.234})
+        self.opened.assert_not_called()
+        self.assertEqual(self.saved(), {"voice": "luna", "speed": 1.23})
+        self.assertIn("'luna', at speed 1.23 ", result)
+
+    def test_both_can_be_set_at_once(self):
+        self.settings({"action": "set", "voice": "rex", "speed": 0.7})
+        self.assertEqual(self.saved(), {"voice": "rex", "speed": 0.7})
+
+    def test_a_voice_the_service_does_not_have_is_refused_with_the_ones_it_has(self):
+        self.settings({"action": "set", "voice": "rex"})
+        with self.assertRaisesRegex(ValueError, "no voice called 'bob'.*eve, luna, rex"):
+            self.settings({"action": "set", "voice": "bob", "speed": 1.2})
+        self.assertEqual(self.saved(), {"voice": "rex"})  # nothing of it was saved
+
+    def test_a_voice_is_not_saved_when_the_list_cannot_be_had(self):
+        with self.assertRaisesRegex(RuntimeError, "could not be reached"):
+            self.settings({"action": "set", "voice": "rex"},
+                          error=urllib.error.URLError("no route"))
+        self.assertFalse((self.data / "voice_settings.json").exists())
+
+    def test_bad_input_is_refused(self):
+        for bad in ({}, {"action": "delete"}, {"action": "set"},
+                    {"action": "set", "speed": 0.5}, {"action": "set", "speed": 1.6},
+                    {"action": "set", "speed": "fast"}, {"action": "set", "voice": ""},
+                    {"action": "set", "voice": 3}):
+            with self.subTest(bad=bad):
+                with self.assertRaises(ValueError):
+                    self.settings(bad)
+        self.assertFalse((self.data / "voice_settings.json").exists())
+
+
+class OneCallInAnotherVoice(Speaking):
+    def test_a_voice_and_a_speed_for_one_call_change_nothing_that_is_saved(self):
+        speaking.atomic_write_text(self.data / "voice_settings.json", '{"voice": "rex"}')
+        result = self.speak({"text": "Hello.", "voice": "Luna", "speed": 1.5})
+        self.synthesize.assert_called_once_with("Hello.", "luna", 1.5)
+        self.assertIn("in the voice 'luna' at speed 1.5, about", result)
+        self.assertEqual(speaking.voice(), "rex")
+
+    def test_without_them_it_is_the_saved_voice_and_speed(self):
+        speaking.atomic_write_text(self.data / "voice_settings.json",
+                                   '{"voice": "rex", "speed": 0.8}')
+        result = self.speak({"text": "Hello."})
+        self.synthesize.assert_called_once_with("Hello.", "rex", 0.8)
+        self.assertIn("in the voice 'rex' at speed 0.8, about", result)
+
+    def test_a_speed_out_of_range_is_refused_before_anything_is_sent(self):
+        for bad in ({"text": "Hi.", "speed": 3}, {"text": "Hi.", "voice": ""}):
+            with self.assertRaises(ValueError):
+                self.speak(bad)
+            self.synthesize.assert_not_called()
+
+
 class WhenItIsOffered(unittest.TestCase):
     def available(self, key="k", system="posix", player="/usr/bin/aplay"):
         with mock.patch.dict("os.environ", {hearing.KEY_ENV: key}), \
@@ -338,8 +491,20 @@ class TheTool(LoopCase):
         self.assertIn(f"{speaking.MAX_CHARS:,} characters", described)
 
     def test_an_instruction_can_block_it_in_the_editor(self):
-        self.assertIn("speak", editor.TOOL_NAMES)
-        self.assertNotIn("speak", editor.META_TOOL_NAMES)
+        for name in ("speak", "voice_settings"):
+            self.assertIn(name, editor.TOOL_NAMES)
+            self.assertNotIn(name, editor.META_TOOL_NAMES)
+
+    def test_the_settings_tool_is_offered_with_it_and_states_the_codes_limits(self):
+        settings = next(tool for tool in ALL_TOOLS
+                        if tool.definition["name"] == "voice_settings")
+        self.assertIs(settings.run, speaking.voice_settings)
+        self.assertIs(settings.is_available, speaking.available)
+        self.assertFalse(settings.parallel_safe)
+        for tool in (settings, self.tool):
+            described = tool.definition["input_schema"]["properties"]["speed"]["description"]
+            self.assertIn(f"from {speaking.MIN_SPEED} (slow) to {speaking.MAX_SPEED} (fast)",
+                          described)
 
     def test_what_was_done_reaches_the_model_as_the_tools_result(self):
         script = [reply(tool_use("speak", {"text": "Hello."})), reply(text_block("Said."))]

@@ -402,6 +402,7 @@ Each skill has a mode:
 | `view_image` | always | Shows the model an image file on the Pi (a photo it took, for instance), so that it can say what is in it. |
 | `microphone_listen` | if the Pi has a microphone's recorder and an xAI key | Listens through the Pi's microphone for some seconds and gives the model what was said, as text. |
 | `speak` | if the Pi has a sound player and an xAI key | Says a text out loud through the Pi's speakers, and keeps the speech as a WAV file. |
+| `voice_settings` | with `speak` | Lists the voices there are, and saves the voice and the speed that `speak` uses. |
 | `user_prompt` | always | Asks you a question and waits for the answer. |
 | `get_skill` | if a skill is on demand | Fetches an on-demand skill's text. |
 | `web_search` | always | Searches the web on Anthropic's servers, up to 5 searches per request. |
@@ -413,7 +414,7 @@ Each skill has a mode:
 Meta is the only group of tools. It is one switch on an instruction, and it
 turns the last four on together: the tools with which the robot works on its
 own setup. Their descriptions add about 3,000 tokens to every request. The
-first eight are not grouped: each is offered on its own, whenever it can work.
+first nine are not grouped: each is offered on its own, whenever it can work.
 
 There is no tool for the CPU temperature any more (there was one until
 2026-11-20). Asked how hot it is, the robot reads the Pi's sensor with the
@@ -480,15 +481,25 @@ to xAI's text-to-speech service, saves what comes back as
 `speech_<date>_<time>.wav` in `robot-sound` in the Pi's home folder, and
 plays it through the speakers on the headphone socket; the tool returns when
 the file has been played to its end. Asked for the file alone (`play` false),
-it makes it and does not play it. The voice is the service's `eve` unless
-`ROBOT_VOICE=...` in `~/robot/.env` names another. The service costs $15 for
+it makes it and does not play it. The service costs $15 for
 a million characters, about a tenth of a cent for a sentence; like hearing,
 that is billed by xAI and is not in the robot's cost log. The robot cannot
 hear itself and cannot tell whether the speakers are on. Together with
 `microphone_listen` it can be talked with: tell it, typed, to listen, and to
 answer aloud.
 
-Any of the twelve can be switched off for one instruction. In the Instruction
+The voice and its speed are yours to choose: ask the robot which voices
+it has, to switch to one, or to speak faster or slower. `voice_settings`
+lists the service's voices (28 of them, each a name and whether it is male
+or female) and saves a voice, a speed from 0.7 to 1.5, or both, in
+`voice_settings.json` in the data folder. A saved choice holds from the next
+sentence on, in every chat and interface on the Pi, until it is changed.
+Nothing describes how a voice sounds, so ask to hear a sentence in the ones
+you are curious about: `speak` takes a voice and a speed for one call, which
+changes nothing that is saved. With nothing saved the voice is `eve` at
+speed 1.
+
+Any of the thirteen can be switched off for one instruction. In the Instruction
 Editor the Tools button shows this list, in this order, with a tick beside
 each tool the instruction may use. A cleared tool is blocked for that
 instruction only (`blocked_tools` in the file), and a Meta tool needs both
