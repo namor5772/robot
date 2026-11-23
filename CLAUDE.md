@@ -1003,6 +1003,13 @@ show the user the output. The user does not want to be asked to test things.
     voice and one in `eve` at 0.8 for that call only, while the microphone
     listened: both sentences came back word for word, and `rex` at 1.3 was
     still what was saved.
+  - Then a paid chat on Haiku ($0.0028), the real program on the real data
+    folder: "How many voices do you have? Switch to the voice called orion,
+    a little faster than usual, and then say hello out loud" gave `list`,
+    `set` with `orion` and 1.15, and `speak`; the answer was "28 voices".
+    The settings file that chat left was removed again, there having been
+    none before: a paid check of `set` changes the owner's own voice, so
+    look first whether the file is there, and put back what was.
   - Listing is a second tool and not an action of `speak`, as the owner agreed to when it was put to
     them, so that `speak`'s description stays about speaking. It adds
     about 300 tokens to every request (an estimate).
