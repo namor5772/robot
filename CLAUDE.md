@@ -66,8 +66,9 @@ see "The windowed interface").
 - 64-bit Raspberry Pi OS Lite (Trixie), Python 3.13.5, no tkinter
 - Hostname `robot.local`, user `grobliro`, repo checkout at `~/robot`
 - Virtual environment: `~/robot/.venv` (created with `--system-site-packages`)
-- API key: `~/robot/.env` (`ANTHROPIC_API_KEY=...`). Never commit it; `.env`
-  is in `.gitignore`.
+- API keys: `~/robot/.env` (`ANTHROPIC_API_KEY=...`, and since 2026-11-23
+  `XAI_API_KEY=...` for hearing, see "Hearing"). Never commit it; `.env` is
+  in `.gitignore`.
 - The program's data: `~/robot-data` (outside the checkout on purpose).
 - Passwordless sudo is enabled for `grobliro` (the user set it up on
   2026-11-15 in `/etc/sudoers.d/010_grobliro-nopasswd`).
@@ -459,7 +460,7 @@ show the user the output. The user does not want to be asked to test things.
 - Because one skill is on demand, every run now also offers `get_skill`.
 - `.venv/bin/python -m robot.main --skills` and `--list` on the Pi show the
   current skills and instructions; check there instead of trusting this list.
-- 1,350 tests pass (counted on 2026-11-23, on the desktop and on the Pi).
+- 1,390 tests pass (counted on 2026-11-23, on the laptop and on the Pi).
   On the Pi 2 are skipped, on Windows 44, among them the 13 of the Wi-Fi
   service (bash), the 8 real-terminal tests (they need curses), the 19
   launcher tests (they need bash) and 3 that build a real tree of child runs
@@ -704,6 +705,8 @@ show the user the output. The user does not want to be asked to test things.
   streaming, and the retry ladder. The only module that imports `anthropic`.
 - `robot/console.py`: `Console` (all output and input) and `Interrupts`.
 - `robot/tools.py`: the Pi's own tools as `Tool` entries in `ALL_TOOLS`.
+- `robot/hearing.py`: recording through the microphone and sending it to
+  xAI's speech-to-text service (see "Hearing"). Standard library only.
 - `robot/meta.py`: Meta tool schemas, `manage_instructions`, `meta_tools`.
 - `robot/spawn.py`: `run_instruction` (child runs).
 - `robot/instructions.py`: `RunSettings`, the library, `settings_from_entry`.
@@ -811,6 +814,8 @@ show the user the output. The user does not want to be asked to test things.
   "Pictures"), `user_prompt`, server-side `web_search`
   (`models.web_search_tool`: `web_search_20260209`, `max_uses` 5; its
   definition alone is about 6,000 tokens of every request).
+- `microphone_listen` where `arecord` exists and `XAI_API_KEY` is set (see
+  "Hearing"). On a PC it is never offered.
 - `get_skill` when a skill is on demand. Its result adds the skill's folder
   path when the skill has bundled files, so they can be run with the shell.
 - With Meta on: `manage_instructions`, `manage_skills`, `run_instruction`,
@@ -878,14 +883,85 @@ show the user the output. The user does not want to be asked to test things.
     stand-in for `ssh` and `scp`. No test decodes a picture: that was looked
     at by hand, on the desktop, with two photos.
 
+### Hearing
+
+- `microphone_listen` (in `tools.py`, its work in `hearing.py`, since
+  2026-11-23, at the owner's request) is how the robot hears, and what it
+  hears is speech only. Claude takes no sound (MyAgent's audit of
+  2026-09-20, and no audio in the API's documentation on 2026-11-23), so
+  the tool records some seconds and sends them to xAI's Grok Speech to
+  Text, `POST https://api.x.ai/v1/stt`, model `grok-voice-transcribe-2.0`.
+  The words are the tool's result, as text. It is MyAgent's tool of the
+  same name; MyAgent's Mike button (dictating a reply) is not here.
+- The owner chose xAI and this entry point out of four that were put to
+  them (a skill alone, this tool, a key in the interface that dictates a
+  reply, listening hands-free). The last two are not built: do not build
+  them unasked.
+- The key is `XAI_API_KEY` in the Pi's `~/robot/.env`. It was copied there
+  from the laptop's environment, where MyAgent uses it, with a pipe that
+  never showed it. A call made with it is billed to the owner's xAI
+  account. Without the key, or without `arecord`, the tool
+  is not offered (`hearing.available`), so a PC's runs never have it.
+- Recording: `arecord -q -D plughw:CARD=B100,DEV=0 -t raw -f S16_LE -c 1 -r
+  16000 -d N+1`, to a pipe. The device is the first capture device that
+  `arecord -l` lists, named by its card (`hearing.find_microphone`;
+  `ROBOT_MIC_DEVICE` overrules it). One second more than asked for is
+  recorded and dropped, for the thump described under "Sound". 5 seconds
+  unless the model says otherwise, 120 at most, rounded up to whole
+  seconds. Nothing is written to disk.
+- The upload is a multipart form made by hand with `urllib` (no new
+  package): the `model` field, then the file, which must come last. The
+  answer is JSON with a `text` field. No `language` is sent, so the service
+  finds the language itself and leaves numbers as words.
+- A recording whose loudest sample is under 50 of 32767 is not sent: that
+  is a dead microphone, not a quiet room. A room without speech IS sent,
+  and the service answers with no words ("no speech was recognised"):
+  three listens of 4 seconds with nothing played said so.
+- The cost is xAI's, $0.10 for an hour of sound, and is stated in the
+  tool's result as an estimate ("about $0.0003" for 9 seconds). It is not
+  in the run's cost and not in the cost log, which is for Anthropic's
+  calls. That is MyAgent's way.
+- It is not `parallel_safe`: it runs on the main thread, inside the region
+  where Ctrl-C and STOP raise, and `hearing.record` kills the recorder on
+  the way out. Tried on the Pi: one `arecord` while listening, none half a
+  second after a SIGINT.
+- The person cannot tell when the robot listens. The tool's description
+  tells the model to say so in its reply before the call, and in both paid
+  checks it did ("I'm listening now").
+- A wrong key is answered by xAI with HTTP 400 and "Incorrect API key
+  provided", not 401. `hearing.transcribe` goes by that wording too.
+- How it was tried, since a session can neither speak nor hear. A sentence
+  was made with Windows' own speech (`System.Speech`, a WAV file), copied
+  to the Pi's `/tmp`, and played through the Pi's speakers while the tool
+  listened: a loop waited for `pgrep -x arecord` and started `aplay` 1.3
+  seconds later, past the second that is dropped. First the tool alone in
+  a scratch copy, then two paid chats on Haiku ($0.0020 and $0.0023): asked
+  to "listen to me for 10 seconds", the robot repeated the sentence; told
+  "I am about to say something out loud. Hear me out and do what I ask", it
+  listened, read the clock and answered the spoken question.
+- Not understood: in three of the seven real listens that day the transcript
+  held one thing more that was not played. "Fifty." from a room with
+  nothing played, and "Eight." and "8:50" after the sentence. The owner
+  was in the room, so it may have been real sound; it may also be the
+  service making words out of the noise at the end. Not looked into.
+- The `record-sound` skill said "You can record but not listen" in every
+  run's system prompt. Three sentences of it were changed the same day,
+  through `manage_skills` with a script fed over stdin: it now sends the
+  model to `microphone_listen` for speech, and still says that no tool
+  takes a sound FILE in.
+- `tests/test_hearing.py` (40 tests, on every machine) gives it stand-ins
+  for `arecord` and for the service. The Instruction Editor's Tools dialog
+  lists the tool, so an instruction can block it.
+
 ### Sound
 
-- The robot can record sound and cannot hear it. Nothing in the repo
-  records: the model does it with the shell tool, told how by its
-  `record-sound` skill (see "State on 2026-11-18"), and there is no tool
-  that takes a sound file in, as `view_image` takes a picture. So a run can
-  say that it made a recording and where the file is, and nothing about what
-  is on it.
+- The robot can record sound to a file and cannot listen to a file.
+  Nothing in the repo records to a file: the model does it with the shell
+  tool, told how by its `record-sound` skill (see "State on 2026-11-18"),
+  and there is no tool that takes a sound file in, as `view_image` takes a
+  picture. So a run can say that it made a recording and where the file
+  is, and nothing about what is on it. What it can do since 2026-11-23 is
+  hear speech in the room as it is spoken (see "Hearing").
 - The microphone is the webcam's (see "Conventions"). The Pi has it as sound
   card `B100`, with `arecord` installed and the user in the `audio` group,
   so recording needs nothing installed. It gives mono, 16 bit, at 16,000 to
@@ -1314,7 +1390,7 @@ underneath is the same code the chat runs; only the console differs.
 - `~/robot-data/tui_state.json` holds the instruction in use and the five
   display boxes (`tui_state_NAME.json` for a copy started with a session
   name). Nothing a run needs is in it.
-- The Tools dialog lists `editor.TOOL_NAMES`: the six ordinary tools first,
+- The Tools dialog lists `editor.TOOL_NAMES`: the seven ordinary tools first,
   the four Meta tools last, then any blocked name the program does not know
   (one copied in from MyAgent, or one of a tool since removed), so that such a block is not lost on saving.
   The README's tool table is in the same order. Nothing marks where the Meta
