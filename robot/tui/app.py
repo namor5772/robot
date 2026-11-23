@@ -21,9 +21,9 @@ import traceback
 
 from dotenv import load_dotenv
 
-from robot import instructions, models
+from robot import handsfree, instructions, models
 from robot import main as command_line
-from robot.console import Console, Interrupts
+from robot.console import HEARD_MARK, Console, Interrupts
 from robot.datastore import DataDir, load_store, save_store
 from robot.tui.dialogs import MessageBox, PickDialog, TextDialog
 from robot.tui.editor import InstructionEditor
@@ -67,7 +67,12 @@ _RUN_SIGNALS = {getattr(signal, name) for name in ("SIGINT", "SIGTERM", "SIGHUP"
 # The display switches, as the chat's command line has them, and their values
 # on first use.
 FLAGS = {"activity": True, "thinking": False, "tool_calls": False, "debug": False,
-         "save_thinking": False}
+         "save_thinking": False, "hands_free": False}
+
+# What the bottom line says while the robot waits and listens (robot.handsfree).
+EAR_NOTICES = {handsfree.LISTENING: " Listening: speak, or type your message ",
+               handsfree.HEARING: " Hearing you... ",
+               handsfree.WORKING: " Working out what you said... "}
 
 HELP_TEXT = """\
 GETTING AROUND
@@ -101,6 +106,12 @@ THE MAIN WINDOW
   (tool lines and the cost of each call), Thinking, Tool calls
   (as JSON) and Debug (every request). Save thinking keeps the
   thinking in the saved chat.
+
+  Hands-free: with this box ticked the robot listens through its
+  microphone whenever it waits for your message. Speak, pause,
+  and what you said is sent as your message; typing still works.
+  Say "bye" or "stop" on its own to end a conversation. The
+  bottom line shows when it is listening and when it hears you.
 
 TEXT BOXES
   Arrows, Home, End, PgUp and PgDn move the cursor. Ctrl+Left and
@@ -203,22 +214,47 @@ class UiConsole(Console):
             except queue.Empty:
                 break
         self.bridge.events.put(("ask",))
+        # With the Hands-free box ticked a spoken message is a reply too. The
+        # box can be ticked and cleared while the robot waits.
+        ear, tried, shown, heard = None, False, "", False
         try:
             with interrupts.raisable():
                 while True:
+                    if not self.hands_free:
+                        tried = False
+                        if ear is not None:
+                            ear.stop()
+                            ear = None
+                    elif ear is None and not tried:
+                        tried = True
+                        ear = self._open_ear()
+                    if ear is not None and not self._ear_alive(ear):
+                        ear.stop()
+                        ear = None
+                    state = ear.state if ear is not None else ""
+                    if state != shown:
+                        shown = state
+                        self.bridge.events.put(("ear", state))
                     try:
                         reply = replies.get(timeout=0.1)
                         break
                     except queue.Empty:
                         if interrupts.pending():
                             raise KeyboardInterrupt from None
+                    if ear is not None:
+                        reply = ear.take()
+                        if reply:
+                            heard = True
+                            break
         except KeyboardInterrupt:
             # STOP while the robot waits for the person: nobody is going to answer.
             interrupts.clear()
             return None
         finally:
+            if ear is not None:
+                ear.stop()
             self.bridge.events.put(("ask_done",))
-        self._line(prompt + reply)
+        self._line(prompt + (HEARD_MARK if heard else "") + reply)
         return reply.strip()
 
 
@@ -551,7 +587,8 @@ class MainWindow(Window):
                               lambda value, name=name: app.set_flag(name, value)))
             for name, label in (("activity", "&Activity"), ("thinking", "&Thinking"),
                                 ("tool_calls", "Tool &calls"), ("debug", "&Debug"),
-                                ("save_thinking", "Sa&ve thinking"))]
+                                ("save_thinking", "Sa&ve thinking"),
+                                ("hands_free", "&Hands-free"))]
         self.keys = {
             "f1": app.open_help, "f2": app.start, "f3": app.stop, "f4": app.open_editor,
             "f5": app.open_skills, "f10": app.quit, "ctrl+c": app.stop, "ctrl+q": app.quit,
@@ -573,9 +610,11 @@ class MainWindow(Window):
             button.place(1, right)
             right -= 1
         reply_height = 5
-        self.output.place(2, 0, cols, max(3, rows - 3 - reply_height))
+        # The boxes take a second row where one is too narrow for them all.
+        check_rows = flow(self.checks, 0, 1, cols)
+        self.output.place(2, 0, cols, max(3, rows - 2 - check_rows - reply_height))
         self.reply.place(2 + self.output.h, 0, cols, reply_height)
-        flow(self.checks, rows - 1, 1, cols)
+        flow(self.checks, rows - check_rows, 1, cols)
 
     def paint(self, scr):
         scr.fill(0, 0, 1, self.w, "bar")
@@ -716,6 +755,7 @@ class App:
         self.too_small = False
         self.running = False   # a run is in progress
         self.asking = False    # and it is waiting for the person
+        self.ear = ""          # what hands-free is doing meanwhile, "" when it is off
         self.started = 0.0
         self.status = ""       # a short message in the bottom line, until the next key
         self._seconds_shown = None
@@ -741,6 +781,7 @@ class App:
         console.show_thinking = flags["thinking"]
         console.tool_calls_on = flags["tool_calls"]
         console.debug_on = flags["debug"]
+        console.hands_free = flags["hands_free"]
 
     def set_flag(self, name, value):
         self.flags[name] = bool(value)
@@ -842,8 +883,11 @@ class App:
                 self.asking = True
                 self.status = ""  # a "Stopping..." has done its work by now
                 self.main.await_reply()
+            elif kind == "ear":
+                self.ear = event[1]
             elif kind == "ask_done":
                 self.asking = False
+                self.ear = ""
                 self.main.reply_over()
             elif kind == "run_end":
                 self._run_ended(event[1], event[2])
@@ -871,7 +915,8 @@ class App:
         scr.fill(y, 0, 1, cols, "bar")
         style = "bar"
         if self.asking:
-            left, style = " Waiting for your message ", "bar_notice"
+            left = EAR_NOTICES.get(self.ear, " Waiting for your message ")
+            style = "bar_notice"
         elif self.running:
             self._seconds_shown = int(time.monotonic() - self.started)
             left = f" Working {self._seconds_shown // 60}:{self._seconds_shown % 60:02d} "

@@ -89,6 +89,9 @@ def build_parser() -> argparse.ArgumentParser:
                      help="text put in front of the task, for this run only")
     run.add_argument("--relay-dir", metavar="DIR",
                      help="folder through which another process answers the agent's questions")
+    run.add_argument("--hands-free", action="store_true",
+                     help="listen through the microphone whenever the robot waits for "
+                          "your message: what you say is sent, and typing still works")
     run.add_argument("--dry-run", action="store_true",
                      help="print the first request instead of sending it")
     show = parser.add_argument_group("what is shown")
@@ -202,6 +205,9 @@ def show_banner(console, settings, skills):
             console.note("Skills: " + "; ".join(parts))
     if settings.conversational and console.tty:
         console.note("Type quit, stop or exit, or send nothing, to end. Ctrl-C stops a reply.")
+    if console.hands_free:
+        console.note("Hands-free: when the robot waits for you, speak and then pause. "
+                     "Typing works too.")
 
 
 def first_message(console) -> str:
@@ -275,6 +281,9 @@ def main(argv=None) -> int:
         activity=not args.no_activity, show_thinking=args.thinking, tool_calls=args.tool_calls,
         debug=args.debug, headless=args.headless, relay_dir=args.relay_dir,
         interrupts=interrupts)
+    # Only where a person is at a terminal: piped lines and headless runs have
+    # their own way of being answered.
+    console.hands_free = bool(args.hands_free) and console.tty
     datadir = DataDir()
     try:
         datadir.ensure()

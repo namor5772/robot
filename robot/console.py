@@ -13,8 +13,11 @@ try:
 except ImportError:
     pass  # not available on Windows
 
+from robot import handsfree
+
 LABEL = "robot> "
 PROMPT = "you> "
+HEARD_MARK = "(heard) "  # in front of a message that was spoken, not typed
 ASK_LABEL = "robot asks> "
 
 # Returned by Console.ask when Ctrl-C was pressed at the prompt.
@@ -169,6 +172,9 @@ class Console:
         self._relay_seq = 0
         self._parent_pid = os.getppid()
         self.input_wait_secs = 0.0  # time spent waiting on the person, not working
+        # Hands-free: while waiting for a message, listen for a spoken one too.
+        self.hands_free = False
+        self._ear_note = ""  # the last trouble with it that was shown
         self._startup_input_dropped = False
 
     def _drop_startup_input(self):
@@ -344,9 +350,14 @@ class Console:
             while True:
                 self._emit("\n")
                 self._drop_startup_input()
+                ear = self._open_ear()
+                heard = False
                 try:
                     with self.interrupts.raisable():
-                        line = input(prompt)
+                        if ear is None:
+                            line = input(prompt)
+                        else:
+                            line, heard = self._type_or_speak(prompt, ear)
                 except EOFError:
                     self._after_terminal_line(prompt, None)
                     return None
@@ -354,6 +365,12 @@ class Console:
                     self.interrupts.clear()
                     self._after_terminal_line(prompt, None)
                     return None if self.interrupts.stop.is_set() else INTERRUPTED
+                finally:
+                    if ear is not None:
+                        ear.stop()
+                if heard:
+                    self._after_heard(prompt, line)
+                    return line
                 self._after_terminal_line(prompt, line)
                 if only_terminal_replies(line):
                     # Nobody typed this. It is not an answer of any kind, not
@@ -365,6 +382,70 @@ class Console:
                 return line.strip()
         finally:
             self._relay_answered(seq)
+
+    # -- hands-free ----------------------------------------------------------
+
+    def _open_ear(self):
+        """An ear that is listening, or None: hands-free is off or cannot work."""
+        if not self.hands_free:
+            return None
+        ear = handsfree.Ear()
+        if ear.start():
+            return ear
+        self._ear_trouble(f"Hands-free is not listening: {ear.problem}. Type instead.")
+        return None
+
+    def _ear_trouble(self, message):
+        """Say what is wrong with hands-free, once and not at every prompt."""
+        if message != self._ear_note:
+            self._ear_note = message
+            self.warn(message)
+
+    def _ear_alive(self, ear) -> bool:
+        """Report what the ear could not do. False when it has stopped listening."""
+        if ear.trouble:
+            self._ear_trouble(f"Hands-free could not work out what was said: {ear.trouble}")
+            ear.trouble = ""
+        if ear.problem:
+            self._ear_trouble(f"Hands-free has stopped listening: {ear.problem}. Type instead.")
+            return False
+        return True
+
+    def _type_or_speak(self, prompt, ear):
+        """Wait for a typed line or a spoken message, whichever comes first.
+
+        Returns (text, heard). readline is not used here: a voice cannot wake
+        it. The terminal itself still echoes and edits the line being typed.
+        """
+        import select
+        self._line("  (listening: speak, or type)", dim=True)
+        self._show(prompt, False)
+        while True:
+            ready, _, _ = select.select([self._in], [], [], 0.1)
+            if ready:
+                line = self._in.readline()
+                if line == "":
+                    raise EOFError
+                return line.rstrip("\r\n"), False
+            text = ear.take()
+            if text:
+                return text, True
+            if not self._ear_alive(ear):
+                return input(prompt), False
+
+    def _after_heard(self, prompt, text):
+        """Show a spoken message at the prompt, as typing would have shown it."""
+        try:  # what was half typed when the voice came is not part of the next line
+            import termios
+            termios.tcflush(self._in.fileno(), termios.TCIFLUSH)
+        except Exception:
+            pass
+        with self._lock:
+            self._show(f"{HEARD_MARK}{text}\n", False)
+            if self._transcript is not None:
+                self._transcript.write(f"{prompt}{HEARD_MARK}{text}\n")
+            self._at_line_start = True
+            self._label_due = True
 
     def _after_terminal_line(self, prompt, line):
         # The terminal echoed what was typed, so _emit never saw it: record it.
