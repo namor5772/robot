@@ -22,8 +22,10 @@ class BasePrompt(unittest.TestCase):
         first = base_system_prompt(True).split("\n\n")[0].split("\n")
         self.assertEqual(len(first), 4)
         self.assertEqual(first[0], "Your name is Larry.")
-        self.assertTrue(first[1].endswith('"smart" chat terminal inside a goal cell.'))
+        self.assertTrue(first[1].endswith('"smart" chat terminal inside a jail cell.'))
         self.assertTrue(first[2].startswith("Your purpose in life is to make me Roman"))
+        self.assertTrue(first[2].endswith("to be released from jail."))
+        self.assertNotIn("goal", base_system_prompt(True))
         self.assertTrue(first[3].endswith("replying to me Roman or for using tools."))
         self.assertEqual(first, base_system_prompt(False).split("\n\n")[0].split("\n"))
 
