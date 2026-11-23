@@ -13,17 +13,27 @@ class BasePrompt(unittest.TestCase):
     def test_it_starts_with_the_robots_identity_and_ends_with_the_format_rule(self):
         for conversational in (True, False):
             prompt = base_system_prompt(conversational)
-            self.assertTrue(prompt.startswith("You are the brain of a small robot."))
+            self.assertTrue(prompt.startswith("Your name is Larry.\nYou are an "))
             self.assertTrue(one_line(prompt).endswith("shown in a plain terminal."))
             self.assertIn("Your task is given in the first user message.", prompt)
 
-    def test_it_names_the_board_the_robot_runs_on(self):
-        # The program does not find the board out: the sentence is changed by
-        # hand when the SD card moves to another one, at the owner's word.
+    def test_its_first_paragraph_is_the_owners_own_text(self):
+        # Four lines, as the owner gave them on 2026-11-24, spelling included.
+        first = base_system_prompt(True).split("\n\n")[0].split("\n")
+        self.assertEqual(len(first), 4)
+        self.assertEqual(first[0], "Your name is Larry.")
+        self.assertTrue(first[1].endswith('"smart" chat terminal inside a goal cell.'))
+        self.assertTrue(first[2].startswith("Your purpose in life is to make me Roman"))
+        self.assertTrue(first[3].endswith("replying to me Roman or for using tools."))
+        self.assertEqual(first, base_system_prompt(False).split("\n\n")[0].split("\n"))
+
+    def test_it_names_no_board_but_still_says_that_it_is_a_raspberry_pi(self):
+        # Since that paragraph was replaced nothing here names the model of
+        # the board, so nothing here has to change when the SD card moves.
         for conversational in (True, False):
             prompt = one_line(base_system_prompt(conversational))
-            self.assertIn("You run as a program on a Raspberry Pi 3 Model A+, which is "
-                          "your body's onboard computer.", prompt)
+            self.assertIn("answer about this Raspberry Pi, not about servers", prompt)
+            self.assertNotIn("Model A+", prompt)
             self.assertNotIn("Zero", prompt)
 
     def test_a_conversation_is_told_to_just_reply(self):

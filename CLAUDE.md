@@ -463,7 +463,7 @@ show the user the output. The user does not want to be asked to test things.
 - Because one skill is on demand, every run now also offers `get_skill`.
 - `.venv/bin/python -m robot.main --skills` and `--list` on the Pi show the
   current skills and instructions; check there instead of trusting this list.
-- 1,499 tests pass (counted on 2026-11-24, on the laptop and on the Pi).
+- 1,500 tests pass (counted on 2026-11-24, on the laptop and on the Pi).
   On the Pi 2 are skipped, on Windows 51, among them the 7 of hands-free
   at the chat's prompt (they need `select`), the 13 of the Wi-Fi
   service (bash), the 8 real-terminal tests (they need curses), the 19
@@ -797,15 +797,27 @@ show the user the output. The user does not want to be asked to test things.
   reply; in a single task: you must ask through `user_prompt`), and a
   plain-text rule. Enabled skills and the on-demand skill list are appended by
   `SkillStore.compose_system_prompt`.
-- Its first sentence names the board ("You run as a program on a Raspberry
-  Pi 3 Model A+"), and the program does not find the board out: the text is
-  fixed. It went on saying "Zero 2 W" from the evening the SD card moved
-  (see "Target device") until the next morning, 2026-11-23, when a dry run
-  showed it and the owner had it changed. When the card moves to another
-  board, look at this sentence, and at what the skills on the Pi say about
-  the board: the `cpu-temp` skill's "this Pi starts to slow itself down at
-  80 degrees" was the Zero 2 W's figure, and the owner had that changed the
-  same day as well (see "State on 2026-11-18").
+- Its first paragraph is the owner's own text since 2026-11-24: four lines
+  that give the robot its name and its character, typed by the owner and
+  put in as given, spelling and line breaks included (the other paragraphs
+  are wrapped at 78 columns; these lines are not). It took the place of
+  "You are the brain of a small robot. You run as a program on a Raspberry
+  Pi 3 Model A+ ... The person talking to you is typing at a keyboard
+  connected to the robot, or over SSH."
+  - So the fixed text no longer says what the robot runs on, nor that it
+    is a robot. The second paragraph still says "answer about this
+    Raspberry Pi", and the skills and the tool descriptions name the Pi.
+    The owner was told and asked for the replacement as it is.
+  - The same sentences are in the owner's `robot-identity` skill, which is
+    enabled, so a run gets them twice. The skill is the owner's: left
+    alone.
+  - Nothing in the fixed text names the board's model any more. Until then
+    it did, and went on saying "Zero 2 W" from the evening the SD card
+    moved (see "Target device") until the next morning. When the card
+    moves to another board, what is left to look at is what the skills on
+    the Pi say about it: the `cpu-temp` skill's "this Pi starts to slow
+    itself down at 80 degrees" was the Zero 2 W's figure (see "State on
+    2026-11-18").
 - The last thing in the system prompt is the "About this run" paragraph
   (`prompts.run_paragraph`, wording also approved on 2026-11-16): the
   instruction's name, or that it is a plain chat on the `Default` settings, and
