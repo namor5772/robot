@@ -808,9 +808,11 @@ show the user the output. The user does not want to be asked to test things.
     is a robot. The second paragraph still says "answer about this
     Raspberry Pi", and the skills and the tool descriptions name the Pi.
     The owner was told and asked for the replacement as it is.
-  - The same sentences are in the owner's `robot-identity` skill, which is
-    enabled, so a run gets them twice. The skill is the owner's: left
-    alone.
+  - The same sentences are in the owner's `robot-identity` skill, which
+    the owner had set to disabled by then, so a run gets them once. With
+    the skill off, two things it said are in no run's prompt: to speak
+    every reply before typing it, and that the voice can be changed with
+    `voice_settings`. The skill is the owner's: left alone.
   - Nothing in the fixed text names the board's model any more. Until then
     it did, and went on saying "Zero 2 W" from the evening the SD card
     moved (see "Target device") until the next morning. When the card
