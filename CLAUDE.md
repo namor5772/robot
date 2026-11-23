@@ -1010,6 +1010,11 @@ show the user the output. The user does not want to be asked to test things.
     The settings file that chat left was removed again, there having been
     none before: a paid check of `set` changes the owner's own voice, so
     look first whether the file is there, and put back what was.
+  - The `robot-identity` skill, which the owner has rewritten since
+    2026-11-18, got one paragraph more the same day at the owner's request,
+    through `manage_skills` with a script fed over stdin: that the robot
+    can change its voice and speed, and to use `voice_settings` when asked.
+    The rest of the skill is the owner's own text and was left as it was.
   - Listing is a second tool and not an action of `speak`, as the owner agreed to when it was put to
     them, so that `speak`'s description stays about speaking. It adds
     about 300 tokens to every request (an estimate).
