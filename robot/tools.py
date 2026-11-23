@@ -10,6 +10,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Callable
 
+from robot import hearing
+
 @dataclass
 class Tool:
     definition: dict  # what the model is told about the tool
@@ -225,6 +227,43 @@ ALL_TOOLS = [
         run=view_image,
         is_available=lambda: True,
         parallel_safe=True,
+    ),
+    Tool(
+        definition={
+            "name": "microphone_listen",
+            "description": (
+                "Listen through the microphone of the Raspberry Pi this program is "
+                "running on for a number of seconds and get back what was said, as "
+                "text. This is how you hear: a speech-to-text service (xAI) turns the "
+                "recording into words, and only the words come back to you. Use it to "
+                "hear a person in the room: a spoken instruction or question, the "
+                "answer to something you asked, a name or a number read out. The "
+                "person cannot tell when you are listening, so say so in your reply "
+                "before you call this, and the call returns only when the time is up. "
+                "You get words and nothing else: not who spoke, not how it sounded, "
+                "no other sounds. Never say what was said in the room without having "
+                "listened with this tool. Silence is reported as such and sent "
+                "nowhere; anything else is uploaded and costs a fraction of a cent. "
+                "The recording is not kept."
+            ),
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "seconds": {
+                        "type": "number",
+                        "description": (
+                            "How long to listen, in seconds (default 5, maximum "
+                            "120). Allow enough for a sentence."
+                        ),
+                    },
+                },
+                "additionalProperties": False,
+            },
+        },
+        run=hearing.listen,
+        # Not parallel_safe: it runs on the main thread, where Ctrl-C and STOP
+        # end the listening at once, and one microphone serves one call.
+        is_available=hearing.available,
     ),
 ]
 

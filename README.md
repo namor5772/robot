@@ -398,6 +398,7 @@ Each skill has a mode:
 | `run_shell_command` | always | Runs any bash command on the Pi as its user, with sudo. |
 | `get_current_datetime` | always | Reads the Pi's clock. |
 | `view_image` | always | Shows the model an image file on the Pi (a photo it took, for instance), so that it can say what is in it. |
+| `microphone_listen` | if the Pi has a microphone's recorder and an xAI key | Listens through the Pi's microphone for some seconds and gives the model what was said, as text. |
 | `user_prompt` | always | Asks you a question and waits for the answer. |
 | `get_skill` | if a skill is on demand | Fetches an on-demand skill's text. |
 | `web_search` | always | Searches the web on Anthropic's servers, up to 5 searches per request. |
@@ -409,7 +410,7 @@ Each skill has a mode:
 Meta is the only group of tools. It is one switch on an instruction, and it
 turns the last four on together: the tools with which the robot works on its
 own setup. Their descriptions add about 3,000 tokens to every request. The
-first six are not grouped: each is offered on its own, whenever it can work.
+first seven are not grouped: each is offered on its own, whenever it can work.
 
 There is no tool for the CPU temperature any more (there was one until
 2026-11-20). Asked how hot it is, the robot reads the Pi's sensor with the
@@ -439,9 +440,9 @@ changed.
 
 The webcam has a microphone as well, and with a skill that says how, the
 robot records sound with the shell tool: WAV files in `robot-sound` in the
-Pi's home folder. It can record but not listen. No tool takes a sound file
-in, so it can say that it made a recording and where the file is, and
-nothing about what is on it. To hear one yourself, on a PC, in the checkout:
+Pi's home folder. No tool takes a sound file in, so of a recording it has
+made it can say where the file is, and nothing about what is on it. To hear
+one yourself, on a PC, in the checkout:
 
 ```powershell
 .venv\Scripts\python.exe scripts\pi_sound.py
@@ -458,7 +459,20 @@ shell tool: one of its recordings, or any other WAV file. It cannot hear what
 it plays, and it cannot tell whether the speakers are switched on: when it
 says that it played a file, the sound was sent to them.
 
-Any of the ten can be switched off for one instruction. In the Instruction
+`microphone_listen` is how the robot hears, and what it hears is speech
+only. Claude takes no sound, so the tool records through the webcam's
+microphone (5 seconds unless the model asks for another length, 120 at most)
+and sends the recording to xAI's speech-to-text service
+(`grok-voice-transcribe-2.0`); the words come back as the tool's result. It
+gets no voices, no tone and no other sounds. The robot cannot be spoken to
+out of the blue: it listens when the model calls the tool, so ask for it
+("listen to me for ten seconds") or give an instruction that says when. The
+service costs $0.10 for an hour of sound, so a call is a fraction of a cent;
+that is billed by xAI and is not in the robot's cost log. A recording made
+this way is kept nowhere on the Pi. It needs `XAI_API_KEY=...` in
+`~/robot/.env`: without the key the tool is not offered.
+
+Any of the eleven can be switched off for one instruction. In the Instruction
 Editor the Tools button shows this list, in this order, with a tick beside
 each tool the instruction may use. A cleared tool is blocked for that
 instruction only (`blocked_tools` in the file), and a Meta tool needs both
@@ -684,7 +698,7 @@ differ: the desktop has PowerShell only, the laptop also Git Bash.
 - `robot/main.py`: the command line.
 - `robot/agent.py`: the run loop. `robot/api.py`: the model call and its retries.
 - `robot/console.py`: everything printed and typed, and Ctrl-C handling.
-- `robot/tools.py`: the Pi's own tools. `robot/meta.py`, `robot/spawn.py`: the Meta tools and child runs.
+- `robot/tools.py`: the Pi's own tools. `robot/hearing.py`: recording through the microphone and having the speech in it turned into text. `robot/meta.py`, `robot/spawn.py`: the Meta tools and child runs.
 - `robot/instructions.py`, `robot/skills.py`: the library and the skills.
 - `robot/prompts.py`: the system prompt's wording.
 - `robot/models.py`: model and price tables. `robot/costs.py`, `robot/chats.py`, `robot/history.py`, `robot/datastore.py`, `robot/relay.py`: supporting parts.
@@ -695,7 +709,9 @@ differ: the desktop has PowerShell only, the laptop also Git Bash.
 ## Setup on the Pi
 
 - Checkout at `~/robot`, venv at `~/robot/.venv` (created with `--system-site-packages`).
-- `~/robot/.env` contains `ANTHROPIC_API_KEY=...` and is never committed.
+- `~/robot/.env` contains `ANTHROPIC_API_KEY=...` and is never committed. An
+  `XAI_API_KEY=...` line there as well lets the robot hear (see
+  `microphone_listen` under "Tools").
 - Passwordless sudo for the Pi's user, if the agent should have root.
 - `deploy.sh` installs the pinned Python packages and tmux, and sets up the
   `robot-wifi` service (it needs sudo for that).

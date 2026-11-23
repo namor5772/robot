@@ -223,11 +223,11 @@ class SmallWindows(EditorCase):
         self.editor("down", "alt+l", self.shows(
             "[-] manage_instructions  (needs Meta)", "[-] manage_skills  (needs Meta)",
             "[-] run_instruction  (needs Meta)", "[-] upgrade_model  (needs Meta)",
-            "[x] run_shell_command", "[x] get_skill", "[x] web_search",
-            "[-] needs the Meta box ticked."),
+            "[x] run_shell_command", "[x] microphone_listen", "[x] get_skill",
+            "[x] web_search", "[-] needs the Meta box ticked."),
             self.lacks("[x] manage_skills", "A cleared tool is blocked."),
-            "m", " ", "down", " ",              # Space does nothing on those rows
-            self.shows("[-] manage_instructions", "[-] manage_skills"),
+            "end", " ", "up", " ",              # Space does nothing on those rows
+            self.shows("[-] upgrade_model", "[-] run_instruction"),
             "alt+o", self.shows("Tools: all allowed."), self.lacks("(changed)"))
 
     def test_with_meta_its_four_tools_can_be_ticked_and_cleared(self):
