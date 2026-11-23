@@ -1081,6 +1081,19 @@ show the user the output. The user does not want to be asked to test things.
   - Without a voice (no key, no `aplay`) it is shown and not spoken. A
     failure to speak is a warning; STOP cuts it short; the conversation
     ends either way.
+  - Tried with a paid hands-free chat on Haiku ($0.0004), in a tmux of
+    its own: after the speakers' "Bye." the chat showed `you> (heard) Bye`
+    and the `robot>` goodbye, and a `hearing.listen` started the moment
+    the chat's recorder was gone heard "This conversation now. Good to
+    have known you." (its own first second is thrown away). No file was
+    left in `tmp`.
+  - That check's first try failed by its own timing: "the last line is
+    `you>`" is still true while the message just spoken is being worked
+    out, so the next line was played too soon. A check waits for the Nth
+    `(listening: speak, or type)` line, the prompt and a running
+    `arecord`. The failed try did show the fallback: with the microphone
+    taken by the check, the chat said "Hands-free has stopped listening:
+    ... Device or resource busy. Type instead." and went on at `you>`.
 - `tests/test_handsfree.py` (50 tests; 7 need `select` and are skipped on
   Windows): the segmenter on made-up sound, the ear on a stand-in recorder
   that writes through a real pipe, and both consoles with a stand-in ear.
