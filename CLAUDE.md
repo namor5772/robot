@@ -537,6 +537,32 @@ show the user the output. The user does not want to be asked to test things.
   network can be joined, `connection.autoconnect yes` brings them back.
 - That makes the opening of this section out of date in one point: not all
   saved Wi-Fi networks connect automatically any more.
+- That second network was joined on 2026-11-23, on the 3 A+, and the cause
+  was in the Pi's profile, not in the access point: the profile had
+  protected management frames switched off (`802-11-wireless-security.pmf`
+  was `1`, "disable"). An access point that announces WPA2 with WPA3 wants
+  them at least offered. With the setting at its default (`sudo nmcli
+  connection modify NAME 802-11-wireless-security.pmf 0`) the same profile,
+  with the password it already held, joined at the first try, on 5 GHz.
+  - What the refusal looked like in `sudo journalctl -u wpa_supplicant`:
+    `CTRL-EVENT-ASSOC-REJECT ... status_code=16` a fraction of a second
+    after each "Trying to associate", five times over, and a line "MBO:
+    Disable MBO/OCE due to misbehaving AP not having enabled PMF".
+    NetworkManager then asked for a password ("no-secrets"), which
+    misleads: no password had been looked at.
+  - Only one profile for that network was left by then. It connects
+    automatically again, with priority 0, so the network in everyday use
+    (10) still wins where both are in range. Three profiles are saved.
+  - It was done with no keyboard at the Pi: the Pi and the laptop were both
+    on the everyday network, and a detached job (see "Running and testing")
+    tried the profile, wrote down what happened and went back to that
+    network, so that its log could be read over ssh. A join that needs a
+    password typed can go the same way: `ssh -t pi "sudo nmcli --ask device
+    wifi connect NAME"`, where the session freezes once the Pi changes
+    network.
+  - PowerShell 5.1 on the laptop puts a byte-order mark in front of a
+    script piped to `ssh` (`bash: line 1: ...cat: command not found`).
+    There the script is fed with Git Bash's `<`.
 - A network the Pi has never joined is added at its own console (keyboard
   and screen), which needs no network: `sudo nmcli device wifi list --rescan
   yes` shows what the Pi sees, and `sudo nmcli --ask device wifi connect
