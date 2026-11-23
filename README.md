@@ -399,6 +399,7 @@ Each skill has a mode:
 | `get_current_datetime` | always | Reads the Pi's clock. |
 | `view_image` | always | Shows the model an image file on the Pi (a photo it took, for instance), so that it can say what is in it. |
 | `microphone_listen` | if the Pi has a microphone's recorder and an xAI key | Listens through the Pi's microphone for some seconds and gives the model what was said, as text. |
+| `speak` | if the Pi has a sound player and an xAI key | Says a text out loud through the Pi's speakers, and keeps the speech as a WAV file. |
 | `user_prompt` | always | Asks you a question and waits for the answer. |
 | `get_skill` | if a skill is on demand | Fetches an on-demand skill's text. |
 | `web_search` | always | Searches the web on Anthropic's servers, up to 5 searches per request. |
@@ -410,7 +411,7 @@ Each skill has a mode:
 Meta is the only group of tools. It is one switch on an instruction, and it
 turns the last four on together: the tools with which the robot works on its
 own setup. Their descriptions add about 3,000 tokens to every request. The
-first seven are not grouped: each is offered on its own, whenever it can work.
+first eight are not grouped: each is offered on its own, whenever it can work.
 
 There is no tool for the CPU temperature any more (there was one until
 2026-11-20). Asked how hot it is, the robot reads the Pi's sensor with the
@@ -472,7 +473,20 @@ that is billed by xAI and is not in the robot's cost log. A recording made
 this way is kept nowhere on the Pi. It needs `XAI_API_KEY=...` in
 `~/robot/.env`: without the key the tool is not offered.
 
-Any of the eleven can be switched off for one instruction. In the Instruction
+`speak` is how the robot talks. It sends a text of up to 2,000 characters
+to xAI's text-to-speech service, saves what comes back as
+`speech_<date>_<time>.wav` in `robot-sound` in the Pi's home folder, and
+plays it through the speakers on the headphone socket; the tool returns when
+the file has been played to its end. Asked for the file alone (`play` false),
+it makes it and does not play it. The voice is the service's `eve` unless
+`ROBOT_VOICE=...` in `~/robot/.env` names another. The service costs $15 for
+a million characters, about a tenth of a cent for a sentence; like hearing,
+that is billed by xAI and is not in the robot's cost log. The robot cannot
+hear itself and cannot tell whether the speakers are on. Together with
+`microphone_listen` it can be talked with: tell it, typed, to listen, and to
+answer aloud.
+
+Any of the twelve can be switched off for one instruction. In the Instruction
 Editor the Tools button shows this list, in this order, with a tick beside
 each tool the instruction may use. A cleared tool is blocked for that
 instruction only (`blocked_tools` in the file), and a Meta tool needs both
@@ -698,7 +712,7 @@ differ: the desktop has PowerShell only, the laptop also Git Bash.
 - `robot/main.py`: the command line.
 - `robot/agent.py`: the run loop. `robot/api.py`: the model call and its retries.
 - `robot/console.py`: everything printed and typed, and Ctrl-C handling.
-- `robot/tools.py`: the Pi's own tools. `robot/hearing.py`: recording through the microphone and having the speech in it turned into text. `robot/meta.py`, `robot/spawn.py`: the Meta tools and child runs.
+- `robot/tools.py`: the Pi's own tools. `robot/hearing.py`: recording through the microphone and having the speech in it turned into text. `robot/speaking.py`: having a text turned into speech, and playing it. `robot/meta.py`, `robot/spawn.py`: the Meta tools and child runs.
 - `robot/instructions.py`, `robot/skills.py`: the library and the skills.
 - `robot/prompts.py`: the system prompt's wording.
 - `robot/models.py`: model and price tables. `robot/costs.py`, `robot/chats.py`, `robot/history.py`, `robot/datastore.py`, `robot/relay.py`: supporting parts.
@@ -710,8 +724,8 @@ differ: the desktop has PowerShell only, the laptop also Git Bash.
 
 - Checkout at `~/robot`, venv at `~/robot/.venv` (created with `--system-site-packages`).
 - `~/robot/.env` contains `ANTHROPIC_API_KEY=...` and is never committed. An
-  `XAI_API_KEY=...` line there as well lets the robot hear (see
-  `microphone_listen` under "Tools").
+  `XAI_API_KEY=...` line there as well lets the robot hear and speak (see
+  `microphone_listen` and `speak` under "Tools").
 - Passwordless sudo for the Pi's user, if the agent should have root.
 - `deploy.sh` installs the pinned Python packages and tmux, and sets up the
   `robot-wifi` service (it needs sudo for that).

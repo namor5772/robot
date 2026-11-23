@@ -67,7 +67,7 @@ see "The windowed interface").
 - Hostname `robot.local`, user `grobliro`, repo checkout at `~/robot`
 - Virtual environment: `~/robot/.venv` (created with `--system-site-packages`)
 - API keys: `~/robot/.env` (`ANTHROPIC_API_KEY=...`, and since 2026-11-23
-  `XAI_API_KEY=...` for hearing, see "Hearing"). Never commit it; `.env` is
+  `XAI_API_KEY=...` for hearing and speaking, see "Hearing" and "Speaking"). Never commit it; `.env` is
   in `.gitignore`.
 - The program's data: `~/robot-data` (outside the checkout on purpose).
 - Passwordless sudo is enabled for `grobliro` (the user set it up on
@@ -460,7 +460,7 @@ show the user the output. The user does not want to be asked to test things.
 - Because one skill is on demand, every run now also offers `get_skill`.
 - `.venv/bin/python -m robot.main --skills` and `--list` on the Pi show the
   current skills and instructions; check there instead of trusting this list.
-- 1,390 tests pass (counted on 2026-11-23, on the laptop and on the Pi).
+- 1,426 tests pass (counted on 2026-11-23, on the laptop and on the Pi).
   On the Pi 2 are skipped, on Windows 44, among them the 13 of the Wi-Fi
   service (bash), the 8 real-terminal tests (they need curses), the 19
   launcher tests (they need bash) and 3 that build a real tree of child runs
@@ -707,6 +707,8 @@ show the user the output. The user does not want to be asked to test things.
 - `robot/tools.py`: the Pi's own tools as `Tool` entries in `ALL_TOOLS`.
 - `robot/hearing.py`: recording through the microphone and sending it to
   xAI's speech-to-text service (see "Hearing"). Standard library only.
+- `robot/speaking.py`: having xAI turn a text into a WAV file, and playing
+  it (see "Speaking"). Standard library only.
 - `robot/meta.py`: Meta tool schemas, `manage_instructions`, `meta_tools`.
 - `robot/spawn.py`: `run_instruction` (child runs).
 - `robot/instructions.py`: `RunSettings`, the library, `settings_from_entry`.
@@ -815,7 +817,8 @@ show the user the output. The user does not want to be asked to test things.
   (`models.web_search_tool`: `web_search_20260209`, `max_uses` 5; its
   definition alone is about 6,000 tokens of every request).
 - `microphone_listen` where `arecord` exists and `XAI_API_KEY` is set (see
-  "Hearing"). On a PC it is never offered.
+  "Hearing"), and `speak` where `aplay` exists and the key is set (see
+  "Speaking"). On a PC neither is ever offered.
 - `get_skill` when a skill is on demand. Its result adds the skill's folder
   path when the skill has bundled files, so they can be run with the shell.
 - With Meta on: `manage_instructions`, `manage_skills`, `run_instruction`,
@@ -952,6 +955,66 @@ show the user the output. The user does not want to be asked to test things.
 - `tests/test_hearing.py` (40 tests, on every machine) gives it stand-ins
   for `arecord` and for the service. The Instruction Editor's Tools dialog
   lists the tool, so an instruction can block it.
+
+### Speaking
+
+- `speak` (in `tools.py`, its work in `speaking.py`, since 2026-11-23, at
+  the owner's request) is how the robot talks: a text goes to xAI's
+  text-to-speech service, `POST https://api.x.ai/v1/tts`, a WAV file comes
+  back, is saved and is played. The owner asked for text made into a WAV
+  file that can be played through the speakers; the service and the shape
+  (a tool, as for hearing, with the key that was already on the Pi) were
+  chosen without asking, and the owner was told. MyAgent has no such tool:
+  it speaks through skills.
+- The request is JSON: `text`, `voice_id`, `language` (required by the
+  service; `auto` is sent) and `output_format` (`codec` `wav`,
+  `sample_rate` 24000). The answer is the file's bytes. Read in xAI's REST
+  reference that day; the limits there are 60,000 characters a request and
+  26 voices (`GET /v1/tts/voices`), `eve` being the default.
+- The voice is `eve` unless `ROBOT_VOICE` in the Pi's `.env` names another.
+  An unknown voice is a 404, which the tool reports as such. The text may
+  hold the service's speech tags (`[pause]`, `<whisper>...</whisper>` and
+  so on); the tool's description does not mention them, and none was tried.
+- The WAV file as it comes states a length it does not have: its header
+  said 1,073,741,823 frames for a file of 3.8 seconds (it is made while
+  the sound is still being produced). `speaking.clean_wav` reads to the
+  last sample and writes the file again with a right header, which is also
+  how the tool knows the speech's length.
+- The file is kept: `~/robot-sound/speech_<date>_<time>.wav`, mono, 16 bit,
+  24 kHz, 48 KB a second, beside the recordings, so that `play-sound` can
+  play it again. Nothing removes them.
+- It is played with `aplay -q -D plughw:CARD=Headphones,DEV=0`: the first
+  playback device `aplay -l` lists, named by its card
+  (`speaking.find_speakers`; `ROBOT_SPEAKER_DEVICE` overrules it). With
+  `play` false the file is made and not played. A failure to play still
+  says where the file is.
+- One call takes 2,000 characters at most (`MAX_CHARS`), about two minutes
+  of speech: the tool returns only when the file has been played to its
+  end, and it is not `parallel_safe`, so Ctrl-C and STOP cut the sound off
+  (the player is killed on the way out, as hearing's recorder is).
+- The cost is xAI's, $15.00 for a million characters (its pricing page on
+  2026-11-23), stated in the result as an estimate and, like hearing's,
+  not in the run's cost or the cost log. A sentence of 94 characters is
+  $0.0014; a full call of 2,000 is three cents.
+- The result says "The sound was sent to the speakers; whether it was
+  heard is not known": `aplay` cannot tell whether the speakers have power
+  (see "Sound").
+- The description tells the model not to listen in the same turn as it
+  speaks. Both tools run one after the other in any case, in the order the
+  model gave.
+- How it was tried: the tool spoke a sentence in a scratch copy while
+  `hearing.listen` ran on a second thread, and the transcript was the
+  sentence, word for word, number included. So the robot's own hearing is
+  the check for its voice. `HOME` was a scratch folder, so the check's
+  files did not land in the owner's `~/robot-sound`.
+- That check went wrong in one way: a run of the owner's was in progress
+  (`~/robot-data/runs` held a file, which the check listed and did not
+  act on), and the sentence was played into the room during it. A check
+  that uses the speakers or the microphone must STOP when that folder is
+  not empty, not just show it.
+- `tests/test_speaking.py` (36 tests, on every machine) gives it stand-ins
+  for the service and for `aplay`, among them a file with the header the
+  service really sends.
 
 ### Sound
 
@@ -1390,7 +1453,7 @@ underneath is the same code the chat runs; only the console differs.
 - `~/robot-data/tui_state.json` holds the instruction in use and the five
   display boxes (`tui_state_NAME.json` for a copy started with a session
   name). Nothing a run needs is in it.
-- The Tools dialog lists `editor.TOOL_NAMES`: the seven ordinary tools first,
+- The Tools dialog lists `editor.TOOL_NAMES`: the eight ordinary tools first,
   the four Meta tools last, then any blocked name the program does not know
   (one copied in from MyAgent, or one of a tool since removed), so that such a block is not lost on saving.
   The README's tool table is in the same order. Nothing marks where the Meta

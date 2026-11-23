@@ -10,7 +10,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Callable
 
-from robot import hearing
+from robot import hearing, speaking
 
 @dataclass
 class Tool:
@@ -264,6 +264,50 @@ ALL_TOOLS = [
         # Not parallel_safe: it runs on the main thread, where Ctrl-C and STOP
         # end the listening at once, and one microphone serves one call.
         is_available=hearing.available,
+    ),
+    Tool(
+        definition={
+            "name": "speak",
+            "description": (
+                "Say something out loud through the speakers of the Raspberry Pi "
+                "this program is running on. This is how you speak: a "
+                "text-to-speech service (xAI) turns your text into a voice, the "
+                "sound is saved as a WAV file on the Pi and played, and the call "
+                "returns when it has been played to its end. Use it when the person "
+                "asks you to say, speak or answer something aloud, and to answer a "
+                "person who spoke to you. Write the text as it should be spoken: "
+                "plain sentences, no lists, no markup, no web addresses. Keep it "
+                "short, as speech is slow to listen to. You cannot hear yourself: "
+                "the result says that the sound was sent to the speakers, not that "
+                "anybody heard it. Do not listen with microphone_listen in the same "
+                "turn as you speak: finish speaking first. Speech costs about a "
+                "cent and a half for a thousand characters."
+            ),
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "text": {
+                        "type": "string",
+                        "description": (
+                            "The words to speak, at most 2,000 characters."
+                        ),
+                    },
+                    "play": {
+                        "type": "boolean",
+                        "description": (
+                            "Set it to false to make the WAV file without "
+                            "playing it. Defaults to true."
+                        ),
+                    },
+                },
+                "required": ["text"],
+                "additionalProperties": False,
+            },
+        },
+        run=speaking.speak,
+        # Not parallel_safe: on the main thread Ctrl-C and STOP cut the sound
+        # off at once, and two voices at once would be mixed.
+        is_available=speaking.available,
     ),
 ]
 
