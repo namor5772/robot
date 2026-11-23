@@ -812,7 +812,11 @@ show the user the output. The user does not want to be asked to test things.
     the owner had set to disabled by then, so a run gets them once. With
     the skill off, two things it said are in no run's prompt: to speak
     every reply before typing it, and that the voice can be changed with
-    `voice_settings`. The skill is the owner's: left alone.
+    `voice_settings`. So the owner had the skill trimmed the same day
+    ("trim robot identity"): the two paragraphs that are now in the fixed
+    text were taken out, those two things were kept, its description was
+    changed to say what it holds now, and it was set to enabled again.
+    Enabling it was not asked for in so many words: the owner was told.
   - Nothing in the fixed text names the board's model any more. Until then
     it did, and went on saying "Zero 2 W" from the evening the SD card
     moved (see "Target device") until the next morning. When the card
