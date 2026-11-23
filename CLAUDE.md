@@ -1012,6 +1012,13 @@ show the user the output. The user does not want to be asked to test things.
   act on), and the sentence was played into the room during it. A check
   that uses the speakers or the microphone must STOP when that folder is
   not empty, not just show it.
+- Then a paid chat on Haiku ($0.0022), the real program with `HOME` a
+  scratch folder: "Say out loud, in one short sentence, what day of the
+  week it is" gave `get_current_datetime`, then `speak` with "Today is
+  Monday.", a file of 76 KB, and the reply that it cannot tell whether
+  anyone heard it. Listening and answering aloud in one run was not tried.
+- An interface that was open before the deploy keeps the old code: its
+  runs get the tool once it has been quit and started again.
 - `tests/test_speaking.py` (36 tests, on every machine) gives it stand-ins
   for the service and for `aplay`, among them a file with the header the
   service really sends.
