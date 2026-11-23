@@ -463,8 +463,9 @@ show the user the output. The user does not want to be asked to test things.
 - Because one skill is on demand, every run now also offers `get_skill`.
 - `.venv/bin/python -m robot.main --skills` and `--list` on the Pi show the
   current skills and instructions; check there instead of trusting this list.
-- 1,449 tests pass (counted on 2026-11-24, on the laptop and on the Pi).
-  On the Pi 2 are skipped, on Windows 44, among them the 13 of the Wi-Fi
+- 1,487 tests pass (counted on 2026-11-24, on the laptop and on the Pi).
+  On the Pi 2 are skipped, on Windows 50, among them the 6 of hands-free
+  at the chat's prompt (they need `select`), the 13 of the Wi-Fi
   service (bash), the 8 real-terminal tests (they need curses), the 19
   launcher tests (they need bash) and 3 that build a real tree of child runs
   (they need the kernel's list of processes). `tests/test_spawn.py` starts real
@@ -712,6 +713,9 @@ show the user the output. The user does not want to be asked to test things.
 - `robot/tools.py`: the Pi's own tools as `Tool` entries in `ALL_TOOLS`.
 - `robot/hearing.py`: recording through the microphone and sending it to
   xAI's speech-to-text service (see "Hearing"). Standard library only.
+- `robot/handsfree.py`: `Segmenter` (cuts what was said out of the
+  microphone's sound) and `Ear` (the thread that listens while the robot
+  waits). See "Hands-free". Standard library only.
 - `robot/speaking.py`: having xAI turn a text into a WAV file, and playing
   it (see "Speaking"). Standard library only.
 - `robot/meta.py`: Meta tool schemas, `manage_instructions`, `meta_tools`.
@@ -904,8 +908,9 @@ show the user the output. The user does not want to be asked to test things.
   same name; MyAgent's Mike button (dictating a reply) is not here.
 - The owner chose xAI and this entry point out of four that were put to
   them (a skill alone, this tool, a key in the interface that dictates a
-  reply, listening hands-free). The last two are not built: do not build
-  them unasked.
+  reply, listening hands-free). Hands-free was built the next day (see
+  "Hands-free"). The key that dictates a reply is not built: do not build
+  it unasked.
 - The key is `XAI_API_KEY` in the Pi's `~/robot/.env`. It was copied there
   from the laptop's environment, where MyAgent uses it, with a pipe that
   never showed it. A call made with it is billed to the owner's xAI
@@ -961,6 +966,107 @@ show the user the output. The user does not want to be asked to test things.
 - `tests/test_hearing.py` (40 tests, on every machine) gives it stand-ins
   for `arecord` and for the service. The Instruction Editor's Tools dialog
   lists the tool, so an instruction can block it.
+
+### Hands-free
+
+- Since 2026-11-24, at the owner's request ("build hands-free properly"):
+  while the robot waits for a message it listens for a spoken one, and what
+  was said is the reply. Typing still works. Off unless asked for:
+  `--hands-free` in the chat (`chat.sh --hands-free`), the Hands-free box
+  in the interface (Alt+H, kept in `tui_state.json`, and it can be ticked
+  and cleared while the robot waits).
+- It is not a tool and the model does not know of it: a spoken message
+  reaches the agent as the reply to `Console.ask`, like a typed one. So
+  every wait listens (the first message, the next one in a conversation,
+  the answer to `user_prompt`), and the end words work when spoken:
+  `convo_end_word` takes "Bye." for "bye". The line shown and saved is
+  `you> (heard) ...`; the model gets the words without the mark.
+- `handsfree.Segmenter` is the part that decides what is speech, a tenth
+  of a second (3,200 bytes) at a time, and has no microphone in it:
+  - A chunk's level is the RMS of its samples around their own average, so
+    a steady offset counts as nothing.
+  - The first ten chunks are not looked at. Measured on the Pi from a cold
+    start: 7,100 and 2,500 (the thump described under "Sound"), then 600
+    to 1,300 for seven tenths, in a room that was at 300; it goes on
+    sinking for seconds, to about 270.
+  - `floor` is the room's own level. The first chunk looked at sets it;
+    below it, it follows down fast (0.7 of the old, 0.3 of the new),
+    between it and the start level slowly up (0.98 and 0.02). Speech
+    starts when 3 of the last 4 chunks are above `max(2.5 x floor, floor
+    + 300)`, and ends after 15 chunks in a row below `max(1.6 x floor,
+    floor + 150)`. What is cut out is half a second from before the start,
+    the speech, and three tenths of the pause; a minute at most; fewer
+    than three loud chunks in all is a click and is dropped.
+  - Those figures come from one measurement: the speakers' speech was
+    1,000 to 4,800 at the microphone, mostly 1,500 to 2,300, and the gaps
+    between its sentences, four to five tenths long, went down to the
+    room's 270 to 450. The owner's own voice at the microphone was not
+    measured: if it is not picked up, the two `max(...)` lines are where
+    to look.
+  - `not_speech()` is called when a cut-out piece came back without words:
+    the floor is raised to half that piece's typical level, so the same
+    noise does not start another piece at once.
+- `handsfree.Ear` runs `arecord` with no length on a thread of its own
+  (the same command as hearing's otherwise), feeds the segmenter, has each
+  piece transcribed with `hearing.transcribe`, and holds the words for
+  `take()`. `state` is `listening`, `hearing` or `working`. `problem` is
+  set when it stops by itself (no key, no microphone, `arecord` ended:
+  "Device or resource busy" when something else has the microphone), and
+  `trouble` when one transcription failed and it goes on listening.
+  `stop()` kills the recorder; words that arrive after that are dropped.
+- The microphone is open only during the wait. The robot's own `speak`
+  and `microphone_listen` run between waits, on the same thread that then
+  opens the ear, so the robot neither hears itself nor fights itself for
+  the microphone. Two interfaces that are both hands-free do: the second
+  one's recorder fails and it says so.
+- The two places that wait:
+  - The interface: `UiConsole._read_reply` looks at the reply queue and at
+    the ear every tenth of a second, opens and closes the ear as the box
+    changes, and posts an `("ear", state)` event when the state changes,
+    which the bottom line shows (`EAR_NOTICES`).
+  - The chat: `Console._type_or_speak` waits with `select` on the keyboard
+    and looks at the ear. readline's `input()` is not used while
+    hands-free is on, because a voice cannot wake it: the line is edited
+    by the terminal itself, so there is no history and no arrow keys
+    there. What was half typed when a voice came is thrown away
+    (`tcflush`). Piped and headless runs never listen.
+- A warning is shown once per kind of trouble (`Console._ear_trouble`),
+  not at every prompt, and one failed start is not tried again within the
+  same wait.
+- The interface's bottom row has six boxes now, which do not fit in 72
+  columns: `MainWindow.layout` gives them a second row there and the
+  output pane one row less.
+- Cost: only what is cut out is sent. In the first real test 9.6 seconds
+  of sound were uploaded in 40 seconds of listening, with two messages
+  spoken; a quiet room uploads nothing.
+- Tried for real on the Pi, a session being unable to speak: xAI's voice
+  `rex` said the "person's" lines through the speakers.
+  - The ear alone, in a scratch copy: two messages eleven seconds apart
+    were each handed over 1.3 to 1.9 seconds after the speakers fell
+    silent, word for word, the full stop in the middle of each not
+    splitting it, and nothing was sent in the 20 quiet seconds after.
+  - The interface, in a tmux of the check's own (`zz-ui`, `--session zzt`,
+    its `tui_state_zzt.json` written beforehand with the box ticked, an
+    instruction `ZZ Talk` on Haiku, `HOME` a scratch folder): a spoken
+    first message, the answer spoken by the robot (the owner's
+    `robot-identity` skill has it speak its replies), listening again, and
+    a spoken "Bye." ending the run. $0.0004.
+  - The chat, in a tmux of its own (`zz-chat`): two spoken messages, one
+    typed while it listened, each answered aloud, and "Bye." $0.0032.
+  - The check's script waited for the listening prompt AND for `pgrep -x
+    arecord` before the speakers spoke, then 1.5 seconds more for the
+    lead-in.
+  - Two mistakes in those scripts, for the next one: a helper that calls
+    `robot.speaking` outside the program must load the `.env` itself, and
+    `ls` on the Pi sorts `x_2.wav` BEFORE `x.wav` (its locale ignores the
+    punctuation), so files to be played in order need names that say so.
+  - In the first, failed try the speakers said nothing, and the interface
+    still took a message from the room and ran with it. Whose voice that
+    was is not known. Hands-free hears whoever speaks: a radio or a
+    second person in the room can send a message.
+- `tests/test_handsfree.py` (38 tests; 6 need `select` and are skipped on
+  Windows): the segmenter on made-up sound, the ear on a stand-in recorder
+  that writes through a real pipe, and both consoles with a stand-in ear.
 
 ### Speaking
 
@@ -1504,8 +1610,8 @@ underneath is the same code the chat runs; only the console differs.
   Even the longest settings there are fit the smallest window that way, also
   with a short session name in front. `describe_instruction` returns the
   parts, not a finished line, so that this can be done.
-- `~/robot-data/tui_state.json` holds the instruction in use and the five
-  display boxes (`tui_state_NAME.json` for a copy started with a session
+- `~/robot-data/tui_state.json` holds the instruction in use and the six
+  boxes of the bottom row (five display boxes and Hands-free) (`tui_state_NAME.json` for a copy started with a session
   name). Nothing a run needs is in it.
 - The Tools dialog lists `editor.TOOL_NAMES`: the nine ordinary tools first,
   the four Meta tools last, then any blocked name the program does not know

@@ -32,6 +32,23 @@ MyAgent: nothing sent means you are done. (When the robot has asked you a
 question, an empty line stops the run.) Ctrl-C stops the reply or command in
 progress and returns to the prompt.
 
+To talk instead of typing, start it hands-free:
+
+```powershell
+ssh -t pi "bash ~/robot/scripts/chat.sh --hands-free"
+```
+
+Whenever the robot waits for you it then listens through its microphone.
+Speak, pause for a second and a half, and what you said is sent as your
+message, shown as `you> (heard) ...`. Typing still works at the same prompt.
+Say "bye" or "stop" on its own to end the conversation. In the windowed
+interface the same thing is the Hands-free box in the bottom row (Alt+H),
+which can be ticked and cleared at any time; the bottom line shows
+"Listening", "Hearing you..." and "Working out what you said...". For the
+robot to answer out loud as well, tell it to (a skill or an instruction can
+say so for good). See "Hands-free" further down for how it works and what
+it costs.
+
 `chat.sh` runs the chat inside tmux, so it belongs to the Pi and not to your
 SSH connection. If the PC sleeps or the connection drops, the chat keeps
 running, and the same command brings you back to it.
@@ -499,6 +516,32 @@ you are curious about: `speak` takes a voice and a speed for one call, which
 changes nothing that is saved. With nothing saved the voice is `eve` at
 speed 1.
 
+### Hands-free
+
+With hands-free on (see "Starting a chat") the robot listens whenever it
+waits for a message: the first one, the next one in a conversation, or the
+answer to a question it asked. It does not listen while it is working or
+speaking, so it does not hear itself.
+
+- The microphone's sound is watched a tenth of a second at a time. Sound
+  that stands clearly above the room's own level starts a message; a second
+  and a half of quiet ends it. Only that piece is sent to xAI's
+  speech-to-text service, so silence costs nothing and a quiet room is never
+  uploaded.
+- A piece in which the service finds no words (a door, a cough) is dropped
+  and the robot goes on listening. It never counts as an empty message,
+  which would end the conversation.
+- The room's level is followed all the time, so it works in a quiet room and
+  in a noisy one. In a noisy one you have to speak up.
+- A message can be a minute long at most. The first second after the robot
+  starts listening is not heard: the microphone needs it to settle.
+- "Bye", "stop", "quit" or "exit" said alone ends a conversation, exactly as
+  when typed.
+- If the microphone cannot be used (another program has it, or no xAI key),
+  a warning says so once and typing goes on working.
+- Every message is one transcription, about a hundredth of a cent, billed by
+  xAI and not in the robot's cost log.
+
 Any of the thirteen can be switched off for one instruction. In the Instruction
 Editor the Tools button shows this list, in this order, with a tick beside
 each tool the instruction may use. A cleared tool is blocked for that
@@ -725,7 +768,7 @@ differ: the desktop has PowerShell only, the laptop also Git Bash.
 - `robot/main.py`: the command line.
 - `robot/agent.py`: the run loop. `robot/api.py`: the model call and its retries.
 - `robot/console.py`: everything printed and typed, and Ctrl-C handling.
-- `robot/tools.py`: the Pi's own tools. `robot/hearing.py`: recording through the microphone and having the speech in it turned into text. `robot/speaking.py`: having a text turned into speech, and playing it. `robot/meta.py`, `robot/spawn.py`: the Meta tools and child runs.
+- `robot/tools.py`: the Pi's own tools. `robot/hearing.py`: recording through the microphone and having the speech in it turned into text. `robot/handsfree.py`: listening for a spoken message while the robot waits for one. `robot/speaking.py`: having a text turned into speech, and playing it. `robot/meta.py`, `robot/spawn.py`: the Meta tools and child runs.
 - `robot/instructions.py`, `robot/skills.py`: the library and the skills.
 - `robot/prompts.py`: the system prompt's wording.
 - `robot/models.py`: model and price tables. `robot/costs.py`, `robot/chats.py`, `robot/history.py`, `robot/datastore.py`, `robot/relay.py`: supporting parts.
