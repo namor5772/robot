@@ -13,9 +13,13 @@ import queue
 import threading
 import time
 
-from robot import api, chats, costs, history, meta, models, prompts
-from robot.console import INTERRUPTED, convo_end_word
+from robot import api, chats, costs, history, meta, models, prompts, speaking
+from robot.console import INTERRUPTED, LABEL, convo_end_word
 from robot.tools import Tool, available_tools
+
+# Said by the robot, out loud, when the person ends a conversation by saying
+# an end word (not by typing one). The owner's wording.
+FAREWELL = "I am ending this conversation now. Good to have known you."
 
 # Typed in answer to a user_prompt question, this word ends the whole run.
 EXIT_WORD = "exit"
@@ -412,11 +416,29 @@ class Agent:
             if reply == "":
                 break  # the empty reply ends a conversation, typed or not
             if convo_end_word(reply):
+                if console.last_reply_heard:
+                    self._say_farewell()
                 break
             self.messages.append({"role": "user", "content": reply})
             return True
         console.activity("Conversation ended.")
         return False
+
+    def _say_farewell(self):
+        """The robot's last words when the person said goodbye out loud: shown,
+        and spoken where the robot has a voice. It is the program that says
+        them, not the model, so no call is made for it."""
+        console = self.console
+        console.note(LABEL + FAREWELL)
+        if not speaking.available():
+            return
+        try:
+            with console.interrupts.raisable():
+                speaking.say(FAREWELL)
+        except KeyboardInterrupt:
+            console.interrupts.clear()  # STOP or Ctrl-C: the goodbye is cut short
+        except Exception as error:
+            console.warn(f"The goodbye could not be spoken: {error}")
 
     # -- tools -------------------------------------------------------------
 

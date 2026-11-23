@@ -463,8 +463,8 @@ show the user the output. The user does not want to be asked to test things.
 - Because one skill is on demand, every run now also offers `get_skill`.
 - `.venv/bin/python -m robot.main --skills` and `--list` on the Pi show the
   current skills and instructions; check there instead of trusting this list.
-- 1,487 tests pass (counted on 2026-11-24, on the laptop and on the Pi).
-  On the Pi 2 are skipped, on Windows 50, among them the 6 of hands-free
+- 1,499 tests pass (counted on 2026-11-24, on the laptop and on the Pi).
+  On the Pi 2 are skipped, on Windows 51, among them the 7 of hands-free
   at the chat's prompt (they need `select`), the 13 of the Wi-Fi
   service (bash), the 8 real-terminal tests (they need curses), the 19
   launcher tests (they need bash) and 3 that build a real tree of child runs
@@ -1064,7 +1064,24 @@ show the user the output. The user does not want to be asked to test things.
     still took a message from the room and ran with it. Whose voice that
     was is not known. Hands-free hears whoever speaks: a radio or a
     second person in the room can send a message.
-- `tests/test_handsfree.py` (38 tests; 6 need `select` and are skipped on
+- A conversation ended by a SPOKEN end word gets a goodbye first, at the
+  owner's request and in the owner's words (`agent.FAREWELL`): "I am ending
+  this conversation now. Good to have known you."
+  - It is the program that says it, not the model: no call is made.
+    `Agent._say_farewell` shows it as a `robot>` line and speaks it with
+    `speaking.say`, which plays from a file in the data folder's `tmp` and
+    keeps nothing (unlike the `speak` tool). It costs xAI's price for 58
+    characters, a tenth of a cent.
+  - `Console.last_reply_heard` is how the agent knows: both consoles set it
+    with every reply. A typed end word, an empty reply and nobody being
+    there end a conversation without the goodbye.
+  - Only the conversation's own end (`_next_convo_message`). "exit" in
+    answer to `user_prompt`, and an end word as the very first message of
+    an instruction without text, end things silently as before.
+  - Without a voice (no key, no `aplay`) it is shown and not spoken. A
+    failure to speak is a warning; STOP cuts it short; the conversation
+    ends either way.
+- `tests/test_handsfree.py` (50 tests; 7 need `select` and are skipped on
   Windows): the segmenter on made-up sound, the ear on a stand-in recorder
   that writes through a real pipe, and both consoles with a stand-in ear.
 

@@ -255,6 +255,7 @@ class UiConsole(Console):
                 ear.stop()
             self.bridge.events.put(("ask_done",))
         self._line(prompt + (HEARD_MARK if heard else "") + reply)
+        self.last_reply_heard = heard
         return reply.strip()
 
 

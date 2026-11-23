@@ -252,6 +252,24 @@ def play(path: Path, seconds: float, device: str) -> None:
                            f"{reason or 'aplay ended with code ' + str(process.returncode)}")
 
 
+def say(text: str) -> None:
+    """Speak a text in the voice in use and keep nothing: for what the program
+    itself has to say, as distinct from what the model says with the tool."""
+    wav, seconds = clean_wav(synthesize(text))
+    folder = DataDir().tmp_dir
+    folder.mkdir(parents=True, exist_ok=True)
+    path = folder / f"say_{os.getpid()}.wav"
+    path.write_bytes(wav)
+    try:
+        device, _ = find_speakers()
+        play(path, seconds, device)
+    finally:
+        try:
+            path.unlink()
+        except OSError:
+            pass
+
+
 def _pace_words(pace: float) -> str:
     return "" if pace == DEFAULT_SPEED else f" at speed {pace:g}"
 

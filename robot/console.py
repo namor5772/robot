@@ -174,6 +174,7 @@ class Console:
         self.input_wait_secs = 0.0  # time spent waiting on the person, not working
         # Hands-free: while waiting for a message, listen for a spoken one too.
         self.hands_free = False
+        self.last_reply_heard = False  # the reply ask() gave last was spoken, not typed
         self._ear_note = ""  # the last trouble with it that was shown
         self._startup_input_dropped = False
 
@@ -327,6 +328,7 @@ class Console:
         self.end_line()
         if question:
             self._line(ASK_LABEL + question.strip())
+        self.last_reply_heard = False
         started = time.monotonic()
         try:
             return self._read_reply(question, preface, prompt)
@@ -370,6 +372,7 @@ class Console:
                         ear.stop()
                 if heard:
                     self._after_heard(prompt, line)
+                    self.last_reply_heard = True
                     return line
                 self._after_terminal_line(prompt, line)
                 if only_terminal_replies(line):

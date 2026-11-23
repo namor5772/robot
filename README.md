@@ -535,8 +535,10 @@ speaking, so it does not hear itself.
   in a noisy one. In a noisy one you have to speak up.
 - A message can be a minute long at most. The first second after the robot
   starts listening is not heard: the microphone needs it to settle.
-- "Bye", "stop", "quit" or "exit" said alone ends a conversation, exactly as
-  when typed.
+- "Bye", "stop", "quit" or "exit" said alone ends a conversation, as when
+  typed. When it was said, the robot first answers out loud: "I am ending
+  this conversation now. Good to have known you." A typed end word ends the
+  conversation without that.
 - If the microphone cannot be used (another program has it, or no xAI key),
   a warning says so once and typing goes on working.
 - Every message is one transcription, about a hundredth of a cent, billed by

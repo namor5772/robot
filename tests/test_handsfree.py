@@ -12,13 +12,15 @@ import time
 import unittest
 from unittest import mock
 
-from robot import handsfree, hearing
+from robot import agent as agent_module
+from robot import handsfree, hearing, speaking
 from robot import main as command_line
 from robot.console import Console
 from robot.handsfree import (
     CHUNK_BYTES, END_QUIET_CHUNKS, LEAD_IN_CHUNKS, MAX_CHUNKS, PRE_ROLL_CHUNKS, TAIL_CHUNKS,
     Ear, Segmenter)
-from tests.fakes import NoWaitInterrupts, reply, text_block
+from tests.fakes import NoWaitInterrupts, TerminalConsole, reply, text_block
+from tests.test_agent import LoopCase
 from tests.test_tui_app import MainCase, said
 from tests.tui_fakes import Check, Until
 
@@ -344,6 +346,15 @@ class AtTheChatsPrompt(unittest.TestCase):
         self.assertTrue(self.out.getvalue().endswith("you> (heard) What time is it?\n"))
         self.assertTrue(FakeEar.opened[0].stopped)
 
+    def test_the_console_remembers_whether_the_last_reply_was_spoken(self):
+        fake_ears(self, None)
+        console = self.console(typed="typed\n")
+        self.assertEqual(console.ask(), "typed")
+        self.assertFalse(console.last_reply_heard)
+        fake_ears(self, "Spoken.")
+        self.assertEqual(console.ask(), "Spoken.")
+        self.assertTrue(console.last_reply_heard)
+
     def test_a_typed_line_is_the_reply_all_the_same(self):
         fake_ears(self, None)
         console = self.console(typed="  typed instead \n")
@@ -380,6 +391,118 @@ class AtTheChatsPrompt(unittest.TestCase):
         self.assertEqual(FakeEar.opened, [])
 
 
+class HeardConsole(TerminalConsole):
+    """A terminal console whose replies in `spoken` count as heard."""
+
+    spoken = ()
+
+    def ask(self, **how):
+        reply = super().ask(**how)
+        self.last_reply_heard = reply in self.spoken
+        return reply
+
+
+class TheGoodbye(LoopCase):
+    WORDS = "I am ending this conversation now. Good to have known you."
+
+    def end_with(self, replies, spoken, can_speak=True, say=None):
+        console = HeardConsole(replies)
+        console.spoken = spoken
+        made = self.make([reply(text_block("Hi."))], console=console, conversational=True)
+        with mock.patch.object(speaking, "available", return_value=can_speak), \
+                mock.patch.object(speaking, "say", side_effect=say) as said:
+            self.assertEqual(made.run(), "completed")
+        self.said = said
+        return console.out.getvalue()
+
+    def test_a_spoken_end_word_is_answered_out_loud_before_the_end(self):
+        for word in ("Bye.", "Stop.", "quit", "Exit!"):
+            with self.subTest(word=word):
+                shown = self.end_with([word], spoken=(word,))
+                self.said.assert_called_once_with(self.WORDS)
+                self.assertEqual(agent_module.FAREWELL, self.WORDS)
+                self.assertLess(shown.index("robot> " + self.WORDS),
+                                shown.index("Conversation ended."))
+                self.assertEqual(len(self.client.requests), 1)  # no call is made for it
+
+    def test_a_typed_end_word_ends_it_without_a_word(self):
+        shown = self.end_with(["bye"], spoken=())
+        self.said.assert_not_called()
+        self.assertNotIn(self.WORDS, shown)
+        self.assertIn("Conversation ended.", shown)
+
+    def test_an_empty_reply_and_nobody_there_end_it_without_a_word(self):
+        for replies in ([""], [None]):
+            self.end_with(replies, spoken=())
+            self.said.assert_not_called()
+
+    def test_an_ordinary_spoken_message_is_not_a_goodbye(self):
+        console = HeardConsole(["Stop the motor.", None])
+        console.spoken = ("Stop the motor.",)
+        made = self.make([reply(text_block("Hi.")), reply(text_block("Done."))],
+                         console=console, conversational=True)
+        with mock.patch.object(speaking, "available", return_value=True), \
+                mock.patch.object(speaking, "say") as said:
+            made.run()
+        said.assert_not_called()
+        self.assertEqual(len(self.client.requests), 2)
+
+    def test_without_a_voice_the_goodbye_is_shown_and_not_spoken(self):
+        shown = self.end_with(["Bye."], spoken=("Bye.",), can_speak=False)
+        self.said.assert_not_called()
+        self.assertIn("robot> " + self.WORDS, shown)
+
+    def test_a_goodbye_that_cannot_be_spoken_still_ends_the_conversation(self):
+        shown = self.end_with(["Bye."], spoken=("Bye.",),
+                              say=RuntimeError("xAI could not be reached"))
+        self.assertIn("warning: The goodbye could not be spoken: xAI could not be reached",
+                      shown)
+        self.assertIn("Conversation ended.", shown)
+
+    def test_stop_cuts_the_goodbye_short_and_the_conversation_still_ends(self):
+        shown = self.end_with(["Bye."], spoken=("Bye.",), say=KeyboardInterrupt())
+        self.assertIn("Conversation ended.", shown)
+
+
+class SayingWithoutKeeping(unittest.TestCase):
+    def test_the_file_is_played_from_the_data_folders_tmp_and_removed(self):
+        import tempfile
+        from pathlib import Path
+        from tests.test_speaking import wav
+        folder = tempfile.TemporaryDirectory()
+        self.addCleanup(folder.cleanup)
+        played = []
+
+        def play(path, seconds, device):
+            played.append((path, path.read_bytes(), seconds, device))
+
+        with mock.patch.dict("os.environ", {"ROBOT_DATA_DIR": folder.name}), \
+                mock.patch.object(speaking, "synthesize", return_value=wav(2)) as synthesize, \
+                mock.patch.object(speaking, "find_speakers", return_value=("dev", "X")), \
+                mock.patch.object(speaking, "play", side_effect=play):
+            speaking.say("Goodbye.")
+        synthesize.assert_called_once_with("Goodbye.")
+        (path, content, seconds, device), = played
+        self.assertEqual(path.parent, Path(folder.name).resolve() / "tmp")
+        self.assertEqual((content, seconds, device), (wav(2), 2.0, "dev"))
+        self.assertFalse(path.exists())
+        self.assertEqual(list(Path(folder.name).rglob("*.wav")), [])
+
+    def test_it_is_removed_when_playing_fails_too(self):
+        import tempfile
+        from pathlib import Path
+        from tests.test_speaking import wav
+        folder = tempfile.TemporaryDirectory()
+        self.addCleanup(folder.cleanup)
+        with mock.patch.dict("os.environ", {"ROBOT_DATA_DIR": folder.name}), \
+                mock.patch.object(speaking, "synthesize", return_value=wav(1)), \
+                mock.patch.object(speaking, "find_speakers", return_value=("dev", "X")), \
+                mock.patch.object(speaking, "play", side_effect=RuntimeError("busy")):
+            with self.assertRaisesRegex(RuntimeError, "busy"):
+                speaking.say("Goodbye.")
+        self.assertEqual(list(Path(folder.name).rglob("*.wav")), [])
+
+
 class TheChatsCommandLine(unittest.TestCase):
     def test_hands_free_is_an_option_and_off_without_it(self):
         parser = command_line.build_parser()
@@ -407,6 +530,25 @@ class InTheInterface(MainCase):
             self.asked(), self.shows("you> (heard) What time is it?", "It is noon."))
         self.assertEqual(said(client.requests[1]["messages"][-1]), "What time is it?")
         self.assertTrue(FakeEar.opened[0].stopped)
+
+    def bye(self, typed_it):
+        fake_ears(self, *([] if typed_it else ["Bye."]))
+        keys = list("bye") + ["enter"] if typed_it else []
+        with mock.patch.object(speaking, "available", return_value=True), \
+                mock.patch.object(speaking, "say") as say:
+            self.run_with("Talk", self.TALK, "alt+h", "f2", self.asked(), *keys,
+                          self.ended(), self.shows("Conversation ended."))
+        return say, self.screen.find("robot> I am ending this conversation now.")
+
+    def test_a_spoken_bye_gets_the_goodbye(self):
+        say, shown = self.bye(typed_it=False)
+        say.assert_called_once_with(agent_module.FAREWELL)
+        self.assertIsNotNone(shown)
+
+    def test_a_typed_bye_does_not(self):
+        say, shown = self.bye(typed_it=True)
+        say.assert_not_called()
+        self.assertIsNone(shown)
 
     def test_the_bottom_line_says_that_it_listens(self):
         fake_ears(self)
