@@ -1160,6 +1160,9 @@ show the user the output. The user does not want to be asked to test things.
     ($0.0004): `you> (heard) Stop`, the goodbye, "Conversation ended.",
     the cost-log line, and no line about powering off; the stand-in was
     never run.
+  - The real thing was tried by the owner that morning, after a restart
+    of the Pi that came up through the autostart on this code: "All the
+    above changes work well, the Pi is now powered off."
   - Hands-free hears whoever speaks: a "Bye." from a radio switches the
     Pi off. With autostart on, the Pi's life is then: power on, run,
     listen, "bye", off.
