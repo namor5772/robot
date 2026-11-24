@@ -21,6 +21,10 @@ from robot.tools import Tool, available_tools
 # an end word (not by typing one). The owner's wording.
 FAREWELL = "I am ending this conversation now. Good to have known you."
 
+# The one end word that, when it is spoken, also switches the Pi off after
+# the conversation has ended. The other end words only end the conversation.
+POWER_OFF_WORD = "bye"
+
 # Typed in answer to a user_prompt question, this word ends the whole run.
 EXIT_WORD = "exit"
 
@@ -117,8 +121,8 @@ class Agent:
         self.chat_stem = ""
         self._transcript = None
         self._stop_run = False  # set when a reply to user_prompt ends the run
-        # Set when the person ended the conversation by saying so out loud:
-        # the Pi is then powered off once the run has been wound down.
+        # Set when the person ended the conversation by saying "bye" out
+        # loud: the Pi is then powered off once the run has been wound down.
         self.power_off = False
         self._turn_text = ""
         self._truncated_note = ""
@@ -424,7 +428,7 @@ class Agent:
             if convo_end_word(reply):
                 if console.last_reply_heard:
                     self._say_farewell()
-                    self.power_off = True
+                    self.power_off = convo_end_word(reply) == POWER_OFF_WORD
                 break
             self.messages.append({"role": "user", "content": reply})
             return True

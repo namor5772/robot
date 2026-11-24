@@ -249,13 +249,13 @@ show the user the output. The user does not want to be asked to test things.
   Piped lines are echoed, and the end of input ends the conversation.
   `--model claude-haiku-5-5` keeps checks cheap (a whole chat for well under a
   cent); the default Opus chat costs about 5 cents to start.
-- A conversation ended by a SPOKEN end word powers the Pi off (see
+- A conversation ended by a SPOKEN "bye" powers the Pi off (see
   "Hands-free"), and a Pi that is off stays off until somebody takes its
   power away and gives it back. So:
   - `tests/__init__.py` sets `ROBOT_POWEROFF_COMMAND=true` for every test:
     no test can switch off the machine it runs on. Leave that line alone.
-  - A check on the Pi in which anything says "bye", "stop", "quit" or
-    "exit" to a hands-free run (the speakers included) exports
+  - A check on the Pi in which anything says "bye" to a hands-free run
+    (the speakers included) exports
     `ROBOT_POWEROFF_COMMAND` with a harmless command BEFORE it starts the
     program or its tmux server, for example `touch /tmp/zz-poweroff-asked`.
   - The real `sudo poweroff` is not for a session to try: it ends the
@@ -482,7 +482,7 @@ show the user the output. The user does not want to be asked to test things.
 - Because one skill is on demand, every run now also offers `get_skill`.
 - `.venv/bin/python -m robot.main --skills` and `--list` on the Pi show the
   current skills and instructions; check there instead of trusting this list.
-- 1,531 tests pass (counted on 2026-11-25, on the laptop and on the Pi).
+- 1,532 tests pass (counted on 2026-11-25, on the laptop and on the Pi).
   On the Pi 2 are skipped, on Windows 67, among them the 16 of the
   autostart script (bash), the 7 of hands-free
   at the chat's prompt (they need `select`), the 13 of the Wi-Fi
@@ -1134,16 +1134,21 @@ show the user the output. The user does not want to be asked to test things.
     poweroff`; systemd's shutdown stops the interface and everything else
     in order and unmounts the card. That is the whole of "safely".
     `ROBOT_POWEROFF_COMMAND` names another command, for tests and checks.
-  - The same trigger as the goodbye, and nothing else: any of the four end
-    words, SPOKEN, at the conversation's own prompt. A typed end word, an
-    empty reply, STOP, Quit, "exit" to `user_prompt` and a run that ends
-    by itself leave the Pi on. It is in the chat and in the interface.
+  - Only the word "bye" (`agent.POWER_OFF_WORD`), and only SPOKEN, at the
+    conversation's own prompt: the owner narrowed it to that the same day
+    ("ONLY work if I say the word bye (not write it!)"); for an hour it
+    had been all four end words. A spoken "stop", "quit" or "exit" gets
+    the goodbye and leaves the Pi on. So do a typed "bye", an empty reply,
+    STOP, Quit, "exit" to `user_prompt` and a run that ends by itself. It
+    is in the chat and in the interface. `convo_end_word` decides what
+    counts as the word: "Bye.", "BYE!" and " bye " do, "bye for now" is
+    an ordinary message.
   - Tried on the Pi with a stand-in for the command (`date +%T.%N >
     /tmp/zz-poweroff-asked`, exported before the check's tmux server
     started; `tmux show-environment -g` confirmed it): a paid hands-free
     chat on Haiku ($0.0022), the speakers' "Bye.", then the goodbye,
-    "Conversation ended.", the cost-log line, "Powering the Pi off now:
-    the conversation was ended by voice." The saved chat was written at
+    "Conversation ended.", the cost-log line, and the line that says
+    the Pi is powering off. The saved chat was written at
     10:31:48.76 and the stand-in was run at 10:31:48.83. The check first
     made sure that no run was in progress and nothing else was listening:
     another run hearing its "Bye." would have switched the Pi off. The

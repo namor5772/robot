@@ -83,14 +83,22 @@ class AfterASpokenGoodbye(LoopCase):
         self.order = order
         return off
 
-    def test_the_pi_is_powered_off_once_the_run_is_wound_down(self):
-        for word in ("Bye.", "Stop.", "quit", "Exit!"):
+    def test_after_a_spoken_bye_the_pi_is_powered_off_once_the_run_is_wound_down(self):
+        for word in ("Bye.", "bye", "BYE!", " Bye "):
             with self.subTest(word=word):
                 off = self.end_with([word], spoken=(word,))
                 off.assert_called_once()
                 self.assertEqual(self.status, "completed")
                 # The goodbye, then the cost and the chat, then the power.
                 self.assertEqual(self.order, ["goodbye", "run wound down", "power off"])
+
+    def test_the_other_end_words_spoken_end_the_conversation_and_leave_the_pi_on(self):
+        self.assertEqual(agent_module.POWER_OFF_WORD, "bye")
+        for word in ("Stop.", "quit", "Exit!"):
+            with self.subTest(word=word):
+                off = self.end_with([word], spoken=(word,))
+                off.assert_not_called()
+                self.assertEqual(self.order, ["goodbye", "run wound down"])
 
     def test_a_typed_end_word_leaves_the_pi_on(self):
         for word in ("bye", "stop"):
@@ -114,7 +122,8 @@ class AfterASpokenGoodbye(LoopCase):
         with mock.patch.object(speaking, "available", return_value=False):
             made.run()
         shown = console.out.getvalue()
-        said = "Powering the Pi off now" if os.name == "posix" else "nothing is powered off"
+        said = ("Powering the Pi off now: you said bye." if os.name == "posix"
+                else "nothing is powered off")
         self.assertIn(said, shown)
         self.assertNotIn("could not be powered off", shown)
         self.assertLess(shown.index("Logged API cost"), shown.index(said))

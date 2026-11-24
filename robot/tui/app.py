@@ -112,8 +112,9 @@ THE MAIN WINDOW
   and what you said is sent as your message; typing still works.
   The bottom line shows when it is listening and when it hears
   you. Say "bye" or "stop" on its own to end a conversation: the
-  robot then says goodbye and POWERS THE PI OFF, without asking.
-  Typed, the same words end the conversation and nothing more.
+  robot says goodbye first. After a spoken "bye", and only then,
+  it also POWERS THE PI OFF, without asking. Typed, these words
+  end the conversation and nothing more.
 
 TEXT BOXES
   Arrows, Home, End, PgUp and PgDn move the cursor. Ctrl+Left and

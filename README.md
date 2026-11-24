@@ -42,7 +42,8 @@ Whenever the robot waits for you it then listens through its microphone.
 Speak, pause for a second and a half, and what you said is sent as your
 message, shown as `you> (heard) ...`. Typing still works at the same prompt.
 Say "bye" or "stop" on its own to end the conversation; the robot then says
-goodbye and switches the Pi off (see "Hands-free" further down). In the windowed
+goodbye, and after "bye" it also switches the Pi off (see "Hands-free" further
+down). In the windowed
 interface the same thing is the Hands-free box in the bottom row (Alt+H),
 which can be ticked and cleared at any time; the bottom line shows
 "Listening", "Hearing you..." and "Working out what you said...". For the
@@ -564,12 +565,14 @@ speaking, so it does not hear itself.
   starts listening is not heard: the microphone needs it to settle.
 - "Bye", "stop", "quit" or "exit" said alone ends a conversation, as when
   typed. When it was said, the robot first answers out loud: "I am ending
-  this conversation now. Good to have known you." Then, once the run's cost
-  is logged and its chat saved, **the Pi powers itself off** (`sudo
-  poweroff`), without asking. To use it again, take its power away and give
-  it back; with autostart on it then comes up running and listening. A
-  typed end word ends the conversation without the goodbye and leaves the
-  Pi on, and so do STOP, Quit and an empty message.
+  this conversation now. Good to have known you." A typed end word ends the
+  conversation without that.
+- **A spoken "bye" also powers the Pi off.** Only that word, and only when
+  it was said, not typed: once the run's cost is logged and its chat saved,
+  the Pi runs `sudo poweroff`, without asking. To use it again, take its
+  power away and give it back; with autostart on it then comes up running
+  and listening. "Stop", "quit" and "exit", spoken or typed, a typed "bye",
+  STOP, Quit and an empty message all leave the Pi on.
 - If the microphone cannot be used (another program has it, or no xAI key),
   a warning says so once and typing goes on working.
 - Every message is one transcription, about a hundredth of a cent, billed by

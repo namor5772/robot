@@ -1,10 +1,11 @@
 """Switching the Pi off, when the person has said goodbye to it.
 
-A conversation that is ended by a spoken end word (see robot.handsfree) ends
-with the Pi powering itself off: no question is asked first, at the owner's
-word. The run is over by then, its cost logged and its chat saved, and the
-system's own shutdown does the rest in order: it stops what is running,
-writes what is unwritten and unmounts the card.
+A conversation that is ended by the spoken word "bye" (see robot.handsfree)
+ends with the Pi powering itself off: no question is asked first, at the
+owner's word. Typed, the word does not do it, and neither do the other end
+words, spoken or typed. The run is over by then, its cost logged and its chat
+saved, and the system's own shutdown does the rest in order: it stops what is
+running, writes what is unwritten and unmounts the card.
 """
 
 import os
@@ -29,7 +30,7 @@ def power_off(console) -> bool:
     if os.name != "posix":
         console.note("(this is not the Pi: nothing is powered off)")
         return False
-    console.note("Powering the Pi off now: the conversation was ended by voice.")
+    console.note("Powering the Pi off now: you said bye.")
     try:
         os.sync()  # what is unwritten goes to the card before anything else
     except OSError:
