@@ -249,6 +249,11 @@ show the user the output. The user does not want to be asked to test things.
   Piped lines are echoed, and the end of input ends the conversation.
   `--model claude-haiku-5-5` keeps checks cheap (a whole chat for well under a
   cent); the default Opus chat costs about 5 cents to start.
+- With autostart on (`bash scripts/autostart.sh status`, see "Starting by
+  itself"), every restart of the Pi starts a paid run of the owner's that
+  listens to the room and may speak. A piece of work that has to restart
+  the Pi for another reason switches it off first and on again after, and
+  says so.
 - The owner uses the Pi while work goes on. A chat may be open in tmux on the
   socket `robot`, and the windowed interface on `robot-ui`. A check must
   NEVER use those two sockets: no `kill-server`, no `send-keys`, and neither
@@ -400,7 +405,10 @@ show the user the output. The user does not want to be asked to test things.
 - The Pi had two skills on that day, both made by the owner in chats, in
   `~/robot-data/skills`:
   - `robot-identity` (enabled, so its text is in every run's system prompt):
-    the robot's name and one sentence on what it is.
+    the robot's name and one sentence on what it is. Since 2026-11-24 the
+    name and the character are in the fixed prompt instead (see "The
+    system prompt"), and the skill holds only how to reply (briefly, and
+    aloud before typing) and that the voice can be changed.
   - `wifi-monitor` (on demand, fetched with `get_skill`): describes a Wi-Fi
     monitor the robot set up on 2026-11-18. That monitor is not part of this
     repo: a bash loop in `~/wifimon` that pings the gateway every 10 s, logs
@@ -624,7 +632,8 @@ show the user the output. The user does not want to be asked to test things.
   so the last lines can be read. The `stty sane` matters: a program killed
   outright leaves the terminal in raw mode, and Enter was not recognised.
 - tmux keeps a chat alive across a dropped connection, not across a reboot of
-  the Pi. Nothing starts tmux at boot.
+  the Pi. Nothing starts a chat at boot. The interface can be started at
+  boot, with its run, since 2026-11-24 (see "Starting by itself").
 - `ui.sh` is `chat.sh` with five variables set: `ROBOT_MODULE=robot.tui`,
   `ROBOT_SOCKET=robot-ui` (unless the environment already names a socket,
   which is how a check gets a tmux of its own), `ROBOT_SESSION` (`robot-ui`,
@@ -1413,7 +1422,9 @@ show the user the output. The user does not want to be asked to test things.
   with `--thinking`. Everything shown also goes to the chat's `.txt`.
 - Input modes: a terminal (readline `input()`), piped stdin (lines are replies,
   end of input means nobody is there), `--headless` (never reads stdin: a relay
-  folder answers, or nobody does).
+  folder answers, or nobody does). At a terminal, and in the interface, a
+  message can also be spoken when hands-free is on (see "Hands-free"); the
+  prompt is then read without readline.
 - At a terminal the chat is forgiving in two ways, unlike MyAgent's dialog:
   Ctrl-C cancels the reply or command and returns to `you>`, and an API error
   returns to `you>`.
@@ -1632,7 +1643,9 @@ underneath is the same code the chat runs; only the console differs.
   every such loop.
 - The focus is never left on START: Enter presses the focused button, and a
   stray Enter must not start a run that costs money. It starts on Instruction
-  (as in MyAgent) and goes to the output pane when a run ends.
+  (as in MyAgent) and goes to the output pane when a run ends. The one run
+  that starts without START is the one `--start` asks for (see "Starting
+  by itself").
 - START empties the output pane before the run begins
   (`OutputBuffer.clear`, called from `MainWindow.run_started`), as MyAgent
   empties its display. Until 2026-11-19 a run's lines were added under the

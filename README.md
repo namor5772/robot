@@ -132,6 +132,7 @@ bash ~/robot/scripts/ui.sh
 │                                                                              │
 └──────────────────────────────────────────────────────────────────────────────┘
  [x] Activity [ ] Thinking [ ] Tool calls [ ] Debug [ ] Save thinking
+ [ ] Hands-free
  Waiting for your message                  F1 Help  F2 Start  F3 Stop  F10 Quit
 ```
 
@@ -161,7 +162,10 @@ What the main window has:
   description and bundled files. Space on the list switches a skill between
   off, ON (in every prompt) and OD (on demand).
 - **The boxes along the bottom** choose what a run shows: Activity (tool lines
-  and the cost of each call), Thinking, Tool calls, Debug. They are remembered.
+  and the cost of each call), Thinking, Tool calls, Debug. The last one,
+  **Hands-free** (Alt+H), has the robot listen for a spoken message whenever
+  it waits for you (see "Hands-free" under "Tools"). They are remembered. In a
+  narrow window the boxes take two rows.
 - **Help** (F1) lists every key. **Quit** is F10.
 
 Getting around:
@@ -628,7 +632,7 @@ On the Pi, outside this repository, in `~/robot-data`:
 | `skills/<name>/SKILL.md` | The skills. |
 | `saved_chats/` | Every run's transcript (`.txt`) and messages (`.json`). |
 | `APICostLog_<host>.txt` | One line per run: time, model, cost, tokens. |
-| `tui_state.json` | What the windowed interface remembers: the instruction in use and the display boxes. An interface started with `--session 2` has `tui_state_2.json`. |
+| `tui_state.json` | What the windowed interface remembers: the instruction in use and the boxes of the bottom row (Hands-free among them). An interface started with `--session 2` has `tui_state_2.json`. |
 | `tui_errors.log` | Anything a library printed while the windows were up (normally empty). |
 
 These files use MyAgent's formats, so instructions and skills can be copied
