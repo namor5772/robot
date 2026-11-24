@@ -249,6 +249,17 @@ show the user the output. The user does not want to be asked to test things.
   Piped lines are echoed, and the end of input ends the conversation.
   `--model claude-haiku-5-5` keeps checks cheap (a whole chat for well under a
   cent); the default Opus chat costs about 5 cents to start.
+- A conversation ended by a SPOKEN end word powers the Pi off (see
+  "Hands-free"), and a Pi that is off stays off until somebody takes its
+  power away and gives it back. So:
+  - `tests/__init__.py` sets `ROBOT_POWEROFF_COMMAND=true` for every test:
+    no test can switch off the machine it runs on. Leave that line alone.
+  - A check on the Pi in which anything says "bye", "stop", "quit" or
+    "exit" to a hands-free run (the speakers included) exports
+    `ROBOT_POWEROFF_COMMAND` with a harmless command BEFORE it starts the
+    program or its tmux server, for example `touch /tmp/zz-poweroff-asked`.
+  - The real `sudo poweroff` is not for a session to try: it ends the
+    session's own access to the Pi.
 - With autostart on (`bash scripts/autostart.sh status`, see "Starting by
   itself"), every restart of the Pi starts a paid run of the owner's that
   listens to the room and may speak. A piece of work that has to restart
@@ -471,7 +482,7 @@ show the user the output. The user does not want to be asked to test things.
 - Because one skill is on demand, every run now also offers `get_skill`.
 - `.venv/bin/python -m robot.main --skills` and `--list` on the Pi show the
   current skills and instructions; check there instead of trusting this list.
-- 1,520 tests pass (counted on 2026-11-24, on the laptop and on the Pi).
+- 1,531 tests pass (counted on 2026-11-25, on the laptop and on the Pi).
   On the Pi 2 are skipped, on Windows 67, among them the 16 of the
   autostart script (bash), the 7 of hands-free
   at the chat's prompt (they need `select`), the 13 of the Wi-Fi
@@ -726,6 +737,8 @@ show the user the output. The user does not want to be asked to test things.
 - `robot/handsfree.py`: `Segmenter` (cuts what was said out of the
   microphone's sound) and `Ear` (the thread that listens while the robot
   waits). See "Hands-free". Standard library only.
+- `robot/power.py`: `power_off`, which switches the Pi off after a spoken
+  goodbye (see "Hands-free").
 - `robot/speaking.py`: having xAI turn a text into a WAV file, and playing
   it (see "Speaking"). Standard library only.
 - `robot/meta.py`: Meta tool schemas, `manage_instructions`, `meta_tools`.
@@ -1112,6 +1125,22 @@ show the user the output. The user does not want to be asked to test things.
   - Without a voice (no key, no `aplay`) it is shown and not spoken. A
     failure to speak is a warning; STOP cuts it short; the conversation
     ends either way.
+  - After the goodbye the Pi is POWERED OFF, since 2026-11-25, at the
+    owner's request and with no question asked ("with no user
+    guardrail/prompt"). `_next_convo_message` sets `Agent.power_off`, and
+    `Agent.run` calls `power.power_off` after `_end_run`, so the cost is
+    logged and the chat saved first, and only when the run ended as
+    "completed". `power.power_off` calls `os.sync()` and runs `sudo -n
+    poweroff`; systemd's shutdown stops the interface and everything else
+    in order and unmounts the card. That is the whole of "safely".
+    `ROBOT_POWEROFF_COMMAND` names another command, for tests and checks.
+  - The same trigger as the goodbye, and nothing else: any of the four end
+    words, SPOKEN, at the conversation's own prompt. A typed end word, an
+    empty reply, STOP, Quit, "exit" to `user_prompt` and a run that ends
+    by itself leave the Pi on. It is in the chat and in the interface.
+  - Hands-free hears whoever speaks: a "Bye." from a radio switches the
+    Pi off. With autostart on, the Pi's life is then: power on, run,
+    listen, "bye", off.
   - Tried with a paid hands-free chat on Haiku ($0.0004), in a tmux of
     its own: after the speakers' "Bye." the chat showed `you> (heard) Bye`
     and the `robot>` goodbye, and a `hearing.listen` started the moment

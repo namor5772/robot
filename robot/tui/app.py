@@ -110,8 +110,10 @@ THE MAIN WINDOW
   Hands-free: with this box ticked the robot listens through its
   microphone whenever it waits for your message. Speak, pause,
   and what you said is sent as your message; typing still works.
-  Say "bye" or "stop" on its own to end a conversation. The
-  bottom line shows when it is listening and when it hears you.
+  The bottom line shows when it is listening and when it hears
+  you. Say "bye" or "stop" on its own to end a conversation: the
+  robot then says goodbye and POWERS THE PI OFF, without asking.
+  Typed, the same words end the conversation and nothing more.
 
 TEXT BOXES
   Arrows, Home, End, PgUp and PgDn move the cursor. Ctrl+Left and

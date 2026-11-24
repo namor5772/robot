@@ -41,7 +41,8 @@ ssh -t pi "bash ~/robot/scripts/chat.sh --hands-free"
 Whenever the robot waits for you it then listens through its microphone.
 Speak, pause for a second and a half, and what you said is sent as your
 message, shown as `you> (heard) ...`. Typing still works at the same prompt.
-Say "bye" or "stop" on its own to end the conversation. In the windowed
+Say "bye" or "stop" on its own to end the conversation; the robot then says
+goodbye and switches the Pi off (see "Hands-free" further down). In the windowed
 interface the same thing is the Hands-free box in the bottom row (Alt+H),
 which can be ticked and cleared at any time; the bottom line shows
 "Listening", "Hearing you..." and "Working out what you said...". For the
@@ -563,8 +564,12 @@ speaking, so it does not hear itself.
   starts listening is not heard: the microphone needs it to settle.
 - "Bye", "stop", "quit" or "exit" said alone ends a conversation, as when
   typed. When it was said, the robot first answers out loud: "I am ending
-  this conversation now. Good to have known you." A typed end word ends the
-  conversation without that.
+  this conversation now. Good to have known you." Then, once the run's cost
+  is logged and its chat saved, **the Pi powers itself off** (`sudo
+  poweroff`), without asking. To use it again, take its power away and give
+  it back; with autostart on it then comes up running and listening. A
+  typed end word ends the conversation without the goodbye and leaves the
+  Pi on, and so do STOP, Quit and an empty message.
 - If the microphone cannot be used (another program has it, or no xAI key),
   a warning says so once and typing goes on working.
 - Every message is one transcription, about a hundredth of a cent, billed by
@@ -796,7 +801,7 @@ differ: the desktop has PowerShell only, the laptop also Git Bash.
 - `robot/main.py`: the command line.
 - `robot/agent.py`: the run loop. `robot/api.py`: the model call and its retries.
 - `robot/console.py`: everything printed and typed, and Ctrl-C handling.
-- `robot/tools.py`: the Pi's own tools. `robot/hearing.py`: recording through the microphone and having the speech in it turned into text. `robot/handsfree.py`: listening for a spoken message while the robot waits for one. `robot/speaking.py`: having a text turned into speech, and playing it. `robot/meta.py`, `robot/spawn.py`: the Meta tools and child runs.
+- `robot/tools.py`: the Pi's own tools. `robot/hearing.py`: recording through the microphone and having the speech in it turned into text. `robot/handsfree.py`: listening for a spoken message while the robot waits for one. `robot/speaking.py`: having a text turned into speech, and playing it. `robot/power.py`: switching the Pi off after a spoken goodbye. `robot/meta.py`, `robot/spawn.py`: the Meta tools and child runs.
 - `robot/instructions.py`, `robot/skills.py`: the library and the skills.
 - `robot/prompts.py`: the system prompt's wording.
 - `robot/models.py`: model and price tables. `robot/costs.py`, `robot/chats.py`, `robot/history.py`, `robot/datastore.py`, `robot/relay.py`: supporting parts.

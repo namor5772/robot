@@ -13,7 +13,7 @@ import queue
 import threading
 import time
 
-from robot import api, chats, costs, history, meta, models, prompts, speaking
+from robot import api, chats, costs, history, meta, models, power, prompts, speaking
 from robot.console import INTERRUPTED, LABEL, convo_end_word
 from robot.tools import Tool, available_tools
 
@@ -117,6 +117,9 @@ class Agent:
         self.chat_stem = ""
         self._transcript = None
         self._stop_run = False  # set when a reply to user_prompt ends the run
+        # Set when the person ended the conversation by saying so out loud:
+        # the Pi is then powered off once the run has been wound down.
+        self.power_off = False
         self._turn_text = ""
         self._truncated_note = ""
         self._drops_noted = None
@@ -274,6 +277,9 @@ class Agent:
         finally:
             if not self.dry_run:
                 self._end_run()
+                if self.power_off and self.status == "completed":
+                    # After the cost is logged and the chat saved, never before.
+                    power.power_off(console)
         return self.status
 
     def _interactive_convo(self) -> bool:
@@ -418,6 +424,7 @@ class Agent:
             if convo_end_word(reply):
                 if console.last_reply_heard:
                     self._say_farewell()
+                    self.power_off = True
                 break
             self.messages.append({"role": "user", "content": reply})
             return True
