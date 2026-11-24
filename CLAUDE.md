@@ -1154,6 +1154,10 @@ show the user the output. The user does not want to be asked to test things.
     another run hearing its "Bye." would have switched the Pi off. The
     real `sudo poweroff` was not run by a session; passwordless sudo is
     what it needs, and the Pi has that.
+  - After the narrowing, the same check with the speakers saying "Stop."
+    ($0.0004): `you> (heard) Stop`, the goodbye, "Conversation ended.",
+    the cost-log line, and no line about powering off; the stand-in was
+    never run.
   - Hands-free hears whoever speaks: a "Bye." from a radio switches the
     Pi off. With autostart on, the Pi's life is then: power on, run,
     listen, "bye", off.
