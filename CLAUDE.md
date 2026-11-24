@@ -259,7 +259,10 @@ show the user the output. The user does not want to be asked to test things.
     `ROBOT_POWEROFF_COMMAND` with a harmless command BEFORE it starts the
     program or its tmux server, for example `touch /tmp/zz-poweroff-asked`.
   - The real `sudo poweroff` is not for a session to try: it ends the
-    session's own access to the Pi.
+    session's own access to the Pi, and the Pi stays off until the owner
+    gives it power again. Then `ssh pi` times out, and so does a deploy:
+    what was pushed meanwhile reaches the Pi with the next deploy after it
+    is back (as on 2026-11-25, when a docs commit waited that way).
 - With autostart on (`bash scripts/autostart.sh status`, see "Starting by
   itself"), every restart of the Pi starts a paid run of the owner's that
   listens to the room and may speak. A piece of work that has to restart
@@ -480,6 +483,10 @@ show the user the output. The user does not want to be asked to test things.
     The skill is off in their runs, and by the code such a run says so in
     a warning at its start, as for any skill its list does not name.
 - Because one skill is on demand, every run now also offers `get_skill`.
+- The modes above are as each skill was made. The owner changes them in the
+  Skills Manager: on 2026-11-24 `take-photo` was enabled, not on demand, and
+  `robot-identity` went off and on again that day (see "The system
+  prompt"). The next point says where to look.
 - `.venv/bin/python -m robot.main --skills` and `--list` on the Pi show the
   current skills and instructions; check there instead of trusting this list.
 - 1,532 tests pass (counted on 2026-11-25, on the laptop and on the Pi).
