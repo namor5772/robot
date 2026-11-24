@@ -1722,6 +1722,18 @@ underneath is the same code the chat runs; only the console differs.
 - `ROBOT_AUTOSTART_CONSOLE`, `ROBOT_AUTOSTART_WAIT`, `ROBOT_AUTOSTART_LOG`
   and `ROBOT_AUTOSTART_ARGS` (more words for `ui.sh`, as `--session zzt`)
   are for checks, with `ROBOT_SOCKET` and `ROBOT_DATA_DIR` passed on.
+- Tried with a real restart of the Pi that evening, the switch on and
+  nothing of the owner's running: the Pi started at 23:43:54, the log says
+  "started the interface for ... on console 8, after waiting 20 s" at
+  23:44:41, and half a minute later the screen showed console 8 with the
+  interface at 240 x 67 in proper line characters, the owner's
+  `InterfacesTest` in the top row, a run in progress
+  (`~/robot-data/runs` held its file), one `arecord`, and "Hearing
+  you..." in the bottom line. So 47 seconds from the start of the Pi to a
+  run that listens. The switch was left on, as the owner had asked for
+  the feature.
+- No rehearsal on a console of the check's own came before it: the owner
+  was using the Pi, and the script always puts the screen on its console.
 - `tests/test_autostart.py` (20 tests, 16 of them bash and skipped on
   Windows): the interface's `--start` on the screen in memory, the script
   with stand-ins for `openvt`, the clock and the network, and the service
