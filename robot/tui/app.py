@@ -743,7 +743,7 @@ class App:
     """The windows on the screen, and the loop that draws them and reads keys."""
 
     def __init__(self, screen, bridge, datadir, console, interrupts, sdk_ready=None,
-                 instruction=None, session=""):
+                 instruction=None, session="", autostart=False):
         self.screen = screen
         self.bridge = bridge
         self.datadir = datadir
@@ -756,6 +756,9 @@ class App:
         self.too_small = False
         self.running = False   # a run is in progress
         self.asking = False    # and it is waiting for the person
+        # Asked for with --start: the run begins by itself, once, as soon as
+        # the main window is up. Nothing else ever starts a run unasked.
+        self.autostart = bool(autostart)
         self.ear = ""          # what hands-free is doing meanwhile, "" when it is off
         self.started = 0.0
         self.status = ""       # a short message in the bottom line, until the next key
@@ -844,6 +847,12 @@ class App:
             self.dirty = True
         if self.dirty:
             self.draw()
+        if self.autostart and self.stack and self.stack[-1] is self.main and not self.too_small:
+            self.autostart = False
+            self.start()
+            if self.running:
+                self.status = "Started by itself (--start)"
+            self.dirty = True
         event = self.screen.read(50 if self.running else 200)
         if event is None or event == "unknown":
             return
@@ -1043,6 +1052,10 @@ def build_parser() -> argparse.ArgumentParser:
                              "open, for example 2: it is shown in the top row, and the copy "
                              "remembers its own instruction and display boxes (1 is the "
                              "first copy, the one started without this option)")
+    parser.add_argument("--start", action="store_true",
+                        help="start the run of the chosen instruction at once, without "
+                             "START being pressed (for when the Pi starts the interface "
+                             "by itself: see scripts/autostart.sh)")
     return parser
 
 
@@ -1128,7 +1141,8 @@ def main(argv=None) -> int:
             from robot.tui.screen import CursesScreen
             screen = CursesScreen()
             App(screen, bridge, datadir, console, interrupts, sdk_ready=loader.is_ready,
-                instruction=args.load, session=args.session or "").run()
+                instruction=args.load, session=args.session or "",
+                autostart=args.start).run()
         except BaseException:
             crashes.append(traceback.format_exc())
         finally:

@@ -463,8 +463,9 @@ show the user the output. The user does not want to be asked to test things.
 - Because one skill is on demand, every run now also offers `get_skill`.
 - `.venv/bin/python -m robot.main --skills` and `--list` on the Pi show the
   current skills and instructions; check there instead of trusting this list.
-- 1,500 tests pass (counted on 2026-11-24, on the laptop and on the Pi).
-  On the Pi 2 are skipped, on Windows 51, among them the 7 of hands-free
+- 1,520 tests pass (counted on 2026-11-24, on the laptop and on the Pi).
+  On the Pi 2 are skipped, on Windows 67, among them the 16 of the
+  autostart script (bash), the 7 of hands-free
   at the chat's prompt (they need `select`), the 13 of the Wi-Fi
   service (bash), the 8 real-terminal tests (they need curses), the 19
   launcher tests (they need bash) and 3 that build a real tree of child runs
@@ -741,7 +742,9 @@ show the user the output. The user does not want to be asked to test things.
 - `scripts/deploy.sh` (runs on the Pi: pull, pip install, install tmux, set
   up the `robot-wifi` service; its body is in a `main` function so the pull
   can replace the file safely), `scripts/wifi-reconnect.sh` (that service),
-  `scripts/chat.sh`, `scripts/ui.sh`, `scripts/tmux.conf`.
+  `scripts/chat.sh`, `scripts/ui.sh`, `scripts/tmux.conf`,
+  `scripts/autostart.sh` (the interface and its run when the Pi starts, see
+  "Starting by itself").
 - `scripts/pi_photo.py` runs on a PC, not on the Pi: it fetches a photo from
   the Pi and opens it in the PC's viewer (see "Pictures").
   `scripts/pi_sound.py` does the same for a sound recording and plays it
@@ -1675,6 +1678,54 @@ underneath is the same code the chat runs; only the console differs.
   a block, and the tools would then stay blocked after Meta is ticked. A
   block already set on one of them is kept as it is. The dialog goes by the
   box as it is on the form, saved or not.
+
+### Starting by itself
+
+- Since 2026-11-24, at the owner's request: when the Pi starts, the
+  interface comes up on the Pi's own screen and the run of its instruction
+  begins, with nothing typed. The owner's conditions: it must still be
+  joinable over ssh, and after "bye" another instruction must be
+  startable there. So it is the ordinary interface, started once, and
+  nothing starts a second run.
+- Three parts:
+  - `python -m robot.tui --start`: `App(autostart=True)` calls `start()`
+    once, on the first turn of the loop in which the main window is in
+    front. It is the one way a run starts without START being pressed;
+    without the option nothing has changed. `ui.sh --start` passes it on,
+    and a second `ui.sh` that joins a running interface ignores it, as it
+    ignores every argument.
+  - `scripts/autostart.sh`: `on`, `off` and `status` are the switch, a
+    file `autostart_on` in the data folder. `boot` is what the service
+    runs, as root: nothing when the switch is off; else it waits for the
+    clock to be set (`timedatectl show -p NTPSynchronized`) and for a name
+    to resolve, 180 seconds at most and then starts all the same, and
+    runs `openvt -f -c 8 -s -- sudo -H -u USER env TERM=linux LANG=... bash
+    scripts/ui.sh --start`. USER is the owner of the checkout. `LANG` is
+    read from `/etc/default/locale`: a service has no locale, and the
+    windows' lines need UTF-8. It writes what it did to
+    `/var/log/robot-autostart.log`.
+  - `deploy.sh` (`install_autostart_service`) writes
+    `/etc/systemd/system/robot-autostart.service` and enables it. It never
+    starts or restarts it: a deploy must not put an interface on the
+    screen. `Type=oneshot` with `RemainAfterExit=yes`, and
+    `KillMode=process` so that stopping the service leaves the interface
+    alone. The first deploy with this step did not run it (see "Getting
+    back on the Wi-Fi": deploy twice).
+- Which instruction, and whether it listens, is whatever the interface
+  remembers (`tui_state.json`): the last instruction used and the boxes as
+  they were. With Hands-free ticked the Pi comes up listening. An
+  instruction that has been deleted since falls back to `Default`, as it
+  does at any start of the interface.
+- The same console 8 and the same command as putting the interface on the
+  screen by hand (see "Several screens, several interfaces"); `sudo chvt
+  1` gives the screen back to console 1.
+- `ROBOT_AUTOSTART_CONSOLE`, `ROBOT_AUTOSTART_WAIT`, `ROBOT_AUTOSTART_LOG`
+  and `ROBOT_AUTOSTART_ARGS` (more words for `ui.sh`, as `--session zzt`)
+  are for checks, with `ROBOT_SOCKET` and `ROBOT_DATA_DIR` passed on.
+- `tests/test_autostart.py` (20 tests, 16 of them bash and skipped on
+  Windows): the interface's `--start` on the screen in memory, the script
+  with stand-ins for `openvt`, the clock and the network, and the service
+  `deploy.sh` writes.
 
 ### Several screens, several interfaces
 

@@ -49,6 +49,28 @@ robot to answer out loud as well, tell it to (a skill or an instruction can
 say so for good). See "Hands-free" further down for how it works and what
 it costs.
 
+### Starting by itself when the Pi starts
+
+The Pi can start the windowed interface on its own screen when it is switched
+on, and begin the run at once, with nothing typed:
+
+```bash
+bash ~/robot/scripts/autostart.sh on       # from the next start on
+bash ~/robot/scripts/autostart.sh off      # not any more
+bash ~/robot/scripts/autostart.sh status
+```
+
+What starts is the interface as you left it: the instruction it had last and
+its boxes, Hands-free among them. So tick Hands-free and run the instruction
+you want once, and from then on the Pi comes up running it and listening. It
+first waits (three minutes at most) for the Wi-Fi and for the clock to be
+set. It is the ordinary interface: `ssh -t pi "bash ~/robot/scripts/ui.sh"`
+joins it from a PC, and when the run has ended (say "bye") you can choose
+another instruction there and press START. It starts one run per start of
+the Pi and does not start another by itself afterwards. Every start of the
+Pi is then a paid run, and with Hands-free the robot answers whoever speaks
+near it.
+
 `chat.sh` runs the chat inside tmux, so it belongs to the Pi and not to your
 SSH connection. If the PC sleeps or the connection drops, the chat keeps
 running, and the same command brings you back to it.
@@ -775,7 +797,7 @@ differ: the desktop has PowerShell only, the laptop also Git Bash.
 - `robot/prompts.py`: the system prompt's wording.
 - `robot/models.py`: model and price tables. `robot/costs.py`, `robot/chats.py`, `robot/history.py`, `robot/datastore.py`, `robot/relay.py`: supporting parts.
 - `robot/tui/`: the windowed interface. `app.py`: the main window and how a run and the screen work side by side. `editor.py`, `skillsui.py`: the Instruction Editor and the Skills Manager. `widgets.py`, `dialogs.py`: buttons, lists, text boxes and small windows. `screen.py`: the screen and the keyboard (curses). `text.py`: wrapping and editing text.
-- `scripts/chat.sh`, `scripts/ui.sh`, `scripts/tmux.conf`: the tmux launchers for the chat and the windowed interface. `scripts/deploy.sh`: run on the Pi to update it. `scripts/wifi-reconnect.sh`: the `robot-wifi` service, which puts the Pi back on the Wi-Fi. `scripts/pi_photo.py`: run on a PC, fetches a photo from the Pi and opens it. `scripts/pi_sound.py`: the same for a sound recording, which it plays.
+- `scripts/chat.sh`, `scripts/ui.sh`, `scripts/tmux.conf`: the tmux launchers for the chat and the windowed interface. `scripts/deploy.sh`: run on the Pi to update it. `scripts/wifi-reconnect.sh`: the `robot-wifi` service, which puts the Pi back on the Wi-Fi. `scripts/autostart.sh`: the switch for starting the interface and its run when the Pi starts, and what the `robot-autostart` service runs. `scripts/pi_photo.py`: run on a PC, fetches a photo from the Pi and opens it. `scripts/pi_sound.py`: the same for a sound recording, which it plays.
 - `tests/`: the test suite. `CLAUDE.md`: detailed notes for Claude Code sessions.
 
 ## Setup on the Pi
