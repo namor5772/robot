@@ -67,11 +67,16 @@ its boxes, Hands-free among them. So tick Hands-free and run the instruction
 you want once, and from then on the Pi comes up running it and listening. It
 first waits (three minutes at most) for the Wi-Fi and for the clock to be
 set. It is the ordinary interface: `ssh -t pi "bash ~/robot/scripts/ui.sh"`
-joins it from a PC, and when the run has ended (say "bye") you can choose
-another instruction there and press START. It starts one run per start of
-the Pi and does not start another by itself afterwards. Every start of the
-Pi is then a paid run, and with Hands-free the robot answers whoever speaks
-near it.
+joins it from a PC, and when the run has ended (say "stop", or type "bye")
+you can choose another instruction there and press START. It starts one run
+per start of the Pi and does not start another by itself afterwards. Every
+start of the Pi is then a paid run, and with Hands-free the robot answers
+whoever speaks near it.
+
+Saying "bye" is different: it ends the conversation and switches the Pi off
+(see "Hands-free" under "Tools"). So with autostart on, the robot's day is:
+give it power, it comes up and listens, you talk, you say "bye", it switches
+itself off, and you can take its power away.
 
 `chat.sh` runs the chat inside tmux, so it belongs to the Pi and not to your
 SSH connection. If the PC sleeps or the connection drops, the chat keeps

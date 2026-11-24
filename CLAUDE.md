@@ -1108,7 +1108,9 @@ show the user the output. The user does not want to be asked to test things.
     still took a message from the room and ran with it. Whose voice that
     was is not known. Hands-free hears whoever speaks: a radio or a
     second person in the room can send a message.
-- A conversation ended by a SPOKEN end word gets a goodbye first, at the
+- A conversation ended by a SPOKEN end word (any of the four) gets a
+  goodbye first, and after a spoken "bye" the Pi is powered off as well
+  (further down). The goodbye is at the
   owner's request and in the owner's words (`agent.FAREWELL`): "I am ending
   this conversation now. Good to have known you."
   - It is the program that says it, not the model: no call is made.
@@ -1748,7 +1750,9 @@ underneath is the same code the chat runs; only the console differs.
   begins, with nothing typed. The owner's conditions: it must still be
   joinable over ssh, and after "bye" another instruction must be
   startable there. So it is the ordinary interface, started once, and
-  nothing starts a second run.
+  nothing starts a second run. (The next day the owner had a SPOKEN "bye"
+  power the Pi off, see "Hands-free": to end a run and go on in the same
+  interface, the word is said as "stop", or "bye" is typed.)
 - Three parts:
   - `python -m robot.tui --start`: `App(autostart=True)` calls `start()`
     once, on the first turn of the loop in which the main window is in
