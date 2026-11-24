@@ -1138,6 +1138,17 @@ show the user the output. The user does not want to be asked to test things.
     words, SPOKEN, at the conversation's own prompt. A typed end word, an
     empty reply, STOP, Quit, "exit" to `user_prompt` and a run that ends
     by itself leave the Pi on. It is in the chat and in the interface.
+  - Tried on the Pi with a stand-in for the command (`date +%T.%N >
+    /tmp/zz-poweroff-asked`, exported before the check's tmux server
+    started; `tmux show-environment -g` confirmed it): a paid hands-free
+    chat on Haiku ($0.0022), the speakers' "Bye.", then the goodbye,
+    "Conversation ended.", the cost-log line, "Powering the Pi off now:
+    the conversation was ended by voice." The saved chat was written at
+    10:31:48.76 and the stand-in was run at 10:31:48.83. The check first
+    made sure that no run was in progress and nothing else was listening:
+    another run hearing its "Bye." would have switched the Pi off. The
+    real `sudo poweroff` was not run by a session; passwordless sudo is
+    what it needs, and the Pi has that.
   - Hands-free hears whoever speaks: a "Bye." from a radio switches the
     Pi off. With autostart on, the Pi's life is then: power on, run,
     listen, "bye", off.
