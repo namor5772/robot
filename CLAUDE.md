@@ -1149,7 +1149,8 @@ show the user the output. The user does not want to be asked to test things.
     keep the first one. Tried with the same paid check and stand-in as
     below ($0.0022): `you> (heard) Bye.`, then `robot> I am powering
     myself off now. Good to have known you.`, the chat saved, the stand-in
-    run.
+    run. The owner then tried it for real after a restart of the Pi, with
+    both sentences, and it worked.
   - Only the word "bye" (`agent.POWER_OFF_WORD`), and only SPOKEN, at the
     conversation's own prompt: the owner narrowed it to that the same day
     ("ONLY work if I say the word bye (not write it!)"); for an hour it
