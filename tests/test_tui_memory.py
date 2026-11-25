@@ -54,6 +54,37 @@ class Looking(MemoriesCase):
             "Earlier states: 1.", "Roman likes tea.", "--- The diary ---",
             "We talked about tea."))
 
+    def using(self, name):
+        self.make_app()
+        self.app.instruction = name
+
+    def test_it_opens_on_the_memory_of_the_instruction_in_use(self):
+        self.using("Guard")
+        self.window(self.shows("Memories: night watch", "Used by: Guard",
+                               "The door was shut all night."),
+                    self.lacks("Roman likes tea."))
+
+    def test_an_instruction_on_the_shared_memory_opens_on_that(self):
+        self.using("Talk")
+        self.window(self.shows("Memories: shared", "Roman likes tea."))
+
+    def test_an_instruction_without_memory_opens_on_the_shared_one(self):
+        self.using("Plain")
+        self.window(self.shows("Memories: shared", "Roman likes tea."))
+
+    def test_a_memory_not_yet_written_is_listed_and_shown_empty(self):
+        self.library(Fresh={"text": "Hi", "memory": True, "memory_name": "new one"})
+        self.using("Fresh")
+        self.window(self.shows("Memories: new one", "|new one", "Used by: Fresh",
+                               "(nothing is remembered yet)"),
+                    "alt+d", self.shows("there is nothing to delete"), "enter")
+        self.assertFalse(self.store("new one").folder.exists())
+
+    def test_a_name_that_will_not_do_opens_on_the_shared_one(self):
+        self.library(Odd={"text": "Hi", "memory": True, "memory_name": "../up"})
+        self.using("Odd")
+        self.window(self.shows("Memories: shared"), self.lacks("../up"))
+
     def test_moving_down_shows_the_named_one(self):
         self.window("down", self.shows("Memories: night watch", "Used by: Guard",
                                        "The door was shut all night.", "Last awake: never"),

@@ -501,7 +501,7 @@ show the user the output. The user does not want to be asked to test things.
   prompt"). The next point says where to look.
 - `.venv/bin/python -m robot.main --skills` and `--list` on the Pi show the
   current skills and instructions; check there instead of trusting this list.
-- 1,640 tests pass (counted on 2026-11-25, on the laptop and on the Pi).
+- 1,645 tests pass (counted on 2026-11-26, on the laptop and on the Pi).
   On the Pi 2 are skipped, on Windows 67, among them the 16 of the
   autostart script (bash), the 7 of hands-free
   at the chat's prompt (they need `select`), the 13 of the Wi-Fi
@@ -1384,7 +1384,14 @@ show the user the output. The user does not want to be asked to test things.
     two instructions): the main window at 72 x 20 with the Memories button
     and no Help button, the window at 100 x 26, a copy made with Alt+Y,
     and the editor's Memory list with the copy in it. No run was started.
-  - `tests/test_tui_memory.py` (21 tests, on every machine).
+  - It opens on the memory of the instruction in use, since 2026-11-26
+    (`MemoriesWindow._of_instruction`): the owner had found it showing the
+    shared memory with an instruction loaded that has a named one, which
+    it always did. With memory off in that instruction, or a name that
+    will not do, it opens on the shared one. That memory is in the list
+    even when nothing has been remembered in it yet and it has no folder:
+    it is shown empty, and nothing is created by looking.
+  - `tests/test_tui_memory.py` (26 tests, on every machine).
 - `manage_memories`, a fifth Meta tool since the same evening, at the
   owner's request ("build it with delete out"); the function is
   `memory.manage_memories`, the schema in `meta.py`. It had been held

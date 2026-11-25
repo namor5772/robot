@@ -49,7 +49,8 @@ class MemoriesWindow(Window):
             self.add(Button("&Delete", self.delete)),
         ]
         self.close_button = self.add(Button("Close", self.on_escape))
-        self._reload(memory.SHARED)
+        own = self._of_instruction()
+        self._reload(memory.SHARED if own is None else own)
         self.focus = self.list
 
     @property
@@ -58,9 +59,23 @@ class MemoriesWindow(Window):
 
     # -- showing -------------------------------------------------------------------
 
+    def _of_instruction(self):
+        """The name of the memory the instruction in use has ('' is the shared
+        one), or None when it has none: memory off, or a name that will not do."""
+        entry = instructions.load_instructions(self.app.datadir).get(self.app.instruction) or {}
+        name = str(entry.get("memory_name") or "")
+        if not entry.get("memory") or memory.name_problem(name):
+            return None
+        return name
+
     def _reload(self, select=memory.SHARED):
         """Read what there is and show the memory called `select`."""
         self.names = [memory.SHARED] + memory.names(self.app.datadir)
+        own = self._of_instruction()
+        if own is not None and own not in self.names:
+            # Nothing has been remembered in it yet, so it has no folder. It
+            # is listed all the same: it is the one the person came to see.
+            self.names.append(own)
         index = self.names.index(select) if select in self.names else 0
         self.list.set_items([memory.label(name) for name in self.names], index)
         self._show(self.names[index])
@@ -90,8 +105,7 @@ class MemoriesWindow(Window):
         write the memory when it ends, over whatever was done here."""
         if not self.app.running:
             return False
-        entry = instructions.load_instructions(self.app.datadir).get(self.app.instruction) or {}
-        if not entry.get("memory") or str(entry.get("memory_name") or "") != self.store.name:
+        if self._of_instruction() != self.store.name:
             return False
         self.app.message(TITLE, "The run in progress uses this memory and will write to it "
                                 "when it ends. Change it when the run is over.")

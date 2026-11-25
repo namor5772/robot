@@ -689,6 +689,9 @@ conversation it goes by what was said.
 **Memories** (F6) in the windowed interface lists the shared memory and every
 named one. For the one selected it shows which instructions use it, how
 large it is, when the robot was last awake with it, and the text and diary.
+It opens on the memory of the instruction in use (on the shared one when
+that instruction has no memory), and lists that memory even while nothing
+has been remembered in it yet.
 
 - **Edit** corrects what is remembered, by hand. The diary is a record and is
   not edited here.
