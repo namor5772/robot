@@ -1390,7 +1390,10 @@ show the user the output. The user does not want to be asked to test things.
     it always did. With memory off in that instruction, or a name that
     will not do, it opens on the shared one. That memory is in the list
     even when nothing has been remembered in it yet and it has no folder:
-    it is shown empty, and nothing is created by looking.
+    it is shown empty, and nothing is created by looking. Tried on the Pi
+    in a tmux of the check's own (`zz-ui`, two sessions, a data folder of
+    its own): F6 showed the named memory of the one instruction, and for
+    the other its unwritten one, listed and empty, with no folder made.
   - `tests/test_tui_memory.py` (26 tests, on every machine).
 - `manage_memories`, a fifth Meta tool since the same evening, at the
   owner's request ("build it with delete out"); the function is
