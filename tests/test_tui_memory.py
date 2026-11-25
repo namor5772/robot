@@ -77,7 +77,7 @@ class Looking(MemoriesCase):
         self.assertEqual(version_label(path), "2026-11-25 17:25:09  (4 words)")
         second = path.with_name("memory_20261125_172509_2.md")
         second.write_text("one", encoding="utf-8")
-        self.assertEqual(version_label(second), "2026-11-25 17:25:09_2  (1 words)")
+        self.assertEqual(version_label(second), "2026-11-25 17:25:09_2  (1 word)")
 
 
 class Changing(MemoriesCase):

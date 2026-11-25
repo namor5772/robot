@@ -27,7 +27,7 @@ def version_label(path) -> str:
         words = len(path.read_text(encoding="utf-8", errors="replace").split())
     except OSError:
         words = 0
-    return f"{when}{stamp[15:]}  ({words} words)"
+    return f"{when}{stamp[15:]}  ({memory.counted(words, 'word')})"
 
 
 class MemoriesWindow(Window):
@@ -70,8 +70,10 @@ class MemoriesWindow(Window):
         used = memory.users(self.app.datadir, name)
         self.used_label.text = "Used by: " + (", ".join(used) or "no instruction")
         awake = store.last_awake().replace("T", " ")[:16] or "never"
-        self.facts_label.text = f"{store.words()} words. Last awake: {awake}."
-        self.kept_label.text = (f"In the diary: {len(store.diary())} conversations. "
+        self.facts_label.text = (f"{memory.counted(store.words(), 'word')}. "
+                                 f"Last awake: {awake}.")
+        self.kept_label.text = ("In the diary: "
+                                f"{memory.counted(len(store.diary()), 'conversation')}. "
                                 f"Earlier states: {len(store.versions())}.")
         remembered = store.memory() or "(nothing is remembered yet)"
         diary = "\n\n".join(store.diary())

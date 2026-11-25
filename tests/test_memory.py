@@ -397,8 +397,8 @@ class NamedTest(StoreCase):
             self.assertEqual(memory.main(["show", "--name", "trial"]), 0)
             self.assertEqual(memory.main(["show", "--name", "a/b"]), 2)
         text = shown.getvalue()
-        self.assertIn("- shared: 2 words, 1 conversations in the diary; used by Talk", text)
-        self.assertIn("- trial: 1 words, 0 conversations in the diary; used by no instruction",
+        self.assertIn("- shared: 2 words, 1 conversation in the diary; used by Talk", text)
+        self.assertIn("- trial: 1 word, 0 conversations in the diary; used by no instruction",
                       text)
         self.assertIn("--- What you remember ---\nthree", text)
 

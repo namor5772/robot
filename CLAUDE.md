@@ -489,7 +489,7 @@ show the user the output. The user does not want to be asked to test things.
   prompt"). The next point says where to look.
 - `.venv/bin/python -m robot.main --skills` and `--list` on the Pi show the
   current skills and instructions; check there instead of trusting this list.
-- 1,580 tests pass (counted on 2026-11-25, on the laptop and on the Pi).
+- 1,620 tests pass (counted on 2026-11-25, on the laptop and on the Pi).
   On the Pi 2 are skipped, on Windows 67, among them the 16 of the
   autostart script (bash), the 7 of hands-free
   at the chat's prompt (they need `select`), the 13 of the Wi-Fi
@@ -767,7 +767,7 @@ show the user the output. The user does not want to be asked to test things.
     `ListBox`, and `Window` (focus, Tab order, Alt letters, the mouse).
   - `dialogs.py`: `MessageBox`, `PickDialog`, `TextDialog`, `ChecklistDialog`.
   - `editor.py`: `InstructionEditor` and its two small windows.
-    `skillsui.py`: `SkillsManager`.
+    `skillsui.py`: `SkillsManager`. `memoryui.py`: `MemoriesWindow`.
   - `app.py`: `App` and `MainWindow`, the output pane, and the three classes
     that join a run to the screen (`UiConsole`, `UiInterrupts`, `Runner`).
 - `scripts/deploy.sh` (runs on the Pi: pull, pip install, install tmux, set
@@ -1209,7 +1209,7 @@ show the user the output. The user does not want to be asked to test things.
 ### Memory
 
 - Since 2026-11-25, at the owner's request: an instruction with `memory`
-  true (the Memory box in the Instruction Editor, Alt+M; off by default) is
+  true (Memory in the Instruction Editor, Alt+M; off by default) is
   told at its start what the robot remembers, and its conversation is
   remembered when it ends. `robot/memory.py`. The owner was given four
   options (replaying the last chat, a consolidated memory, the model
@@ -1221,8 +1221,9 @@ show the user the output. The user does not want to be asked to test things.
   conversation under a `## start to end` line, only ever added to),
   `state.json` (`last_awake`, and `pending`: the runs still to be
   remembered), `settings.json` (optional, `model`), and `versions/` (the
-  memory file as it was before each rewrite, the newest 30). One memory
-  for every instruction that has it on.
+  memory file as it was before each rewrite, the newest 30). At first
+  there was one memory for every instruction that had it on; see "Named
+  memories" below.
 - Waking: `Agent._freeze_run` puts `Store.prompt_block()` in front of the
   "About this run" paragraph, so it travels in the second system block,
   the one without a cache marker: runs still share the cached prompt.
@@ -1308,11 +1309,61 @@ show the user the output. The user does not want to be asked to test things.
 - Memory was switched on for the owner's `HandsFreeChatAgent` that day,
   through `manage_instructions` with a script fed over stdin, because
   that is the instruction the owner asked about. The owner was told.
+- Named memories since the same evening, at the owner's request ("build
+  the named version with the Memories window"), after the owner had asked
+  why instructions could not have different memories:
+  - An entry has `memory_name` beside `memory`: '' is the shared memory,
+    the `memory` folder itself, and a name is a folder inside it with the
+    same files (`memory.Store(datadir, name)`). So what was remembered
+    before the change stayed where it was. `settings.json` is one file for
+    all of them, in the shared folder.
+  - A name is 1 to 40 letters, digits, spaces, `-` or `_`, starting with a
+    letter or a digit, and not `versions`, `off`, `shared` or `new`
+    (`memory.name_problem`): it becomes a folder, and those words mean
+    other things on the screen. A dot is not allowed, so no file of the
+    shared folder can be taken for a memory.
+  - Nothing creates a memory: the folder appears when a conversation is
+    first remembered (`memory.names` lists the folders there are). The
+    owner asked whether one would be created and then assigned, and took
+    this.
+  - An entry whose name will not do gives a run WITHOUT memory and a
+    warning, not a run on the shared one: that would write into a memory
+    the instruction was never meant to touch.
+  - The Instruction Editor's Memory is a `Choice` now (it was a box for
+    two hours): off, shared, every name there is as a folder or in an
+    instruction, and "new name...", which asks for the name on the spot
+    and puts the setting back when the name is given up or refused.
+  - `manage_instructions` takes, checks and shows `memory_name`. `--list`
+    and the top row say `memory: NAME` for a named one.
+- The Memories window (`robot/tui/memoryui.py`, F6, the Memories button):
+  the shared memory first, then the named ones; for each, who uses it
+  (`memory.users`), its size, the last time awake, and the text with the
+  diary under it, read only. Edit (`Store.set_memory`; the diary is not
+  edited), Copy (`Store.copy_to`: text, diary and last time awake, not
+  the earlier states and not the noted runs), Roll back (a list of the
+  earlier states, newest first; the one picked is shown, then a question;
+  `Store.roll_back` keeps the state it leaves) and Delete
+  (`Store.delete`: a named memory's folder, or the shared memory's own
+  files and `versions`, never `settings.json` or the named folders).
+  - Every change makes a `Store` afresh, and the memory of the run in
+    progress is refused with a message (`_busy`): that run writes the file
+    when it ends, over whatever was done in the window.
+  - Two changes within one second keep two earlier states: the second
+    file's name gets `_2`.
+  - The main window's top row has seven buttons now, which do not fit in
+    72 columns: under 78 the Help button is not shown
+    (`MainWindow.layout`), and F1 and the bottom line still give the help.
+  - Tried on the Pi in a tmux of the check's own (`zz-ui`, `--session
+    zzm`, a data folder of its own made beforehand with two memories and
+    two instructions): the main window at 72 x 20 with the Memories button
+    and no Help button, the window at 100 x 26, a copy made with Alt+Y,
+    and the editor's Memory list with the copy in it. No run was started.
+  - `tests/test_tui_memory.py` (21 tests, on every machine).
 - A paid check of a run with memory on writes into the owner's memory:
   give it a data folder of its own, as above.
-- `tests/test_memory.py` (46 tests, on every machine): the files, the
-  noted runs, the block, the texts, the call on the fake client, and the
-  agent from waking to falling asleep.
+- `tests/test_memory.py` (61 tests, on every machine): the files, the
+  noted runs, the block, the texts, the call on the fake client, the
+  named memories, and the agent from waking to falling asleep.
 
 ### Speaking
 

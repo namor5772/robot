@@ -123,7 +123,7 @@ bash ~/robot/scripts/ui.sh
 
 ```
  Robot  |  ZZ ui chat  |  claude-haiku-5-5 (Low)  |  conversation
- [ START ] [ STOP ] [ Instruction ] [ Skills ]                [ Help ] [ Quit ]
+ [ START ] [ STOP ] [ Instruction ] [ Skills ] [ Memories ]   [ Help ] [ Quit ]
 ┌─ Output ─────────────────────────────────────────────────────────────────────┐
 │This instruction has no saved task. Type it as your message.                  ▲
 │you> Say hello in exactly five words.                                         │
@@ -171,9 +171,13 @@ What the main window has:
 - **Instruction** (F4) opens the Instruction Editor: a list of the saved
   instructions and a form for the one selected (name, model, thinking level,
   Fast, Meta, Convo, Memory, notes, blocked tools, skills, upgrade model,
-  text).
+  text). Memory is a list: off, shared, each named memory, or a new name
+  (see "Memory").
   *Save* stores the form under the name in the Name box, so a new name makes a
   new instruction. *Use* makes it the one START runs.
+- **Memories** (F6) opens the Memories window: what the robot remembers,
+  memory by memory (see "Memory"). In a window under 78 columns wide the
+  Help button gives up its place to this one; F1 still opens the help.
 - **Skills** (F5) opens the Skills Manager: every skill with its mode, text,
   description and bundled files. Space on the list switches a skill between
   off, ON (in every prompt) and OD (on demand).
@@ -626,9 +630,9 @@ together: the first run's children and the children those started.
 
 A run does not know the runs before it. An instruction with **Memory** on
 does: the robot wakes up knowing what it remembers of earlier conversations,
-and when the conversation ends it remembers that one too. Tick the Memory box
-in the Instruction Editor (Alt+M) and save; it is off unless you do. The top
-row of the interface then says `memory`.
+and when the conversation ends it remembers that one too. Choose a memory in
+the Instruction Editor's Memory list (Alt+M) and save; it is off unless you
+do. The top row of the interface then says `memory`, or `memory: NAME`.
 
 - **Waking up.** At the start of the run the robot is told three things: its
   memory (a text of up to about 1,500 words, in its own words), its diary of
@@ -647,17 +651,48 @@ row of the interface then says `memory`.
   (`Remembering an earlier conversation first...`), from the record on disk.
 - A conversation in which you said nothing, or only goodbye, is not sent
   anywhere and costs nothing.
-- All instructions with Memory on share the one memory: it is the robot's, not
-  the instruction's.
+- A memory is not part of an instruction: the instruction only says which
+  one it uses. The Memory list offers:
+  - **off**: no memory.
+  - **shared**: the one memory that instructions use together. Whatever
+    the robot was told in one of them it knows in the others.
+  - **a name**: a memory of its own. Two instructions that have the same
+    name share that memory, and no other instruction sees it.
+  - **new name...**: asks for a name (1 to 40 letters, digits, spaces, `-`
+    or `_`) and starts an empty memory under it. Nothing has to be created
+    first: its files appear when the first conversation has been remembered.
+- Deleting or copying an instruction leaves its memory as it is.
+
+### The Memories window
+
+**Memories** (F6) in the windowed interface lists the shared memory and every
+named one. For the one selected it shows which instructions use it, how
+large it is, when the robot was last awake with it, and the text and diary.
+
+- **Edit** corrects what is remembered, by hand. The diary is a record and is
+  not edited here.
+- **Copy** makes a second memory from it under a new name, for an experiment
+  that should not touch the original.
+- **Roll back** lists the earlier states (the last 30 are kept, one from
+  before every change), shows the one you pick, and makes it the memory
+  again if you say yes. The state you leave is kept too.
+- **Delete** makes the robot forget: the text, the diary and the earlier
+  states. It names the instructions that will start again with nothing.
+- While a run is using a memory, that memory cannot be changed here: the run
+  writes it when it ends.
+
+### The files
 
 The memory is plain text in `~/robot-data/memory`, and yours to read and
-correct: `memory.md` is what the robot remembers, `diary.md` its diary, and
-`versions/` holds the last 30 earlier states of `memory.md`, so a mistake can
-be undone by copying one back. To make the robot forget everything, remove
-the folder.
+correct there as well: `memory.md` is what the robot remembers, `diary.md` its
+diary, and `versions/` holds the earlier states of `memory.md`. That folder
+is the shared memory; a named one has the same files in a folder of its
+name inside it (`~/robot-data/memory/NAME/`).
 
 ```bash
+.venv/bin/python -m robot.memory list            # the memories, and who uses each
 .venv/bin/python -m robot.memory show            # what a run would be told now
+.venv/bin/python -m robot.memory show --name NAME   # the same for a named one
 .venv/bin/python -m robot.memory try CHAT.txt    # what that saved chat would leave
                                                  # (one paid call, changes nothing)
 .venv/bin/python -m robot.memory try CHAT.txt --model claude-haiku-5-5
@@ -665,8 +700,8 @@ the folder.
 
 The model that does the remembering is Sonnet 5.5. Another one is set with
 `ROBOT_MEMORY_MODEL=...` in `.env`, or with `{"model": "..."}` in
-`~/robot-data/memory/settings.json`; `try` is for comparing them on a chat
-you know.
+`~/robot-data/memory/settings.json` (one setting for every memory); `try` is
+for comparing them on a chat you know.
 
 With Hands-free on, whoever speaks is heard, and what was heard is
 remembered: the robot is told to leave out what makes no sense, but a
@@ -706,7 +741,7 @@ On the Pi, outside this repository, in `~/robot-data`:
 | `saved_chats/` | Every run's transcript (`.txt`) and messages (`.json`). |
 | `APICostLog_<host>.txt` | One line per run: time, model, cost, tokens. |
 | `tui_state.json` | What the windowed interface remembers: the instruction in use and the boxes of the bottom row (Hands-free among them). An interface started with `--session 2` has `tui_state_2.json`. |
-| `memory/` | What the robot remembers from one run to the next: `memory.md`, `diary.md`, earlier versions (see "Memory"). |
+| `memory/` | What the robot remembers from one run to the next: `memory.md`, `diary.md`, earlier versions, and a folder per named memory (see "Memory"). |
 | `tui_errors.log` | Anything a library printed while the windows were up (normally empty). |
 
 These files use MyAgent's formats, so instructions and skills can be copied
@@ -874,7 +909,7 @@ differ: the desktop has PowerShell only, the laptop also Git Bash.
 - `robot/instructions.py`, `robot/skills.py`: the library and the skills.
 - `robot/prompts.py`: the system prompt's wording.
 - `robot/models.py`: model and price tables. `robot/costs.py`, `robot/chats.py`, `robot/history.py`, `robot/datastore.py`, `robot/relay.py`: supporting parts.
-- `robot/tui/`: the windowed interface. `app.py`: the main window and how a run and the screen work side by side. `editor.py`, `skillsui.py`: the Instruction Editor and the Skills Manager. `widgets.py`, `dialogs.py`: buttons, lists, text boxes and small windows. `screen.py`: the screen and the keyboard (curses). `text.py`: wrapping and editing text.
+- `robot/tui/`: the windowed interface. `app.py`: the main window and how a run and the screen work side by side. `editor.py`, `skillsui.py`, `memoryui.py`: the Instruction Editor, the Skills Manager and the Memories window. `widgets.py`, `dialogs.py`: buttons, lists, text boxes and small windows. `screen.py`: the screen and the keyboard (curses). `text.py`: wrapping and editing text.
 - `scripts/chat.sh`, `scripts/ui.sh`, `scripts/tmux.conf`: the tmux launchers for the chat and the windowed interface. `scripts/deploy.sh`: run on the Pi to update it. `scripts/wifi-reconnect.sh`: the `robot-wifi` service, which puts the Pi back on the Wi-Fi. `scripts/autostart.sh`: the switch for starting the interface and its run when the Pi starts, and what the `robot-autostart` service runs. `scripts/pi_photo.py`: run on a PC, fetches a photo from the Pi and opens it. `scripts/pi_sound.py`: the same for a sound recording, which it plays.
 - `tests/`: the test suite. `CLAUDE.md`: detailed notes for Claude Code sessions.
 

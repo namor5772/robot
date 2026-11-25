@@ -78,6 +78,11 @@ def name_problem(name) -> str:
     return ""
 
 
+def counted(number, word) -> str:
+    """3 words, 1 word."""
+    return f"{number} {word}{'' if number == 1 else 's'}"
+
+
 def label(name) -> str:
     return name or SHARED_LABEL
 
@@ -565,8 +570,9 @@ def main(argv=None) -> int:
         for name in [SHARED] + names(datadir):
             one = Store(datadir, name)
             used = ", ".join(users(datadir, name)) or "no instruction"
-            print(f"- {label(name)}: {one.words()} words, {len(one.diary())} "
-                  f"conversations in the diary; used by {used}")
+            print(f"- {label(name)}: {counted(one.words(), 'word')}, "
+                  f"{counted(len(one.diary()), 'conversation')} in the diary; "
+                  f"used by {used}")
         return 0
     try:
         store = Store(datadir, args.name)
