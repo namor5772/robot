@@ -403,8 +403,9 @@ class HeardConsole(TerminalConsole):
 
 
 class TheGoodbye(LoopCase):
-    WORDS = "I am ending this conversation now. Good to have known you."
-    POWER_OFF_WORDS = "I am powering myself off now. Good to have known you."
+    WORDS = "I am ending this conversation now. Goodbye, till we meet again."
+    POWER_OFF_WORDS = (
+        "I am powering myself off now. Goodbye, till we meet again.")
 
     def end_with(self, replies, spoken, can_speak=True, say=None):
         console = HeardConsole(replies)

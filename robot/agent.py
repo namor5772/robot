@@ -21,9 +21,10 @@ from robot.tools import Tool, available_tools
 
 # Said by the robot, out loud, when the person ends a conversation by saying
 # an end word (not by typing one). The owner's wording.
-FAREWELL = "I am ending this conversation now. Good to have known you."
+FAREWELL = "I am ending this conversation now. Goodbye, till we meet again."
 # And when the spoken word was the one that also switches the Pi off.
-FAREWELL_POWER_OFF = "I am powering myself off now. Good to have known you."
+FAREWELL_POWER_OFF = (
+    "I am powering myself off now. Goodbye, till we meet again.")
 
 # The one end word that, when it is spoken, also switches the Pi off after
 # the conversation has ended. The other end words only end the conversation.

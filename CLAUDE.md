@@ -1128,11 +1128,14 @@ show the user the output. The user does not want to be asked to test things.
   goodbye first, and after a spoken "bye" the Pi is powered off as well
   (further down). The goodbye is at the
   owner's request and in the owner's words (`agent.FAREWELL`): "I am ending
-  this conversation now. Good to have known you."
+  this conversation now. Goodbye, till we meet again."
+  - Both goodbyes ended "Good to have known you." until 2026-11-26, when
+    the owner had that sentence changed. The checks written down below
+    are from before: what they showed and heard is left as it was.
   - It is the program that says it, not the model: no call is made.
     `Agent._say_farewell` shows it as a `robot>` line and speaks it with
     `speaking.say`, which plays from a file in the data folder's `tmp` and
-    keeps nothing (unlike the `speak` tool). It costs xAI's price for 58
+    keeps nothing (unlike the `speak` tool). It costs xAI's price for 63
     characters, a tenth of a cent.
   - `Console.last_reply_heard` is how the agent knows: both consoles set it
     with every reply. A typed end word, an empty reply and nobody being
@@ -1154,8 +1157,8 @@ show the user the output. The user does not want to be asked to test things.
     `ROBOT_POWEROFF_COMMAND` names another command, for tests and checks.
   - The goodbye before a power-off is another sentence, the owner's too
     (`agent.FAREWELL_POWER_OFF`, since 2026-11-25): "I am powering myself
-    off now. Good to have known you." The three other spoken end words
-    keep the first one. Tried with the same paid check and stand-in as
+    off now. Goodbye, till we meet again." The three other spoken end
+    words keep the first one. Tried, with the wording of that day, with the same paid check and stand-in as
     below ($0.0022): `you> (heard) Bye.`, then `robot> I am powering
     myself off now. Good to have known you.`, the chat saved, the stand-in
     run. The owner then tried it for real after a restart of the Pi, with
