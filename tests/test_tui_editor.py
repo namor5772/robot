@@ -81,6 +81,12 @@ class Saving(EditorCase):
         self.assertEqual(entry["model"], "claude-haiku-5-5")
         self.assertEqual(entry["thinking_mode"], "low")
 
+    def test_the_memory_box_is_saved_and_shown_again(self):
+        self.editor("down", self.shows("[ ] Memory"), "alt+m", "alt+s")
+        self.assertIs(self.saved("Report")["memory"], True)
+        self.editor("down", self.shows("[x] Memory"), "alt+m", "alt+s")
+        self.assertIs(self.saved("Report")["memory"], False)
+
     def test_what_other_programs_keep_in_an_entry_stays(self):
         self.library(Report=dict(REPORT, section="Daily", order=3, images=["a.png"],
                                  thinking_budget=4096))

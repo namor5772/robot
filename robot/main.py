@@ -203,6 +203,8 @@ def show_banner(console, settings, skills):
             parts.append("on demand: " + ", ".join(on_demand))
         if parts:
             console.note("Skills: " + "; ".join(parts))
+    if settings.memory:
+        console.note("Memory: on. This conversation is remembered when it ends.")
     if settings.conversational and console.tty:
         console.note("Type quit, stop or exit, or send nothing, to end. Ctrl-C stops a reply.")
     if console.hands_free:

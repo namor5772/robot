@@ -62,6 +62,14 @@ MANAGE_INSTRUCTIONS_TOOL = {
                     "(default false on create)"
                 ),
             },
+            "memory": {
+                "type": "boolean",
+                "description": (
+                    "Memory: runs of this instruction are told what the robot remembers "
+                    "of earlier conversations, and their own conversation is remembered "
+                    "when it ends (default false on create)"
+                ),
+            },
             "model": {
                 "type": "string",
                 "description": (
@@ -294,9 +302,9 @@ RUN_INSTRUCTION_TOOL = {
 }
 
 # The fields `update` can change, in the order its error message names them.
-_UPDATABLE = ("text", "notes", "meta", "conversational", "model", "thinking_mode",
+_UPDATABLE = ("text", "notes", "meta", "conversational", "memory", "model", "thinking_mode",
               "thinking_budget", "fast_mode", "upgrade_target", "blocked_tools", "skill_modes")
-_PLAIN_FIELDS = ("text", "notes", "meta", "conversational", "model", "thinking_budget",
+_PLAIN_FIELDS = ("text", "notes", "meta", "conversational", "memory", "model", "thinking_budget",
                  "fast_mode")
 
 
@@ -305,7 +313,7 @@ def _check_fields(params) -> str:
     for key in ("text", "notes", "model", "thinking_mode"):
         if params.get(key) is not None and not isinstance(params[key], str):
             return f"Error: '{key}' must be a string."
-    for key in ("meta", "conversational", "fast_mode"):
+    for key in ("meta", "conversational", "memory", "fast_mode"):
         if params.get(key) is not None and not isinstance(params[key], bool):
             return f"Error: '{key}' must be true or false."
     budget = params.get("thinking_budget")
@@ -374,6 +382,7 @@ def manage_instructions(datadir, run_settings, params) -> str:
             "notes": entry.get("notes", ""),
             "meta": bool(entry.get("meta", False)),
             "conversational": bool(entry.get("conversational", False)),
+            "memory": bool(entry.get("memory", False)),
             "provider": entry.get("provider", instructions.PROVIDER),
             "model": entry.get("model", ""),
             "thinking_mode": entry.get("thinking_mode") or models.mode_from_legacy(entry),
@@ -406,6 +415,7 @@ def manage_instructions(datadir, run_settings, params) -> str:
                           else bool(run_settings.fast_mode)),
             "meta": bool(params.get("meta", False)),
             "conversational": bool(params.get("conversational", False)),
+            "memory": bool(params.get("memory", False)),
             "blocked_tools": sorted(params["blocked_tools"]
                                     if params.get("blocked_tools") is not None
                                     else run_settings.blocked_tools or []),

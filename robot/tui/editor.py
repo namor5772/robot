@@ -180,6 +180,7 @@ class InstructionEditor(Window):
         self.fast = self.add(Checkbox("&Fast"))
         self.meta = self.add(Checkbox("M&eta"))
         self.convo = self.add(Checkbox("&Convo"))
+        self.memory = self.add(Checkbox("&Memory"))
         self.extras = [
             self.add(Button("No&tes", self._edit_notes)),
             self.add(Button("Too&ls", self._edit_tools)),
@@ -210,6 +211,7 @@ class InstructionEditor(Window):
             "name": self.name.text.strip(), "text": self.text.text(),
             "model": self.model.value, "thinking": self.thinking.value,
             "fast": self.fast.value, "meta": self.meta.value, "convo": self.convo.value,
+            "memory": self.memory.value,
             "notes": self.notes, "blocked": list(self.blocked),
             "skill_modes": dict(self.skill_modes),
             "upgrade": dict(self.upgrade) if self.upgrade is not None else None,
@@ -258,6 +260,7 @@ class InstructionEditor(Window):
         self.fast.value = bool(entry.get("fast_mode")) and self.fast.enabled
         self.meta.value = bool(entry.get("meta"))
         self.convo.value = bool(entry.get("conversational"))
+        self.memory.value = bool(entry.get("memory"))
         self.notes = str(entry.get("notes") or "")
         blocked = entry.get("blocked_tools")
         self.blocked = (sorted({str(tool) for tool in blocked})
@@ -397,6 +400,7 @@ class InstructionEditor(Window):
             "text": form["text"], "notes": form["notes"], "provider": instructions.PROVIDER,
             "model": form["model"], "thinking_mode": form["thinking"],
             "fast_mode": form["fast"], "meta": form["meta"], "conversational": form["convo"],
+            "memory": form["memory"],
             "blocked_tools": form["blocked"],
         })
         if "thinking_enabled" in entry:
@@ -481,7 +485,7 @@ class InstructionEditor(Window):
         self.model.w = min(width, 41)
         self.thinking.w = 22
         y = flow([self.model], 2, x, width)
-        y = flow([self.thinking, self.fast, self.meta, self.convo], y, x, width)
+        y = flow([self.thinking, self.fast, self.meta, self.convo, self.memory], y, x, width)
         y = flow(self.extras, y, x, width)
         for label in self.summary:
             label.place(y, x, width)

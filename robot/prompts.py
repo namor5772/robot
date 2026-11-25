@@ -43,6 +43,11 @@ Use plain text only, with no Markdown formatting, because your replies are
 shown in a plain terminal."""
 
 
+def character() -> str:
+    """The lines that tell the robot who it is: the prompt's first paragraph."""
+    return _IDENTITY.split("\n\n")[0]
+
+
 def base_system_prompt(conversational: bool) -> str:
     """The prompt before any skills are appended. Fixed for the whole run."""
     mode = _CONVERSATION if conversational else _SINGLE_TASK

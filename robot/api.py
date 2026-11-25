@@ -130,6 +130,9 @@ def build_request(*, model, system_prompt, messages, client_tools, web_search=Tr
         "max_tokens": learned.output_caps.get(model) or models.output_cap_for(model),
     }
 
+    if not tools:
+        del kwargs["tools"]  # a call that offers nothing (the memory's) names none
+
     features = models.fable_features(model, learned.unsupported)
     binding = features["block_binding"] if features else None
     fallbacks = features["fallbacks"] if features else None

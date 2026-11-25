@@ -693,6 +693,8 @@ def describe_instruction(datadir, name) -> list:
     parts = [name, f"{settings.model} ({mode})", kind]
     if settings.meta:
         parts.append("meta")
+    if settings.memory:
+        parts.append("memory")
     return parts
 
 

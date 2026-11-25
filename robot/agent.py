@@ -7,13 +7,15 @@ ending. There is no limit on the number of steps.
 """
 
 import concurrent.futures
+import datetime
 import json
 import os
 import queue
 import threading
 import time
 
-from robot import api, chats, costs, history, meta, models, power, prompts, speaking
+from robot import (
+    api, chats, costs, history, memory, meta, models, power, prompts, speaking)
 from robot.console import INTERRUPTED, LABEL, convo_end_word
 from robot.tools import Tool, available_tools
 
@@ -133,6 +135,10 @@ class Agent:
         self._started = time.monotonic()
         self._client = None
         self._pool_requests = queue.Queue()  # questions from tools on pool threads
+        # With memory on for the instruction: where it is kept, and the note
+        # that this run's conversation still has to be remembered.
+        self.memory = memory.Store(datadir) if settings.memory else None
+        self._memory_entry = None
 
     # -- set-up ------------------------------------------------------------
 
@@ -221,6 +227,10 @@ class Agent:
         # the rest, stays as it is even if the run is upgraded later.
         self.run_facts = prompts.run_paragraph(
             self.settings.name, self.model, can_upgrade="upgrade_model" in self.tools)
+        if self.memory is not None:
+            # What the robot remembers differs from run to run as well, so it
+            # travels in the same block, after the part that runs share.
+            self.run_facts = self.memory.prompt_block() + "\n\n" + self.run_facts
 
     def _mode_label(self) -> str:
         return models.mode_label(self.model, self.thinking_mode,
@@ -250,6 +260,13 @@ class Agent:
             f"=== {self.chat_stem} | {self.model} | {self._mode_label()} ===\n"
             f"you> {self.settings.text}\n")
         self.console.set_transcript(self._transcript)
+        if self.memory is not None:
+            try:
+                self._memory_entry = self.memory.begin(
+                    self._transcript.path, os.getpid(), costs.current_boot_id())
+            except OSError as error:
+                self.console.warn(
+                    f"This conversation cannot be noted for the memory: {error}")
 
     def _startup_warnings(self):
         for warning in (models.generic_pricing_warning(self.model),
@@ -266,6 +283,11 @@ class Agent:
         self._started = time.monotonic()
         self.messages = [{"role": "user", "content": self.settings.text}]
         try:
+            if self.memory is not None and not self.dry_run:
+                # Before the prompt is fixed: what is made up for here is
+                # part of what this run is told.
+                self._client = self.get_client()
+                self._remember_unfinished()
             self._freeze_run()
             if self.dry_run:
                 console.note(self.describe_request())
@@ -706,6 +728,60 @@ class Agent:
         except OSError as error:
             self.console.warn(f"Could not write result file: {error}")
 
+    # -- memory --------------------------------------------------------------
+
+    def _remember(self, entry, ended=None) -> bool:
+        """One noted conversation into the memory. Its cost joins this run's."""
+        console = self.console
+        try:
+            usage, model = memory.remember(
+                self.memory, entry, self._client, console, console.interrupts,
+                ended=ended, learned=self.learned)
+        except memory.MemoryFailed as error:
+            console.warn(f"The conversation was not put into memory: {error}. "
+                         "The next start tries again.")
+            return False
+        if usage:
+            update, _ = self.run_cost.add_call(usage, model)
+            console.activity(f"Remembered, by {model}: {costs.cost_line(update).strip()}")
+        return True
+
+    def _remember_unfinished(self):
+        """Waking up: conversations that ended without being remembered (the
+        power went, the program was killed) are made up for first."""
+        try:
+            waiting = self.memory.unfinished(
+                costs.process_is_robot, costs.current_boot_id(), os.getpid())
+        except OSError:
+            return
+        for entry in waiting:
+            self.console.note("Remembering an earlier conversation first...")
+            try:
+                self._remember(entry)
+            except KeyboardInterrupt:
+                raise
+            except Exception as error:
+                self.console.warn(f"An earlier conversation could not be remembered: {error}")
+
+    def _fall_asleep(self):
+        """The run is over: put its conversation into the memory."""
+        entry, self._memory_entry = self._memory_entry, None
+        if entry is None or self._client is None:
+            return
+        console = self.console
+        if console.interrupts.stop.is_set():
+            # The program is being closed. The note stays, and the next start
+            # does the remembering.
+            console.note("This conversation will be remembered at the next start.")
+            return
+        console.interrupts.clear()
+        console.note("Remembering this conversation...")
+        try:
+            self._remember(entry, ended=datetime.datetime.now())
+        except KeyboardInterrupt:
+            console.interrupts.clear()
+            console.note("Stopped: this conversation will be remembered at the next start.")
+
     def _restore_upgrade(self):
         """Hook: an upgraded run goes back to the instruction's own model."""
 
@@ -716,8 +792,9 @@ class Agent:
         if self.status == "completed" and self._truncated_note:
             self.status = "error"
             self.error = self._truncated_note
-        steps = (self._log_cost, self._clear_progress, self._restore_upgrade,
-                 self._write_result_file, self._save_chat)
+        # Remembering comes first: what it costs belongs on the run's line.
+        steps = (self._fall_asleep, self._log_cost, self._clear_progress,
+                 self._restore_upgrade, self._write_result_file, self._save_chat)
         for step in steps:
             try:
                 step()

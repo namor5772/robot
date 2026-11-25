@@ -41,6 +41,7 @@ class RunSettings:
     blocked_tools: list = field(default_factory=list)
     skill_modes: dict = field(default_factory=dict)
     upgrade_target: dict | None = None
+    memory: bool = False  # remember this run's conversation, and be told the earlier ones
 
 
 def default_entry() -> dict:
@@ -141,7 +142,7 @@ def settings_from_entry(name: str, entry: dict) -> tuple[RunSettings, list]:
         name=name, text=str(entry.get("text") or ""), model=model, thinking_mode=coerced,
         thinking_budget=budget, fast_mode=fast, meta=bool(entry.get("meta")),
         conversational=bool(entry.get("conversational")), blocked_tools=blocked,
-        skill_modes=skill_modes, upgrade_target=target)
+        skill_modes=skill_modes, upgrade_target=target, memory=bool(entry.get("memory")))
     return settings, warnings
 
 
@@ -152,7 +153,8 @@ def describe(name: str, entry: dict) -> str:
     except InstructionError:
         return f"- {name}  [{entry.get('provider')}: cannot be run here]"
     flags = [flag for flag, on in (("meta", settings.meta), ("convo", settings.conversational),
-                                   ("fast", settings.fast_mode)) if on]
+                                   ("fast", settings.fast_mode),
+                                   ("memory", settings.memory)) if on]
     mode = models.mode_label(settings.model, settings.thinking_mode,
                              thinking_budget=settings.thinking_budget)
     line = f"- {name}  [{settings.model}, {mode}]"
