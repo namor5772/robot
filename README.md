@@ -170,7 +170,8 @@ What the main window has:
   asked a question the run stops.
 - **Instruction** (F4) opens the Instruction Editor: a list of the saved
   instructions and a form for the one selected (name, model, thinking level,
-  Fast, Meta, Convo, notes, blocked tools, skills, upgrade model, text).
+  Fast, Meta, Convo, Memory, notes, blocked tools, skills, upgrade model,
+  text).
   *Save* stores the form under the name in the Name box, so a new name makes a
   new instruction. *Use* makes it the one START runs.
 - **Skills** (F5) opens the Skills Manager: every skill with its mode, text,
@@ -312,8 +313,8 @@ sudo openvt -c 8 -s -- sudo -u $USER env TERM=linux tmux attach -t shared
 ## Saved instructions
 
 An instruction is a saved task together with the settings to run it with:
-model, thinking level, fast mode, Meta on or off, Convo on or off, blocked
-tools, skill modes and an upgrade model. Its text is the first message of the
+model, thinking level, fast mode, Meta on or off, Convo on or off, Memory on
+or off (see "Memory"), blocked tools, skill modes and an upgrade model. Its text is the first message of the
 run.
 
 ```bash
@@ -621,6 +622,56 @@ is a run that is paid for. The 8 is for the whole tree of runs. A child may
 start children of its own (those may not start any), and they all count
 together: the first run's children and the children those started.
 
+## Memory
+
+A run does not know the runs before it. An instruction with **Memory** on
+does: the robot wakes up knowing what it remembers of earlier conversations,
+and when the conversation ends it remembers that one too. Tick the Memory box
+in the Instruction Editor (Alt+M) and save; it is off unless you do. The top
+row of the interface then says `memory`.
+
+- **Waking up.** At the start of the run the robot is told three things: its
+  memory (a text of up to about 1,500 words, in its own words), its diary of
+  the last 7 conversations, and when it was last awake and what time it is
+  now. It is also told where the word-for-word record of every conversation
+  is (`saved_chats`), so that it can look up a detail it no longer remembers.
+- **Falling asleep.** When the run ends, however it ends, the program says
+  `Remembering this conversation...` and makes one more call, to a model of
+  its own (Sonnet 5.5): it reads the conversation and the memory as it was,
+  and writes the memory anew and a few lines for the diary. That takes 5 to
+  15 seconds and costs about a cent for a short conversation; the cost is on
+  the run's line in the cost log. After a spoken "bye" the Pi powers off
+  only when this is done.
+- **Cut off.** If the power goes or the program is closed before that, nothing
+  is lost: the next run with Memory on does the remembering first
+  (`Remembering an earlier conversation first...`), from the record on disk.
+- A conversation in which you said nothing, or only goodbye, is not sent
+  anywhere and costs nothing.
+- All instructions with Memory on share the one memory: it is the robot's, not
+  the instruction's.
+
+The memory is plain text in `~/robot-data/memory`, and yours to read and
+correct: `memory.md` is what the robot remembers, `diary.md` its diary, and
+`versions/` holds the last 30 earlier states of `memory.md`, so a mistake can
+be undone by copying one back. To make the robot forget everything, remove
+the folder.
+
+```bash
+.venv/bin/python -m robot.memory show            # what a run would be told now
+.venv/bin/python -m robot.memory try CHAT.txt    # what that saved chat would leave
+                                                 # (one paid call, changes nothing)
+.venv/bin/python -m robot.memory try CHAT.txt --model claude-haiku-5-5
+```
+
+The model that does the remembering is Sonnet 5.5. Another one is set with
+`ROBOT_MEMORY_MODEL=...` in `.env`, or with `{"model": "..."}` in
+`~/robot-data/memory/settings.json`; `try` is for comparing them on a chat
+you know.
+
+With Hands-free on, whoever speaks is heard, and what was heard is
+remembered: the robot is told to leave out what makes no sense, but a
+visitor's words or a radio's can end up in its memory.
+
 ## What you see
 
 ```
@@ -655,6 +706,7 @@ On the Pi, outside this repository, in `~/robot-data`:
 | `saved_chats/` | Every run's transcript (`.txt`) and messages (`.json`). |
 | `APICostLog_<host>.txt` | One line per run: time, model, cost, tokens. |
 | `tui_state.json` | What the windowed interface remembers: the instruction in use and the boxes of the bottom row (Hands-free among them). An interface started with `--session 2` has `tui_state_2.json`. |
+| `memory/` | What the robot remembers from one run to the next: `memory.md`, `diary.md`, earlier versions (see "Memory"). |
 | `tui_errors.log` | Anything a library printed while the windows were up (normally empty). |
 
 These files use MyAgent's formats, so instructions and skills can be copied

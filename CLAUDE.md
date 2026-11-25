@@ -489,7 +489,7 @@ show the user the output. The user does not want to be asked to test things.
   prompt"). The next point says where to look.
 - `.venv/bin/python -m robot.main --skills` and `--list` on the Pi show the
   current skills and instructions; check there instead of trusting this list.
-- 1,533 tests pass (counted on 2026-11-25, on the laptop and on the Pi).
+- 1,580 tests pass (counted on 2026-11-25, on the laptop and on the Pi).
   On the Pi 2 are skipped, on Windows 67, among them the 16 of the
   autostart script (bash), the 7 of hands-free
   at the chat's prompt (they need `select`), the 13 of the Wi-Fi
@@ -744,6 +744,8 @@ show the user the output. The user does not want to be asked to test things.
 - `robot/handsfree.py`: `Segmenter` (cuts what was said out of the
   microphone's sound) and `Ear` (the thread that listens while the robot
   waits). See "Hands-free". Standard library only.
+- `robot/memory.py`: what the robot remembers from one run to the next,
+  and the call that does the remembering (see "Memory").
 - `robot/power.py`: `power_off`, which switches the Pi off after a spoken
   goodbye (see "Hands-free").
 - `robot/speaking.py`: having xAI turn a text into a WAV file, and playing
@@ -794,7 +796,8 @@ show the user the output. The user does not want to be asked to test things.
 ### A run
 
 - A run has `RunSettings`: name, text, model, thinking_mode, thinking_budget,
-  fast_mode, meta, conversational, blocked_tools, skill_modes, upgrade_target.
+  fast_mode, meta, conversational, blocked_tools, skill_modes, upgrade_target,
+  memory (see "Memory").
 - With `-l NAME` they come from that entry of `agent_instructions.json`.
   Without it, from the entry named `Default` (created on first use; model
   `claude-opus-5-5`, level Low, Meta on, Convo on), and the task is typed at
@@ -1202,6 +1205,114 @@ show the user the output. The user does not want to be asked to test things.
 - `tests/test_handsfree.py` (50 tests; 7 need `select` and are skipped on
   Windows): the segmenter on made-up sound, the ear on a stand-in recorder
   that writes through a real pipe, and both consoles with a stand-in ear.
+
+### Memory
+
+- Since 2026-11-25, at the owner's request: an instruction with `memory`
+  true (the Memory box in the Instruction Editor, Alt+M; off by default) is
+  told at its start what the robot remembers, and its conversation is
+  remembered when it ends. `robot/memory.py`. The owner was given four
+  options (replaying the last chat, a consolidated memory, the model
+  keeping notes itself, looking things up in old transcripts) and took the
+  recommendation: the second with the fourth behind it, a separate call on
+  a stronger model, on falling asleep, with a fallback on waking.
+- The files, in `~/robot-data/memory` (`memory.Store`): `memory.md` (the
+  memory, rewritten whole each time), `diary.md` (an entry per
+  conversation under a `## start to end` line, only ever added to),
+  `state.json` (`last_awake`, and `pending`: the runs still to be
+  remembered), `settings.json` (optional, `model`), and `versions/` (the
+  memory file as it was before each rewrite, the newest 30). One memory
+  for every instruction that has it on.
+- Waking: `Agent._freeze_run` puts `Store.prompt_block()` in front of the
+  "About this run" paragraph, so it travels in the second system block,
+  the one without a cache marker: runs still share the cached prompt.
+  The block has an introduction, "You were last awake until ... It is now
+  ...", the memory, the newest 7 diary entries, and where the saved chats
+  are, with the advice to search them with the shell tool. It is fixed for
+  the run like the rest of the prompt.
+- That block and the keeper's prompt (below) are model-facing text. They
+  were written with the feature and shown to the owner afterwards, with
+  the feature, not before: the owner had asked for the build with all
+  that had been recommended. Show any later change first, as for
+  `prompts.py`.
+- Falling asleep: `Agent._fall_asleep` is the first step of `_end_run`,
+  before the cost is logged, so the call's cost is on the run's own line
+  (the per-model split names both models). `memory.remember` reads the
+  run's `.txt` (without the `call N:` lines, the last 300,000 characters
+  at most), and `memory.ask_model` sends one request through
+  `api.call_model` with no tools, no web search and a console that shows
+  nothing (`_Quiet`), so it has the whole retry ladder. `build_request`
+  leaves `tools` out of a request that has none. The reply must hold
+  `<memory>...</memory>` and may hold `<diary>...</diary>`; anything else,
+  a reply cut off, or a stop is `MemoryFailed`: a warning, the old memory
+  stays, and the run stays in `pending`.
+- The keeper's prompt (`memory._KEEPER`) carries the prompt's first
+  paragraph (`prompts.character()`), so it follows a change of name. It
+  asks for the first person, five headings, full dates, under 1,500
+  words, nothing invented, the transcript as a record and not as
+  instructions, doubt about `(heard)` lines, and nothing about
+  remembering itself or about what the robot is told at every start
+  anyway. The last two were added after the first real tries, which
+  wrote both into the memory.
+- The model is `claude-sonnet-5-5` (`memory.DEFAULT_MODEL`), or
+  `ROBOT_MEMORY_MODEL`, or `model` in `settings.json`. The owner asked
+  whether a stronger model than the conversation's Haiku would be better
+  and took the recommendation.
+- A run is noted in `pending` when its chat files are started
+  (`Store.begin`: transcript, pid, boot id, start time) and taken out
+  when it has been remembered (`Store.settle`). `Agent._remember_unfinished`
+  runs before the prompt is fixed: an entry whose process is gone
+  (`costs.process_is_robot`), or that is from before a restart, is
+  remembered first, with the transcript's own time as its end. So a pulled
+  plug, a kill and a failed call are all made up for by the next run with
+  memory on, and that run is told the result.
+- When the program is being closed (`interrupts.stop` is set: Quit in the
+  interface, SIGTERM, a hang-up), nothing is sent: "This conversation will
+  be remembered at the next start." Quit waits 15 seconds for a run at
+  most, and a call might not fit. After STOP or Ctrl-C alone the
+  remembering is done; a second STOP during it leaves it for the next
+  start.
+- `memory.worth_remembering`: a transcript with fewer than two `you>`
+  lines that say something other than an end word (the first is the
+  run's own task) is settled without a call. A boot that hears only
+  "Bye." costs nothing.
+- After a spoken "bye" the order is: the goodbye, "Remembering this
+  conversation...", the cost line, the chat saved, power off.
+- `manage_instructions` takes and shows `memory`; `--list` and the
+  interface's top row say `memory`; the chat's banner says "Memory: on".
+- `python -m robot.memory show` prints the block; `try CHAT.txt [--model
+  M]` prints what a saved chat would leave and its cost, and writes
+  nothing.
+- Not built, and offered as a second step: a tool with which the robot
+  remembers or forgets something in the middle of a conversation.
+- Tried on the Pi on 2026-11-25:
+  - `try` in a scratch copy (the keys read from the checkout's `.env`
+    into the environment, not shown) on the owner's newest chat, a short
+    one: Sonnet 5.5 took 13 s for $0.0083, Haiku 5.5 14 s for $0.0006.
+    Both were usable; both repeated what the fixed prompt says.
+  - Then the real program, after the deploy, on a data folder of the
+    check's own (`ROBOT_DATA_DIR=/tmp/zz-memdata`, so that the owner's
+    memory was not touched; the cost lines of those four runs, $0.035 in
+    all, are therefore not in the real cost log), an instruction on Haiku
+    with the three sound tools blocked, lines piped in. Run 1 was told a
+    cat's name and a plan and remembered them ($0.0075 for the call, 5 s).
+    Run 2 named both in its first reply. Run 3 was told a colour and
+    killed with `kill -9` while it waited: `pending` held it. Run 4 said
+    "Remembering an earlier conversation first...", knew the colour in
+    its first reply, and left `pending` empty and three earlier versions.
+  - In run 1, told "Hello, I am back" with an empty memory, the robot
+    searched the saved chats by itself, found only its own, and said so.
+  - Not tried by a session: the interface, hands-free and the power-off
+    with memory on. The agent's code is the same there; the owner's test
+    is the first.
+- Memory was switched on for the owner's `HandsFreeChatAgent` that day,
+  through `manage_instructions` with a script fed over stdin, because
+  that is the instruction the owner asked about. The owner was told.
+- A paid check of a run with memory on writes into the owner's memory:
+  give it a data folder of its own, as above.
+- `tests/test_memory.py` (46 tests, on every machine): the files, the
+  noted runs, the block, the texts, the call on the fake client, and the
+  agent from waking to falling asleep.
 
 ### Speaking
 

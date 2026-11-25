@@ -240,6 +240,8 @@ visitor, a radio). Where a heard line makes no sense, or it is not clear who spo
 leave it out of the memory or say that it is uncertain.
 - Lines in square brackets and indented lines are the robot's tool use and the \
 program's own notes: remember what was found out, not the mechanics.
+- The memory is about the people and the world, not about remembering: do not \
+record that the robot recalled something or was asked whether it still knew it.
 - If nothing in the conversation is worth keeping, return the old memory unchanged \
 and say so briefly in the diary entry.
 
