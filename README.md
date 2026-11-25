@@ -573,8 +573,9 @@ speaking, so it does not hear itself.
   this conversation now. Good to have known you." A typed end word ends the
   conversation without that.
 - **A spoken "bye" also powers the Pi off.** Only that word, and only when
-  it was said, not typed: once the run's cost is logged and its chat saved,
-  the Pi runs `sudo poweroff`, without asking. To use it again, take its
+  it was said, not typed. Its goodbye is its own: "I am powering myself off
+  now. Good to have known you." Then, once the run's cost is logged and its
+  chat saved, the Pi runs `sudo poweroff`, without asking. To use it again, take its
   power away and give it back; with autostart on it then comes up running
   and listening. "Stop", "quit" and "exit", spoken or typed, a typed "bye",
   STOP, Quit and an empty message all leave the Pi on.

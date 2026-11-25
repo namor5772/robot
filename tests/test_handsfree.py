@@ -404,6 +404,7 @@ class HeardConsole(TerminalConsole):
 
 class TheGoodbye(LoopCase):
     WORDS = "I am ending this conversation now. Good to have known you."
+    POWER_OFF_WORDS = "I am powering myself off now. Good to have known you."
 
     def end_with(self, replies, spoken, can_speak=True, say=None):
         console = HeardConsole(replies)
@@ -416,7 +417,7 @@ class TheGoodbye(LoopCase):
         return console.out.getvalue()
 
     def test_a_spoken_end_word_is_answered_out_loud_before_the_end(self):
-        for word in ("Bye.", "Stop.", "quit", "Exit!"):
+        for word in ("Stop.", "quit", "Exit!"):
             with self.subTest(word=word):
                 shown = self.end_with([word], spoken=(word,))
                 self.said.assert_called_once_with(self.WORDS)
@@ -424,6 +425,16 @@ class TheGoodbye(LoopCase):
                 self.assertLess(shown.index("robot> " + self.WORDS),
                                 shown.index("Conversation ended."))
                 self.assertEqual(len(self.client.requests), 1)  # no call is made for it
+
+    def test_a_spoken_bye_has_a_goodbye_of_its_own_as_it_powers_the_pi_off(self):
+        for word in ("Bye.", "bye", "BYE!"):
+            with self.subTest(word=word):
+                shown = self.end_with([word], spoken=(word,))
+                self.said.assert_called_once_with(self.POWER_OFF_WORDS)
+                self.assertEqual(agent_module.FAREWELL_POWER_OFF, self.POWER_OFF_WORDS)
+                self.assertLess(shown.index("robot> " + self.POWER_OFF_WORDS),
+                                shown.index("Conversation ended."))
+                self.assertNotIn(self.WORDS, shown)
 
     def test_a_typed_end_word_ends_it_without_a_word(self):
         shown = self.end_with(["bye"], spoken=())
@@ -448,7 +459,7 @@ class TheGoodbye(LoopCase):
         self.assertEqual(len(self.client.requests), 2)
 
     def test_without_a_voice_the_goodbye_is_shown_and_not_spoken(self):
-        shown = self.end_with(["Bye."], spoken=("Bye.",), can_speak=False)
+        shown = self.end_with(["Stop."], spoken=("Stop.",), can_speak=False)
         self.said.assert_not_called()
         self.assertIn("robot> " + self.WORDS, shown)
 
@@ -538,11 +549,11 @@ class InTheInterface(MainCase):
                 mock.patch.object(speaking, "say") as say:
             self.run_with("Talk", self.TALK, "alt+h", "f2", self.asked(), *keys,
                           self.ended(), self.shows("Conversation ended."))
-        return say, self.screen.find("robot> I am ending this conversation now.")
+        return say, self.screen.find("robot> I am powering myself off now.")
 
     def test_a_spoken_bye_gets_the_goodbye(self):
         say, shown = self.bye(typed_it=False)
-        say.assert_called_once_with(agent_module.FAREWELL)
+        say.assert_called_once_with(agent_module.FAREWELL_POWER_OFF)
         self.assertIsNotNone(shown)
 
     def test_a_typed_bye_does_not(self):

@@ -20,6 +20,8 @@ from robot.tools import Tool, available_tools
 # Said by the robot, out loud, when the person ends a conversation by saying
 # an end word (not by typing one). The owner's wording.
 FAREWELL = "I am ending this conversation now. Good to have known you."
+# And when the spoken word was the one that also switches the Pi off.
+FAREWELL_POWER_OFF = "I am powering myself off now. Good to have known you."
 
 # The one end word that, when it is spoken, also switches the Pi off after
 # the conversation has ended. The other end words only end the conversation.
@@ -427,25 +429,25 @@ class Agent:
                 break  # the empty reply ends a conversation, typed or not
             if convo_end_word(reply):
                 if console.last_reply_heard:
-                    self._say_farewell()
                     self.power_off = convo_end_word(reply) == POWER_OFF_WORD
+                    self._say_farewell(FAREWELL_POWER_OFF if self.power_off else FAREWELL)
                 break
             self.messages.append({"role": "user", "content": reply})
             return True
         console.activity("Conversation ended.")
         return False
 
-    def _say_farewell(self):
+    def _say_farewell(self, words):
         """The robot's last words when the person said goodbye out loud: shown,
         and spoken where the robot has a voice. It is the program that says
         them, not the model, so no call is made for it."""
         console = self.console
-        console.note(LABEL + FAREWELL)
+        console.note(LABEL + words)
         if not speaking.available():
             return
         try:
             with console.interrupts.raisable():
-                speaking.say(FAREWELL)
+                speaking.say(words)
         except KeyboardInterrupt:
             console.interrupts.clear()  # STOP or Ctrl-C: the goodbye is cut short
         except Exception as error:

@@ -489,7 +489,7 @@ show the user the output. The user does not want to be asked to test things.
   prompt"). The next point says where to look.
 - `.venv/bin/python -m robot.main --skills` and `--list` on the Pi show the
   current skills and instructions; check there instead of trusting this list.
-- 1,532 tests pass (counted on 2026-11-25, on the laptop and on the Pi).
+- 1,533 tests pass (counted on 2026-11-25, on the laptop and on the Pi).
   On the Pi 2 are skipped, on Windows 67, among them the 16 of the
   autostart script (bash), the 7 of hands-free
   at the chat's prompt (they need `select`), the 13 of the Wi-Fi
@@ -1143,6 +1143,10 @@ show the user the output. The user does not want to be asked to test things.
     poweroff`; systemd's shutdown stops the interface and everything else
     in order and unmounts the card. That is the whole of "safely".
     `ROBOT_POWEROFF_COMMAND` names another command, for tests and checks.
+  - The goodbye before a power-off is another sentence, the owner's too
+    (`agent.FAREWELL_POWER_OFF`, since 2026-11-25): "I am powering myself
+    off now. Good to have known you." The three other spoken end words
+    keep the first one.
   - Only the word "bye" (`agent.POWER_OFF_WORD`), and only SPOKEN, at the
     conversation's own prompt: the owner narrowed it to that the same day
     ("ONLY work if I say the word bye (not write it!)"); for an hour it
