@@ -6,7 +6,7 @@ MyAgent's, without the parts that belong to its windows.
 
 import json
 
-from robot import instructions, models, skills, spawn
+from robot import instructions, memory, models, skills, spawn
 from robot.tools import Tool
 
 _MODE_CHOICES = list(models.THINKING_MODES)
@@ -146,6 +146,62 @@ MANAGE_INSTRUCTIONS_TOOL = {
                     "the listed skills are merged into the existing map."
                 ),
                 "additionalProperties": {"type": "string", "enum": _SKILL_MODES},
+            },
+        },
+        "required": ["action"],
+    },
+}
+
+MANAGE_MEMORIES_TOOL = {
+    "name": "manage_memories",
+    "description": (
+        "Look at and add to the memories: what the robot remembers from one run to the "
+        "next. A memory is a text and a diary, kept on disk; an instruction names the "
+        "memory its runs use (memory and memory_name in manage_instructions), and "
+        "instructions that name the same one share it. A run with memory is told its "
+        "memory once, at its start, and the conversation is put into it by the program "
+        "when the run ends: you need this tool only to act before then. Actions: list "
+        "(the memories and who uses each), read (a memory's text and diary as they are "
+        "on disk now), remember (add one thing to a memory at once: use it when the "
+        "person asks you to remember something, so that it is kept even if the run is "
+        "cut off), edit (replace a memory's whole text: use it when the person asks you "
+        "to forget or correct something; read it first, and change only what was asked), "
+        "copy (a second memory with the same content under a new name). The text a "
+        "memory had before a change is kept. This tool cannot delete a memory or return "
+        "one to an earlier state: the owner does that. Never edit a memory unless the "
+        "person asked for that change."
+    ),
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "action": {
+                "type": "string",
+                "enum": ["list", "read", "remember", "edit", "copy"],
+                "description": "What to do",
+            },
+            "name": {
+                "type": "string",
+                "description": (
+                    "Which memory: \"shared\" for the shared one, or a memory's name. Left "
+                    "out, it is the memory of this run (for copy: the one to copy from)"
+                ),
+            },
+            "text": {
+                "type": "string",
+                "description": (
+                    "For remember: the thing to remember, as one or two plain sentences "
+                    "in the first person (\"Roman's cat is called Miso.\")"
+                ),
+            },
+            "content": {
+                "type": "string",
+                "description": "For edit: the whole memory as it should read from now on",
+            },
+            "new_name": {
+                "type": "string",
+                "description": (
+                    "For copy: the name of the copy (letters, digits, spaces, - and _)"
+                ),
             },
         },
         "required": ["action"],
@@ -508,6 +564,10 @@ def meta_tools(agent) -> dict:
             definition=MANAGE_SKILLS_TOOL,
             run=lambda params: skills.manage_skills(agent.skills, params),
             is_available=lambda: True)
+    tools["manage_memories"] = Tool(
+        definition=MANAGE_MEMORIES_TOOL,
+        run=lambda params: memory.manage_memories(agent.datadir, agent.settings, params),
+        is_available=lambda: True)
     # Waiting on a child only watches a process, so several can be waited on
     # at once: it is safe to run alongside other calls.
     tools["run_instruction"] = Tool(

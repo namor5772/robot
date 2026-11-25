@@ -506,6 +506,149 @@ def remember(store, entry, client, console, interrupts, *, ended=None, learned=N
     return result.usage, model
 
 
+# ---- the tool ----------------------------------------------------------------
+
+DIARY_READ = 20          # diary entries the tool's read shows
+MAX_REMEMBER_CHARS = 1000
+ASKED_HEADING = "Asked to remember"
+
+_NOT_TOLD_AGAIN = (
+    "It is saved, and is part of your memory from the next time you wake. In this "
+    "conversation your memory stays as you were told it at the start.")
+
+
+def _tool_store(datadir, run_settings, params, key="name", needed=True):
+    """The memory a call means: (store, '') or (None, an error text).
+
+    With no name it is the memory of the run that is calling; "shared" is
+    the word for the shared one.
+    """
+    name = params.get(key)
+    if name is None or name == "":
+        if not getattr(run_settings, "memory", False):
+            if needed:
+                return None, (f"Error: this run has no memory of its own. Give '{key}': "
+                              f"\"{SHARED_LABEL}\" or a memory's name.")
+            return Store(datadir), ""
+        name = getattr(run_settings, "memory_name", "") or SHARED
+    elif isinstance(name, str) and name.strip().lower() == SHARED_LABEL:
+        name = SHARED
+    problem = name_problem(name)
+    if problem:
+        return None, f"Error: {problem}"
+    return Store(datadir, name), ""
+
+
+def manage_memories(datadir, run_settings, params) -> str:
+    """The manage_memories tool: look at the memories, and add to or correct one.
+
+    It cannot delete a memory or take one back to an earlier state. Those
+    are the owner's, in the Memories window: with hands-free on the robot
+    hears whoever speaks, and a deleted memory cannot be had back.
+    """
+    action = params.get("action", "")
+    own = (label(getattr(run_settings, "memory_name", "") or SHARED)
+           if getattr(run_settings, "memory", False) else "")
+
+    if action == "list":
+        lines = []
+        for name in [SHARED] + names(datadir):
+            one = Store(datadir, name)
+            used = ", ".join(users(datadir, name)) or "no instruction"
+            mine = "  <- this run's memory" if own and label(name) == own else ""
+            lines.append(f"- {label(name)}: {counted(one.words(), 'word')}, "
+                         f"{counted(len(one.diary()), 'conversation')} in the diary; "
+                         f"used by {used}{mine}")
+        if not own:
+            lines.append("This run has no memory of its own.")
+        return "Memories:\n" + "\n".join(lines)
+
+    if action == "read":
+        store, problem = _tool_store(datadir, run_settings, params)
+        if problem:
+            return problem
+        diary = store.diary()
+        shown = diary[-DIARY_READ:]
+        parts = [f"Memory '{label(store.name)}', as it is on disk now "
+                 f"({counted(store.words(), 'word')}):",
+                 store.memory() or "(nothing is remembered yet)"]
+        if shown:
+            left_out = len(diary) - len(shown)
+            heading = "Diary" + (f" (the newest {len(shown)} of {len(diary)} entries)"
+                                 if left_out else "")
+            parts += [heading + ":", "\n\n".join(shown)]
+        return "\n\n".join(parts)
+
+    if action == "remember":
+        text = params.get("text")
+        if not isinstance(text, str) or not text.strip():
+            return "Error: 'text' is required: the thing to remember, as one or two sentences."
+        text = " ".join(text.split())
+        if len(text) > MAX_REMEMBER_CHARS:
+            return (f"Error: 'text' is {len(text)} characters; {MAX_REMEMBER_CHARS} is the "
+                    "most. Say it more briefly.")
+        store, problem = _tool_store(datadir, run_settings, params)
+        if problem:
+            return problem
+        now = datetime.datetime.now()
+        line = f"- {now.day} {now.strftime('%B %Y')}: {text}"
+        memory = store.memory()
+        if ASKED_HEADING not in memory.splitlines():
+            memory = (memory + "\n\n" if memory else "") + ASKED_HEADING
+        try:
+            store.set_memory(memory + "\n" + line)
+        except OSError as error:
+            return f"Error: the memory could not be written: {error}"
+        return f"Added to the memory '{label(store.name)}'. {_NOT_TOLD_AGAIN}"
+
+    if action == "edit":
+        content = params.get("content")
+        if not isinstance(content, str) or not content.strip():
+            return ("Error: 'content' is required: the whole memory as it should read from "
+                    "now on. An empty memory is not written: erasing one is for the owner, "
+                    "in the Memories window.")
+        if len(content) > MAX_MEMORY_CHARS:
+            return (f"Error: 'content' is {len(content):,} characters; a memory holds "
+                    f"{MAX_MEMORY_CHARS:,} at most.")
+        store, problem = _tool_store(datadir, run_settings, params)
+        if problem:
+            return problem
+        try:
+            store.set_memory(content)
+        except OSError as error:
+            return f"Error: the memory could not be written: {error}"
+        return (f"The memory '{label(store.name)}' now reads as you gave it "
+                f"({counted(store.words(), 'word')}). The text it had is kept among its "
+                f"earlier states. {_NOT_TOLD_AGAIN}")
+
+    if action == "copy":
+        source, problem = _tool_store(datadir, run_settings, params)
+        if problem:
+            return problem
+        new_name = params.get("new_name")
+        if not isinstance(new_name, str) or not new_name:
+            return "Error: 'new_name' is required: the name of the copy."
+        problem = name_problem(new_name)
+        if problem:
+            return f"Error: {problem}"
+        if not source.exists():
+            return f"Error: the memory '{label(source.name)}' is empty: there is nothing to copy."
+        target = Store(datadir, new_name)
+        if target.exists():
+            return f"Error: there is a memory named '{new_name}' already."
+        try:
+            source.copy_to(target)
+        except OSError as error:
+            return f"Error: the copy could not be made: {error}"
+        return (f"Copied the memory '{label(source.name)}' to '{new_name}'. An instruction "
+                "uses it once its memory_name is set to that name (manage_instructions).")
+
+    if action in ("delete", "roll_back"):
+        return ("Error: this tool does not delete a memory or take one back to an earlier "
+                "state. The owner does that, in the interface's Memories window.")
+    return f"Error: Unknown action '{action}'."
+
+
 # ---- small helpers -----------------------------------------------------------
 
 

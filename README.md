@@ -156,7 +156,7 @@ What the main window has:
 - **The top line** names the instruction that START will run, with its model,
   its thinking level and whether it is a conversation or a single task. `meta`
   at the end means the instruction's Meta switch is on, which gives its runs
-  the group of four Meta tools (see [Tools](#tools)). No other tool is shown
+  the group of five Meta tools (see [Tools](#tools)). No other tool is shown
   here. A name too long for the window is shortened with `...`, so that the
   settings after it always stay in view.
 - **START** (F2) runs it. What the run shows appears under *Output*, the same
@@ -471,11 +471,12 @@ Each skill has a mode:
 | `web_search` | always | Searches the web on Anthropic's servers, up to 5 searches per request. |
 | `manage_instructions` | Meta on | Lists, reads, creates, updates and deletes instructions. |
 | `manage_skills` | Meta on | The same for skills and their bundled files. |
+| `manage_memories` | Meta on | Lists and reads the memories, adds a thing to one at once, corrects one, copies one. It cannot delete one (see "Memory"). |
 | `run_instruction` | Meta on | Runs another instruction as a child run. |
 | `upgrade_model` | Meta on | Moves the rest of the run to a stronger model. |
 
 Meta is the only group of tools. It is one switch on an instruction, and it
-turns the last four on together: the tools with which the robot works on its
+turns the last five on together: the tools with which the robot works on its
 own setup. Their descriptions add about 3,000 tokens to every request. The
 first nine are not grouped: each is offered on its own, whenever it can work.
 
@@ -602,7 +603,7 @@ Editor the Tools button shows this list, in this order, with a tick beside
 each tool the instruction may use. A cleared tool is blocked for that
 instruction only (`blocked_tools` in the file), and a Meta tool needs both
 the Meta switch and its tick. While the instruction's Meta box is not ticked,
-the four Meta tools show `[-]` and "(needs Meta)" there in place of a box and
+the five Meta tools show `[-]` and "(needs Meta)" there in place of a box and
 cannot be ticked or cleared: no run would get them either way. A block set on
 one of them earlier is kept, and shows again once Meta is ticked.
 
@@ -662,6 +663,26 @@ do. The top row of the interface then says `memory`, or `memory: NAME`.
     or `_`) and starts an empty memory under it. Nothing has to be created
     first: its files appear when the first conversation has been remembered.
 - Deleting or copying an instruction leaves its memory as it is.
+
+### Remember this, forget that
+
+With Meta on, the robot has a tool for its memories, `manage_memories`, so
+that it can act in the middle of a conversation and not only when it ends:
+
+- **"Remember that ..."**: it adds the thing to its memory at once, as a dated
+  line under "Asked to remember". It is then kept even if the run is cut
+  off.
+- **"Forget that ..."**, or a correction: it reads its memory and writes it
+  again without that, or put right. The text as it was is kept among the
+  earlier states, so you can roll it back.
+- It can list the memories, read any of them (not only its own), and copy
+  one under a new name.
+- It **cannot delete** a memory or roll one back: that is for you, in the
+  Memories window. With Hands-free on the robot hears whoever speaks, and a
+  deleted memory cannot be had back.
+
+What it changes this way it knows from its next waking: within the same
+conversation it goes by what was said.
 
 ### The Memories window
 

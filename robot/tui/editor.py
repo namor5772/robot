@@ -18,7 +18,8 @@ MEMORY_NEW = "new name..."
 
 # The tools that the Meta switch offers together. Without it none of them is
 # offered, whatever the instruction's own list of blocked tools says.
-META_TOOL_NAMES = ("manage_instructions", "manage_skills", "run_instruction", "upgrade_model")
+META_TOOL_NAMES = ("manage_instructions", "manage_skills", "manage_memories",
+                   "run_instruction", "upgrade_model")
 
 # Every tool a run can be offered, for the list of tools an instruction may use.
 TOOL_NAMES = (
@@ -382,7 +383,7 @@ class InstructionEditor(Window):
 
     def _edit_tools(self):
         names = list(TOOL_NAMES) + [name for name in self.blocked if name not in TOOL_NAMES]
-        # A tick only says "not blocked". With the Meta box clear its four
+        # A tick only says "not blocked". With the Meta box clear its five
         # tools are not offered at all, so a tick there would promise what a
         # run does not get: those rows are shown switched off instead, and
         # whether each is blocked is kept as it is for when Meta is ticked.

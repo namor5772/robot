@@ -18,7 +18,8 @@ from robot.instructions import (
     RunSettings, describe, load_instructions, save_instructions, settings_from_entry)
 from robot.meta import manage_instructions
 from robot.tools import available_tools
-from tests.fakes import FakeClient, NoWaitInterrupts, piped_console, reply, text_block, usage
+from tests.fakes import (
+    FakeClient, NoWaitInterrupts, piped_console, reply, text_block, tool_use, usage)
 
 NOON = datetime.datetime(2026, 11, 25, 12, 0)
 LATER = datetime.datetime(2026, 11, 26, 9, 12)
@@ -403,6 +404,155 @@ class NamedTest(StoreCase):
         self.assertIn("--- What you remember ---\nthree", text)
 
 
+class ToolTest(StoreCase):
+    """manage_memories, as a run with the shared memory calls it."""
+
+    def setUp(self):
+        super().setUp()
+        self.running = RunSettings(name="Talk", memory=True)
+        save_instructions(self.datadir, {
+            "Talk": {"text": "x", "memory": True},
+            "Guard": {"text": "x", "memory": True, "memory_name": "night watch"}})
+        self.store.write("The people I know\nRoman likes tea.", "We talked.", NOON, NOON)
+        self.night = memory.Store(self.datadir, "night watch")
+        self.night.write("The door was shut.", "A quiet night.", NOON, NOON)
+
+    def call(self, running=None, **params):
+        return memory.manage_memories(self.datadir, running or self.running, params)
+
+    def test_list_names_each_memory_its_users_and_the_runs_own(self):
+        listed = self.call(action="list")
+        self.assertIn("- shared: 7 words, 1 conversation in the diary; used by Talk"
+                      "  <- this run's memory", listed)
+        self.assertIn("- night watch: 4 words, 1 conversation in the diary; used by Guard\n",
+                      listed + "\n")
+        self.assertNotIn("no memory of its own", listed)
+
+    def test_list_tells_a_run_without_memory_that_it_has_none(self):
+        listed = self.call(RunSettings(name="Plain"), action="list")
+        self.assertIn("This run has no memory of its own.", listed)
+        self.assertNotIn("<- this run's memory", listed)
+
+    def test_read_gives_the_runs_own_memory_and_diary(self):
+        shown = self.call(action="read")
+        self.assertIn("Memory 'shared', as it is on disk now (7 words):", shown)
+        self.assertIn("Roman likes tea.", shown)
+        self.assertIn("Diary:\n\n## 2026-11-25 12:00 to 2026-11-25 12:00\nWe talked.", shown)
+
+    def test_read_gives_any_memory_by_name(self):
+        self.assertIn("The door was shut.", self.call(action="read", name="night watch"))
+        self.assertIn("Roman likes tea.",
+                      self.call(RunSettings(memory=True, memory_name="night watch"),
+                                action="read", name="shared"))
+        self.assertIn("(nothing is remembered yet)", self.call(action="read", name="nobody"))
+
+    def test_read_shows_only_the_newest_of_a_long_diary(self):
+        for number in range(memory.DIARY_READ + 3):
+            self.night.write("m", f"night {number}.", NOON, NOON)
+        shown = self.call(action="read", name="night watch")
+        self.assertIn(f"Diary (the newest {memory.DIARY_READ} of {memory.DIARY_READ + 4} "
+                      "entries):", shown)
+        self.assertNotIn("A quiet night.", shown)
+        self.assertIn(f"night {memory.DIARY_READ + 2}.", shown)
+
+    def test_remember_adds_a_dated_line_under_a_heading_of_its_own(self):
+        answer = self.call(action="remember", text="Roman's  cat is\ncalled Miso.")
+        self.assertIn("Added to the memory 'shared'.", answer)
+        self.assertIn("from the next time you wake", answer)
+        lines = self.store.memory().splitlines()
+        self.assertEqual(lines[:2], ["The people I know", "Roman likes tea."])
+        self.assertEqual(lines[-2], memory.ASKED_HEADING)
+        self.assertRegex(lines[-1], r"^- \d+ \w+ \d{4}: Roman's cat is called Miso\.$")
+        self.assertEqual(len(self.store.versions()), 1)
+
+    def test_remembering_twice_keeps_one_heading(self):
+        self.call(action="remember", text="One.")
+        self.call(action="remember", text="Two.")
+        text = self.store.memory()
+        self.assertEqual(text.count(memory.ASKED_HEADING), 1)
+        self.assertTrue(text.splitlines()[-1].endswith(": Two."))
+        self.assertTrue(text.splitlines()[-2].endswith(": One."))
+
+    def test_remember_starts_a_memory_that_was_empty(self):
+        answer = self.call(action="remember", name="fresh", text="A first thing.")
+        self.assertIn("Added to the memory 'fresh'.", answer)
+        fresh = memory.Store(self.datadir, "fresh")
+        self.assertEqual(fresh.memory().splitlines()[0], memory.ASKED_HEADING)
+        self.assertEqual(memory.names(self.datadir), ["fresh", "night watch"])
+
+    def test_remember_needs_a_text_that_is_not_too_long(self):
+        self.assertIn("Error: 'text' is required", self.call(action="remember"))
+        self.assertIn("Error: 'text' is required", self.call(action="remember", text="  "))
+        self.assertIn("is the most", self.call(action="remember",
+                                               text="x" * (memory.MAX_REMEMBER_CHARS + 1)))
+        self.assertEqual(self.store.versions(), [])
+
+    def test_edit_replaces_the_text_and_keeps_the_old_one(self):
+        answer = self.call(action="edit", content="The people I know\nRoman likes coffee.")
+        self.assertIn("The memory 'shared' now reads as you gave it (7 words).", answer)
+        self.assertIn("kept among its earlier states", answer)
+        self.assertEqual(self.store.memory(), "The people I know\nRoman likes coffee.")
+        kept = self.store.versions()[0].read_text(encoding="utf-8")
+        self.assertIn("Roman likes tea.", kept)
+        self.assertEqual(len(self.store.diary()), 1)
+
+    def test_edit_does_not_write_an_empty_memory(self):
+        for content in (None, "", "  \n "):
+            self.assertIn("An empty memory is not written", self.call(action="edit",
+                                                                     content=content))
+        self.assertIn("at most", self.call(action="edit",
+                                           content="x" * (memory.MAX_MEMORY_CHARS + 1)))
+        self.assertIn("Roman likes tea.", self.store.memory())
+
+    def test_a_run_without_memory_must_say_which_one_it_means(self):
+        plain = RunSettings(name="Plain")
+        for params in ({"action": "read"}, {"action": "remember", "text": "x"},
+                       {"action": "edit", "content": "x"}, {"action": "copy", "new_name": "c"}):
+            self.assertIn("Error: this run has no memory of its own", self.call(plain, **params))
+        self.assertIn("Added to the memory 'night watch'.",
+                      self.call(plain, action="remember", name="night watch", text="A fox."))
+
+    def test_a_run_with_a_named_memory_means_that_one(self):
+        guard = RunSettings(name="Guard", memory=True, memory_name="night watch")
+        self.call(guard, action="remember", text="A fox came by.")
+        self.assertIn("A fox came by.", self.night.memory())
+        self.assertNotIn("fox", self.store.memory())
+
+    def test_a_name_that_will_not_do_is_an_error(self):
+        for params in ({"action": "read", "name": "../x"},
+                       {"action": "remember", "name": "a/b", "text": "x"},
+                       {"action": "copy", "new_name": "versions"},
+                       {"action": "copy", "new_name": "a.b"}):
+            self.assertTrue(self.call(**params).startswith("Error:"), params)
+        self.assertEqual(memory.names(self.datadir), ["night watch"])
+
+    def test_copy_makes_a_second_memory(self):
+        answer = self.call(action="copy", new_name="trial")
+        self.assertIn("Copied the memory 'shared' to 'trial'.", answer)
+        self.assertEqual(memory.Store(self.datadir, "trial").memory(), self.store.memory())
+        self.assertIn("Copied the memory 'night watch' to 'second'.",
+                      self.call(action="copy", name="night watch", new_name="second"))
+
+    def test_copy_refuses_an_empty_source_a_taken_name_and_no_name(self):
+        self.assertIn("already", self.call(action="copy", new_name="night watch"))
+        self.assertIn("nothing to copy", self.call(action="copy", name="nobody", new_name="c"))
+        self.assertIn("'new_name' is required", self.call(action="copy"))
+        self.assertEqual(self.night.memory(), "The door was shut.")
+
+    def test_it_does_not_delete_or_go_back(self):
+        for action in ("delete", "roll_back"):
+            answer = self.call(action=action, name="night watch")
+            self.assertIn("does not delete a memory", answer)
+        self.assertTrue(self.night.exists())
+        self.assertIn("Unknown action", self.call(action="wipe"))
+
+    def test_the_tools_own_list_of_actions_has_no_delete(self):
+        from robot.meta import MANAGE_MEMORIES_TOOL
+
+        actions = MANAGE_MEMORIES_TOOL["input_schema"]["properties"]["action"]["enum"]
+        self.assertEqual(actions, ["list", "read", "remember", "edit", "copy"])
+
+
 class QuietAgent(Agent):
     """An Agent without the machine's own tools, which differ from place to place."""
 
@@ -466,6 +616,20 @@ class AgentTest(StoreCase):
         self.assertEqual(self.store.memory(), "Roman likes tea.")
         self.assertEqual(self.store.diary(), [])
         self.assertEqual(len(named.diary()), 1)
+
+    def test_what_the_tool_adds_during_a_run_is_what_the_remembering_starts_from(self):
+        added = tool_use("manage_memories", {"action": "remember", "text": "The cat is Miso."})
+        agent = self.make([reply(added), reply(text_block("Noted.")), reply(text_block("Yes.")),
+                           reply(text_block(REMEMBERED))],
+                          lines="Thank you\n", meta=True)
+        agent.run()
+        self.assertEqual(self.client.remaining, 0)
+        material = self.client.requests[-1]["messages"][0]["content"][0]["text"]
+        self.assertIn("<old_memory>\n" + memory.ASKED_HEADING, material)
+        self.assertIn("The cat is Miso.", material.split("</old_memory>")[0])
+        self.assertIn("[tool: manage_memories:", material.split("<transcript>")[1])
+        # The run's own prompt was fixed before the tool was called.
+        self.assertNotIn("The cat is Miso.", self.system_text(self.client.requests[1]))
 
     def test_a_run_without_memory_is_as_before(self):
         agent = self.make([reply(text_block("Hello."))], memory=False, conversational=False)

@@ -216,12 +216,13 @@ class MetaInARun(unittest.TestCase):
         machine = set(available_tools())
         return [tool["name"] for tool in request["tools"] if tool["name"] not in machine]
 
-    def test_meta_on_offers_the_four_tools(self):
+    def test_meta_on_offers_the_five_tools(self):
         made = self.make([reply(text_block("ok"))])
         made.run()
         self.assertEqual(self.tool_names(self.client.requests[0]),
                          ["user_prompt", "manage_instructions", "manage_skills",
-                          "run_instruction", "upgrade_model", "web_search"])
+                          "manage_memories", "run_instruction", "upgrade_model",
+                          "web_search"])
 
     def test_meta_off_offers_none_of_them(self):
         made = self.make([reply(text_block("ok"))], meta=False)
