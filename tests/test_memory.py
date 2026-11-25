@@ -435,9 +435,13 @@ class ToolTest(StoreCase):
 
     def test_read_gives_the_runs_own_memory_and_diary(self):
         shown = self.call(action="read")
-        self.assertIn("Memory 'shared', as it is on disk now (7 words):", shown)
-        self.assertIn("Roman likes tea.", shown)
-        self.assertIn("Diary:\n\n## 2026-11-25 12:00 to 2026-11-25 12:00\nWe talked.", shown)
+        self.assertIn("Memory 'shared', as it is on disk now (7 words).", shown)
+        self.assertIn("----- the text starts -----\n\nThe people I know\nRoman likes tea."
+                      "\n\n----- the text ends -----", shown)
+        text, diary = shown.split("----- the text ends -----")
+        self.assertNotIn("We talked.", text)
+        self.assertIn("never goes into 'edit'", diary)
+        self.assertIn("## 2026-11-25 12:00 to 2026-11-25 12:00\nWe talked.", diary)
 
     def test_read_gives_any_memory_by_name(self):
         self.assertIn("The door was shut.", self.call(action="read", name="night watch"))
@@ -450,8 +454,8 @@ class ToolTest(StoreCase):
         for number in range(memory.DIARY_READ + 3):
             self.night.write("m", f"night {number}.", NOON, NOON)
         shown = self.call(action="read", name="night watch")
-        self.assertIn(f"Diary (the newest {memory.DIARY_READ} of {memory.DIARY_READ + 4} "
-                      "entries):", shown)
+        self.assertIn(f"Its diary (the newest {memory.DIARY_READ} of "
+                      f"{memory.DIARY_READ + 4} entries).", shown)
         self.assertNotIn("A quiet night.", shown)
         self.assertIn(f"night {memory.DIARY_READ + 2}.", shown)
 
@@ -495,6 +499,21 @@ class ToolTest(StoreCase):
         kept = self.store.versions()[0].read_text(encoding="utf-8")
         self.assertIn("Roman likes tea.", kept)
         self.assertEqual(len(self.store.diary()), 1)
+
+    def test_edit_does_not_take_the_diary_for_part_of_the_text(self):
+        # What a model did in the first real try: it gave back all that read showed.
+        given = ("The people I know\nRoman likes coffee.\n\nDiary:\n\n"
+                 "## 2026-11-25 12:00 to 2026-11-25 12:00\nWe talked.")
+        self.assertIn("Error: 'content' holds diary entries",
+                      self.call(action="edit", content=given))
+        whole = self.call(action="read")
+        self.assertIn("Error: 'content' holds diary entries",
+                      self.call(action="edit", content=whole))
+        self.assertIn("Roman likes tea.", self.store.memory())
+        self.assertEqual(self.store.versions(), [])
+        # A heading of the text's own is not a diary line.
+        self.assertIn("now reads as you gave it",
+                      self.call(action="edit", content="## About me\nI am here."))
 
     def test_edit_does_not_write_an_empty_memory(self):
         for content in (None, "", "  \n "):

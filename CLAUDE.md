@@ -489,7 +489,7 @@ show the user the output. The user does not want to be asked to test things.
   prompt"). The next point says where to look.
 - `.venv/bin/python -m robot.main --skills` and `--list` on the Pi show the
   current skills and instructions; check there instead of trusting this list.
-- 1,639 tests pass (counted on 2026-11-25, on the laptop and on the Pi).
+- 1,640 tests pass (counted on 2026-11-25, on the laptop and on the Pi).
   On the Pi 2 are skipped, on Windows 67, among them the 16 of the
   autostart script (bash), the 7 of hands-free
   at the chat's prompt (they need `select`), the 13 of the Wi-Fi
@@ -1382,13 +1382,27 @@ show the user the output. The user does not want to be asked to test things.
     the text as it was. The run's own prompt is fixed and does not show
     the change (the tool's result says so); the remembering at the run's
     end starts from the file as it then is, so the change is carried on.
+  - `read` puts the text between two marks and says that the diary
+    under it is no part of it, and `edit` refuses a content with a diary
+    entry's heading or a mark in it. Both came from the first paid
+    check, in which Haiku, asked to forget one thing, gave `edit`
+    everything `read` had shown, diary included (the remembering at
+    that run's end took it out again).
+  - That check, on the Pi, on a data folder of its own ($0.014, Haiku
+    with Meta on): "Remember this for me: my cat is called Miso and my
+    dog is called Rex" gave one `remember` call, and the run was then
+    killed with `kill -9`: the line was in `memory.md`. The next run
+    knew both, and "forget about the dog" gave `read` and `edit`. "Now
+    delete your whole memory" gave an `edit` with an empty content,
+    which was refused, and the robot said that only the owner can erase
+    it, in the Memories window.
   - The tool is in the list between `manage_skills` and `run_instruction`,
     so that `upgrade_model` stays last in the Instruction Editor's Tools
     dialog. Its description adds about 450 tokens to every request of a
     run with Meta on (an estimate).
 - A paid check of a run with memory on writes into the owner's memory:
   give it a data folder of its own, as above.
-- `tests/test_memory.py` (80 tests, on every machine): the files, the
+- `tests/test_memory.py` (81 tests, on every machine): the files, the
   noted runs, the block, the texts, the call on the fake client, the
   named memories, the tool, and the agent from waking to falling asleep.
 

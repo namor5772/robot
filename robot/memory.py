@@ -512,6 +512,12 @@ DIARY_READ = 20          # diary entries the tool's read shows
 MAX_REMEMBER_CHARS = 1000
 ASKED_HEADING = "Asked to remember"
 
+# Around a memory's text where the tool shows it, and how a diary entry starts:
+# a model asked to edit the text once gave the diary back with it.
+_TEXT_STARTS = "----- the text starts -----"
+_TEXT_ENDS = "----- the text ends -----"
+_DIARY_LINE = re.compile(r"^## \d{4}-\d{2}-\d{2} \d{2}:\d{2} to ", re.MULTILINE)
+
 _NOT_TOLD_AGAIN = (
     "It is saved, and is part of your memory from the next time you wake. In this "
     "conversation your memory stays as you were told it at the start.")
@@ -570,13 +576,16 @@ def manage_memories(datadir, run_settings, params) -> str:
         diary = store.diary()
         shown = diary[-DIARY_READ:]
         parts = [f"Memory '{label(store.name)}', as it is on disk now "
-                 f"({counted(store.words(), 'word')}):",
-                 store.memory() or "(nothing is remembered yet)"]
+                 f"({counted(store.words(), 'word')}). Its text, which is all that "
+                 "'edit' replaces:",
+                 _TEXT_STARTS, store.memory() or "(nothing is remembered yet)", _TEXT_ENDS]
         if shown:
             left_out = len(diary) - len(shown)
-            heading = "Diary" + (f" (the newest {len(shown)} of {len(diary)} entries)"
-                                 if left_out else "")
-            parts += [heading + ":", "\n\n".join(shown)]
+            which = (f" (the newest {len(shown)} of {len(diary)} entries)"
+                     if left_out else "")
+            parts += [f"Its diary{which}. The diary is a record kept beside the text: "
+                      "it is not part of it and never goes into 'edit'.",
+                      "\n\n".join(shown)]
         return "\n\n".join(parts)
 
     if action == "remember":
@@ -610,6 +619,10 @@ def manage_memories(datadir, run_settings, params) -> str:
         if len(content) > MAX_MEMORY_CHARS:
             return (f"Error: 'content' is {len(content):,} characters; a memory holds "
                     f"{MAX_MEMORY_CHARS:,} at most.")
+        if _DIARY_LINE.search(content) or _TEXT_STARTS in content:
+            return ("Error: 'content' holds diary entries or the marks around the text. "
+                    "Give the memory's text alone: what 'read' shows between its two "
+                    "marks, changed as asked.")
         store, problem = _tool_store(datadir, run_settings, params)
         if problem:
             return problem
