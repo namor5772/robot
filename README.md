@@ -63,8 +63,12 @@ bash ~/robot/scripts/autostart.sh status
 ```
 
 What starts is the interface as you left it: the instruction it had last and
-its boxes, Hands-free among them. So tick Hands-free and run the instruction
-you want once, and from then on the Pi comes up running it and listening. It
+its boxes, Hands-free among them. So tick Hands-free and choose the
+instruction you want once, and from then on the Pi comes up running it and
+listening. To have it come up with another instruction: join the interface
+over SSH, end the run with STOP (F3) or a typed "stop", open the Instruction
+window (F4), pick the instruction and press *Use*. That is saved at once; the
+instruction need not be run. It
 first waits (three minutes at most) for the Wi-Fi and for the clock to be
 set. It is the ordinary interface: `ssh -t pi "bash ~/robot/scripts/ui.sh"`
 joins it from a PC, and when the run has ended (say "stop", or type "bye")

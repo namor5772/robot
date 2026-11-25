@@ -1802,7 +1802,11 @@ underneath is the same code the chat runs; only the console differs.
     back on the Wi-Fi": deploy twice).
 - Which instruction, and whether it listens, is whatever the interface
   remembers (`tui_state.json`): the last instruction used and the boxes as
-  they were. With Hands-free ticked the Pi comes up listening. An
+  they were. "Used" means chosen with *Use* in the Instruction Editor
+  (`App.set_instruction` saves the file there and then), not run: so the
+  way to change what the Pi comes up with is to choose another one once
+  (the owner asked how on 2026-11-25). A run from the chat, or a check's
+  run, changes nothing in that file. With Hands-free ticked the Pi comes up listening. An
   instruction that has been deleted since falls back to `Default`, as it
   does at any start of the interface.
 - The same console 8 and the same command as putting the interface on the
