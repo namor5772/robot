@@ -782,6 +782,9 @@ show the user the output. The user does not want to be asked to test things.
 - `requirements.txt`: `anthropic==2.8.0`, `python-dotenv==1.2.4`. Pinned on
   purpose: 2.8.0 sends API version 2026-10-21, has no `temperature`
   parameter, sends the key as a Bearer token, and is built on `httpx2`.
+- `RandomCommands.txt` in the checkout is the owner's own notes file, not
+  part of the program: it is in `.gitignore` since 2026-11-25, on both
+  PCs, and is left alone.
 - `.venv/` on each PC (gitignored): the same packages, under Python 3.12 on
   the laptop and 3.13.5 on the desktop.
 - `.gitattributes`: LF line endings for `*.sh`, `*.conf`, `*.sse`.
@@ -1803,6 +1806,14 @@ underneath is the same code the chat runs; only the console differs.
 - The same console 8 and the same command as putting the interface on the
   screen by hand (see "Several screens, several interfaces"); `sudo chvt
   1` gives the screen back to console 1.
+- With no screen attached to the Pi (the owner asked on 2026-11-25, and
+  means to use the screen only to watch the start): NOT tried. Nothing in
+  it needs a monitor: the text consoles are there without one, and the
+  interface is joined over ssh as ever. What is not known is the size of
+  console 8 then, which may be far smaller than 240 x 67 (80 x 25 is the
+  guess); the interface needs 72 x 18, and takes the size of the ssh
+  terminal once somebody joins. If it does not come up that way, read
+  `/var/log/robot-autostart.log` first.
 - `ROBOT_AUTOSTART_CONSOLE`, `ROBOT_AUTOSTART_WAIT`, `ROBOT_AUTOSTART_LOG`
   and `ROBOT_AUTOSTART_ARGS` (more words for `ui.sh`, as `--session zzt`)
   are for checks, with `ROBOT_SOCKET` and `ROBOT_DATA_DIR` passed on.
