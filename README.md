@@ -73,9 +73,9 @@ per start of the Pi and does not start another by itself afterwards. Every
 start of the Pi is then a paid run, and with Hands-free the robot answers
 whoever speaks near it.
 
-The Pi needs no screen for any of this: with none attached, the SSH command
-above is how you see the interface. (Not yet tried without a screen; the
-window may start small and takes your terminal's size once you join.)
+The Pi needs no screen for any of this, and no keyboard: with none attached,
+the SSH command above is how you see the interface. It takes your terminal's
+size once you join.
 
 Saying "bye" is different: it ends the conversation and switches the Pi off
 (see "Hands-free" under "Tools"). So with autostart on, the robot's day is:

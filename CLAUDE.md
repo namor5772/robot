@@ -1806,13 +1806,15 @@ underneath is the same code the chat runs; only the console differs.
 - The same console 8 and the same command as putting the interface on the
   screen by hand (see "Several screens, several interfaces"); `sudo chvt
   1` gives the screen back to console 1.
-- With no screen attached to the Pi (the owner asked on 2026-11-25, and
-  means to use the screen only to watch the start): NOT tried. Nothing in
-  it needs a monitor: the text consoles are there without one, and the
-  interface is joined over ssh as ever. What is not known is the size of
-  console 8 then, which may be far smaller than 240 x 67 (80 x 25 is the
-  guess); the interface needs 72 x 18, and takes the size of the ssh
-  terminal once somebody joins. If it does not come up that way, read
+- With no screen attached to the Pi it works as well: the owner started
+  the Pi that way on 2026-11-25, with no keyboard either, used the robot
+  and ended with a spoken "bye", and reported "All the above changes work
+  well, the Pi is now powered off." Nothing in it needs a monitor: the
+  text consoles are there without one, and the interface is joined over
+  ssh as ever. No session looked at the Pi during that start, so the size
+  console 8 has without a monitor is still not known (80 x 25 is the
+  guess; the interface needs 72 x 18, and takes the size of the ssh
+  terminal once somebody joins). If a start ever fails that way, read
   `/var/log/robot-autostart.log` first.
 - `ROBOT_AUTOSTART_CONSOLE`, `ROBOT_AUTOSTART_WAIT`, `ROBOT_AUTOSTART_LOG`
   and `ROBOT_AUTOSTART_ARGS` (more words for `ui.sh`, as `--session zzt`)
