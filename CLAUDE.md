@@ -1307,7 +1307,12 @@ show the user the output. The user does not want to be asked to test things.
     searched the saved chats by itself, found only its own, and said so.
   - Not tried by a session: the interface, hands-free and the power-off
     with memory on. The agent's code is the same there; the owner's test
-    is the first.
+    was the first. It came that night, after a restart of the Pi at 21:55
+    that came up through the autostart on `HandsFreeChatAgent`, with the
+    named memory the owner had given it in the editor and with
+    `manage_memories` in the run: "All the above changes work well, the Pi
+    is now powered off." No session looked at the Pi during that test, so
+    what the memory then held is not written down here.
 - Memory was switched on for the owner's `HandsFreeChatAgent` that day,
   through `manage_instructions` with a script fed over stdin, because
   that is the instruction the owner asked about. The owner was told.
