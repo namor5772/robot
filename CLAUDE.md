@@ -152,6 +152,13 @@ see "The windowed interface"). Since 2026-11-20 it sees (a webcam and
     `py -3.13 -m venv .venv` and `.venv/Scripts/python.exe -m pip install -r
     requirements.txt`; it has Python 3.13.5, as the Pi has, and the laptop's
     has 3.12.
+- A session on one PC can be worked from the other without the other's
+  checkout coming into it (the owner did so on 2026-11-26): `/remote-control`
+  typed in the session on the laptop, and the session then showed in the
+  Claude app on the desktop. Everything still runs on the PC the session
+  was started on, with its checkout, its key and its tools, and that PC
+  must stay on with the terminal open. The other PC's checkout is not
+  touched: it needs its `git pull --ff-only` as ever.
 - What differs: Git Bash does not work on the desktop, and so neither does
   the Bash tool. Its tries end in `dofork: child -1 - forked process ...
   died unexpectedly, ... exit code 0xC0000142`, or in an exit code and
@@ -334,6 +341,11 @@ show the user the output. The user does not want to be asked to test things.
   broken several times, and backslashes in them are rewritten (a `\x11` in a
   heredoc reached the file as the control character itself). Use the Write
   and Edit tools for file content, scripts included.
+- A commit message with double quotes in it does not survive `git commit
+  -m` in PowerShell 5.1 on the laptop: the quotes are dropped on the way
+  to git, which then takes the words for file names ("pathspec ... did not
+  match") and commits nothing (2026-11-26). Write the message to a file in
+  the scratch folder and use `git commit -F FILE`.
 - On the desktop the Bash tool does not work (see "The two PCs") and the
   PowerShell tool does its job. What was tried there on 2026-11-22, with
   PowerShell 7.7:
