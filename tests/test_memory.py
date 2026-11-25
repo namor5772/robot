@@ -14,7 +14,8 @@ from unittest import mock
 from robot import costs, memory, prompts
 from robot.agent import Agent
 from robot.datastore import DataDir, load_store
-from robot.instructions import RunSettings, describe, load_instructions, settings_from_entry
+from robot.instructions import (
+    RunSettings, describe, load_instructions, save_instructions, settings_from_entry)
 from robot.meta import manage_instructions
 from robot.tools import available_tools
 from tests.fakes import FakeClient, NoWaitInterrupts, piped_console, reply, text_block, usage
@@ -267,6 +268,141 @@ class RememberTest(StoreCase):
         self.assertIn("You have no memories yet", shown.getvalue())
 
 
+class NamedTest(StoreCase):
+    def named(self, name):
+        return memory.Store(self.datadir, name)
+
+    def test_names_that_will_do_and_names_that_will_not(self):
+        for name in ("", "night watch", "Otto-2", "a", "x" * memory.MAX_NAME, "7_up"):
+            self.assertEqual(memory.name_problem(name), "", name)
+        for name in (" lead", "trail ", "a/b", "..", "a.b", "-dash", "x" * (memory.MAX_NAME + 1),
+                     "versions", "Off", "shared", "new", 7, None):
+            self.assertNotEqual(memory.name_problem(name), "", name)
+        with self.assertRaises(ValueError):
+            self.named("a/b")
+
+    def test_a_named_memory_is_a_folder_inside_the_shared_ones(self):
+        store = self.named("night watch")
+        self.assertEqual(store.folder, self.store.folder / "night watch")
+        self.assertEqual(store.settings_file, self.store.settings_file)
+        store.write("The door was shut.", "A quiet night.", NOON, NOON)
+        self.assertEqual(store.memory(), "The door was shut.")
+        self.assertEqual(self.store.memory(), "")
+        self.assertFalse(self.store.exists())
+        self.assertTrue(store.exists())
+
+    def test_the_named_memories_are_listed_and_nothing_else_is(self):
+        self.assertEqual(memory.names(self.datadir), [])
+        self.store.write("one", "", NOON, NOON)
+        self.store.write("two", "", NOON, NOON)    # makes the shared one's versions folder
+        self.named("zebra").write("z", "", NOON, NOON)
+        self.named("Alpha").write("a", "", NOON, NOON)
+        self.assertEqual(memory.names(self.datadir), ["Alpha", "zebra"])
+
+    def test_who_uses_a_memory(self):
+        save_instructions(self.datadir, {
+            "Talk": {"text": "x", "memory": True},
+            "Guard": {"text": "x", "memory": True, "memory_name": "night watch"},
+            "Second": {"text": "x", "memory": True, "memory_name": "night watch"},
+            "Off": {"text": "x", "memory": False, "memory_name": "night watch"}})
+        self.assertEqual(memory.users(self.datadir, ""), ["Talk"])
+        self.assertEqual(memory.users(self.datadir, "night watch"), ["Guard", "Second"])
+        self.assertEqual(memory.users(self.datadir, "other"), [])
+
+    def test_a_copy_has_the_text_the_diary_and_the_time_but_no_past(self):
+        self.store.write("one", "first", NOON, NOON)
+        self.store.write("two", "second", NOON, NOON)
+        self.store.settle(self.store.begin("a.txt", 1), LATER)
+        copy = self.named("trial")
+        self.store.copy_to(copy)
+        self.assertEqual(copy.memory(), "two")
+        self.assertEqual(len(copy.diary()), 2)
+        self.assertEqual(copy.last_awake(), self.store.last_awake())
+        self.assertEqual(copy.versions(), [])
+        copy.write("three", "", NOON, NOON)
+        self.assertEqual(self.store.memory(), "two")
+
+    def test_rolling_back_keeps_the_state_it_leaves(self):
+        self.store.write("one", "", NOON, NOON)
+        self.store.write("two", "", NOON, NOON)
+        self.store.roll_back(self.store.versions()[0])
+        self.assertEqual(self.store.memory(), "one")
+        kept = [path.read_text(encoding="utf-8").strip() for path in self.store.versions()]
+        self.assertEqual(sorted(kept), ["one", "two"])
+
+    def test_two_changes_in_one_second_keep_two_states(self):
+        for text in ("one", "two", "three"):
+            self.store.set_memory(text)
+        self.assertEqual(len(self.store.versions()), 2)
+
+    def test_deleting_a_named_memory_removes_its_folder_only(self):
+        self.store.write("shared", "", NOON, NOON)
+        named = self.named("trial")
+        named.write("mine", "entry", NOON, NOON)
+        named.delete()
+        self.assertFalse(named.folder.exists())
+        self.assertEqual(self.store.memory(), "shared")
+
+    def test_deleting_the_shared_memory_keeps_the_named_ones_and_the_setting(self):
+        self.store.write("one", "entry", NOON, NOON)
+        self.store.write("two", "", NOON, NOON)
+        self.store.settle(self.store.begin("a.txt", 1), NOON)
+        self.store.settings_file.write_text('{"model": "claude-haiku-5-5"}')
+        self.named("trial").write("mine", "", NOON, NOON)
+        self.store.delete()
+        self.assertFalse(self.store.exists())
+        self.assertEqual(self.store.versions(), [])
+        self.assertEqual(self.store.diary(), [])
+        self.assertEqual(self.named("trial").memory(), "mine")
+        self.assertEqual(self.store.model(), "claude-haiku-5-5")
+
+    def test_the_setting_carries_the_name(self):
+        settings, warnings = settings_from_entry(
+            "A", {"text": "x", "memory": True, "memory_name": "night watch"})
+        self.assertEqual((settings.memory, settings.memory_name, warnings),
+                         (True, "night watch", []))
+        self.assertIn("memory: night watch", describe("A", {
+            "text": "x", "memory": True, "memory_name": "night watch"}))
+
+    def test_a_name_without_the_switch_means_nothing(self):
+        settings, _ = settings_from_entry("A", {"text": "x", "memory_name": "night watch"})
+        self.assertEqual((settings.memory, settings.memory_name), (False, ""))
+
+    def test_a_name_that_will_not_do_gives_a_run_without_memory_not_the_shared_one(self):
+        settings, warnings = settings_from_entry(
+            "A", {"text": "x", "memory": True, "memory_name": "../elsewhere"})
+        self.assertEqual((settings.memory, settings.memory_name), (False, ""))
+        self.assertIn("This run has no memory.", warnings[0])
+
+    def test_the_tool_that_manages_instructions_takes_and_checks_the_name(self):
+        running = RunSettings(name="Patrol", model="claude-haiku-5-5")
+        call = lambda **params: manage_instructions(self.datadir, running, params)  # noqa: E731
+        call(action="create", name="Guard", text="Watch", memory=True, memory_name="night watch")
+        self.assertEqual(load_instructions(self.datadir)["Guard"]["memory_name"], "night watch")
+        self.assertIn('"memory_name": "night watch"', call(action="read", name="Guard"))
+        self.assertIn("Error", call(action="update", name="Guard", memory_name="a/b"))
+        self.assertIn("Error", call(action="update", name="Guard", memory_name=7))
+        self.assertEqual(load_instructions(self.datadir)["Guard"]["memory_name"], "night watch")
+        call(action="update", name="Guard", memory_name="")
+        self.assertEqual(load_instructions(self.datadir)["Guard"]["memory_name"], "")
+
+    def test_the_command_line_lists_them(self):
+        save_instructions(self.datadir, {"Talk": {"text": "x", "memory": True}})
+        self.store.write("one two", "entry", NOON, NOON)
+        self.named("trial").write("three", "", NOON, NOON)
+        shown = io.StringIO()
+        with mock.patch.dict("os.environ", {"ROBOT_DATA_DIR": str(self.datadir.root)}), \
+                redirect_stdout(shown):
+            self.assertEqual(memory.main(["list"]), 0)
+            self.assertEqual(memory.main(["show", "--name", "trial"]), 0)
+            self.assertEqual(memory.main(["show", "--name", "a/b"]), 2)
+        text = shown.getvalue()
+        self.assertIn("- shared: 2 words, 1 conversations in the diary; used by Talk", text)
+        self.assertIn("- trial: 1 words, 0 conversations in the diary; used by no instruction",
+                      text)
+        self.assertIn("--- What you remember ---\nthree", text)
+
+
 class QuietAgent(Agent):
     """An Agent without the machine's own tools, which differ from place to place."""
 
@@ -312,6 +448,24 @@ class AgentTest(StoreCase):
         manage_instructions(self.datadir, RunSettings(model="claude-haiku-5-5"),
                             {"action": "create", "name": "Talk", "text": "Hi", "memory": True})
         self.assertEqual(describe_instruction(self.datadir, "Talk")[-1], "memory")
+
+    def test_a_run_with_a_named_memory_reads_and_writes_that_one_only(self):
+        self.store.write("Roman likes tea.", "", NOON, NOON)
+        named = memory.Store(self.datadir, "night watch")
+        named.write("The door was shut.", "", NOON, NOON)
+        agent = self.make([reply(text_block("Hello.")), reply(text_block("Noted.")),
+                           reply(text_block(REMEMBERED))],
+                          lines="The window is open\n", memory_name="night watch")
+        agent.run()
+        told = self.system_text(self.client.requests[0])
+        self.assertIn("The door was shut.", told)
+        self.assertNotIn("Roman likes tea.", told)
+        self.assertIn("<old_memory>\nThe door was shut.",
+                      self.client.requests[-1]["messages"][0]["content"][0]["text"])
+        self.assertIn("The people I know", named.memory())
+        self.assertEqual(self.store.memory(), "Roman likes tea.")
+        self.assertEqual(self.store.diary(), [])
+        self.assertEqual(len(named.diary()), 1)
 
     def test_a_run_without_memory_is_as_before(self):
         agent = self.make([reply(text_block("Hello."))], memory=False, conversational=False)

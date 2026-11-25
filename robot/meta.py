@@ -70,6 +70,15 @@ MANAGE_INSTRUCTIONS_TOOL = {
                     "when it ends (default false on create)"
                 ),
             },
+            "memory_name": {
+                "type": "string",
+                "description": (
+                    "Which memory the instruction uses when memory is true: '' (the "
+                    "default) is the shared one, a name is a memory of its own. "
+                    "Instructions that give the same name share that memory; a new "
+                    "name starts an empty one"
+                ),
+            },
             "model": {
                 "type": "string",
                 "description": (
@@ -302,20 +311,28 @@ RUN_INSTRUCTION_TOOL = {
 }
 
 # The fields `update` can change, in the order its error message names them.
-_UPDATABLE = ("text", "notes", "meta", "conversational", "memory", "model", "thinking_mode",
+_UPDATABLE = ("text", "notes", "meta", "conversational", "memory", "memory_name", "model",
+              "thinking_mode",
               "thinking_budget", "fast_mode", "upgrade_target", "blocked_tools", "skill_modes")
-_PLAIN_FIELDS = ("text", "notes", "meta", "conversational", "memory", "model", "thinking_budget",
+_PLAIN_FIELDS = ("text", "notes", "meta", "conversational", "memory", "memory_name",
+                 "model", "thinking_budget",
                  "fast_mode")
 
 
 def _check_fields(params) -> str:
     """An error text for a field of the wrong kind, or ''."""
-    for key in ("text", "notes", "model", "thinking_mode"):
+    for key in ("text", "notes", "model", "thinking_mode", "memory_name"):
         if params.get(key) is not None and not isinstance(params[key], str):
             return f"Error: '{key}' must be a string."
     for key in ("meta", "conversational", "memory", "fast_mode"):
         if params.get(key) is not None and not isinstance(params[key], bool):
             return f"Error: '{key}' must be true or false."
+    if params.get("memory_name"):
+        from robot import memory
+
+        problem = memory.name_problem(params["memory_name"])
+        if problem:
+            return f"Error: {problem}"
     budget = params.get("thinking_budget")
     if budget is not None and (not isinstance(budget, int) or isinstance(budget, bool)
                                or budget <= 0):
@@ -383,6 +400,7 @@ def manage_instructions(datadir, run_settings, params) -> str:
             "meta": bool(entry.get("meta", False)),
             "conversational": bool(entry.get("conversational", False)),
             "memory": bool(entry.get("memory", False)),
+            "memory_name": str(entry.get("memory_name") or ""),
             "provider": entry.get("provider", instructions.PROVIDER),
             "model": entry.get("model", ""),
             "thinking_mode": entry.get("thinking_mode") or models.mode_from_legacy(entry),
@@ -416,6 +434,7 @@ def manage_instructions(datadir, run_settings, params) -> str:
             "meta": bool(params.get("meta", False)),
             "conversational": bool(params.get("conversational", False)),
             "memory": bool(params.get("memory", False)),
+            "memory_name": params.get("memory_name") or "",
             "blocked_tools": sorted(params["blocked_tools"]
                                     if params.get("blocked_tools") is not None
                                     else run_settings.blocked_tools or []),

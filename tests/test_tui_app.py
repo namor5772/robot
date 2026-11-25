@@ -118,7 +118,7 @@ class TheWindow(MainCase):
 
     def test_help(self):
         self.drive("f1", self.shows("Help", "GETTING AROUND", "Tab, Shift+Tab"),
-                   "pgdn", "pgdn", "pgdn", self.shows("INSIDE TMUX"), "esc",
+                   "pgdn", "pgdn", "pgdn", "pgdn", self.shows("INSIDE TMUX"), "esc",
                    self.lacks("GETTING AROUND"), self.shows("[ START ]"))
 
     def test_a_window_that_is_too_small_says_so(self):

@@ -137,7 +137,8 @@ class Agent:
         self._pool_requests = queue.Queue()  # questions from tools on pool threads
         # With memory on for the instruction: where it is kept, and the note
         # that this run's conversation still has to be remembered.
-        self.memory = memory.Store(datadir) if settings.memory else None
+        self.memory = (memory.Store(datadir, settings.memory_name)
+                       if settings.memory else None)
         self._memory_entry = None
 
     # -- set-up ------------------------------------------------------------

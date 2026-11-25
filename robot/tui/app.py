@@ -28,6 +28,7 @@ from robot.datastore import DataDir, load_store, save_store
 from robot.tui.dialogs import MessageBox, PickDialog, TextDialog
 from robot.tui.editor import InstructionEditor
 from robot.tui.screen import Paste
+from robot.tui.memoryui import MemoriesWindow
 from robot.tui.skillsui import SkillsManager
 from robot.tui.text import clip, text_width, wrap_line
 from robot.tui.widgets import (
@@ -91,6 +92,7 @@ THE MAIN WINDOW
                    message, it ends the run.
   F4   Instruction choose, change, create and delete instructions
   F5   Skills      change skills, and switch them on and off
+  F6   Memories    what the robot remembers from earlier runs
   F10  Quit        (or Ctrl+Q)
   Ctrl+L           draw the screen again
 
@@ -128,12 +130,25 @@ THE INSTRUCTION EDITOR
   makes a new instruction. Use makes the instruction the one that
   START runs. A run already going keeps the settings it began
   with.
+  Memory: off, or the memory the instruction's runs wake up with
+  and add to when they end. "shared" is the one memory that
+  instructions use together; "new name..." starts an empty one
+  under a name of its own. Two instructions that have the same
+  memory both know what either was told.
 
 THE SKILLS MANAGER
   Space on the list, or Cycle mode, switches a skill between off,
   ON (its text is in every run's prompt) and OD (on demand: a run
   fetches it when needed). A change takes effect from the next
   run.
+
+THE MEMORIES WINDOW
+  Each memory with what it holds and which instructions use it.
+  Edit corrects what is remembered. Copy makes a second memory
+  from it under a new name. Roll back returns to one of the
+  earlier states that are kept, and Delete makes the robot
+  forget. A memory is not made here: it appears when an
+  instruction that names it has had its first conversation.
 
 INSIDE TMUX
   Ctrl+B then D leaves everything running and returns to the
@@ -582,6 +597,7 @@ class MainWindow(Window):
         self.stop = self.add(Button("STO&P", app.stop))
         self.instruction = self.add(Button("&Instruction", app.open_editor))
         self.skills = self.add(Button("S&kills", app.open_skills))
+        self.memories = self.add(Button("Memo&ries", app.open_memories))
         self.help = self.add(Button("H&elp", app.open_help))
         self.quit = self.add(Button("&Quit", app.quit))
         self.output = self.add(OutputPane("&Output"))
@@ -595,7 +611,7 @@ class MainWindow(Window):
                                 ("hands_free", "&Hands-free"))]
         self.keys = {
             "f1": app.open_help, "f2": app.start, "f3": app.stop, "f4": app.open_editor,
-            "f5": app.open_skills, "f10": app.quit, "ctrl+c": app.stop, "ctrl+q": app.quit,
+            "f5": app.open_skills, "f6": app.open_memories, "f10": app.quit, "ctrl+c": app.stop, "ctrl+q": app.quit,
             "ctrl+l": app.redraw,
         }
         self.stop.enabled = False
@@ -607,12 +623,19 @@ class MainWindow(Window):
     def layout(self, rows, cols):
         self.y = self.x = 0
         self.h, self.w = rows, cols
-        flow((self.start, self.stop, self.instruction, self.skills), 1, 1, cols)
+        flow((self.start, self.stop, self.instruction, self.skills, self.memories),
+             1, 1, cols)
+        left_end = self.memories.x + self.memories.w
         right = cols - 1
         for button in (self.quit, self.help):
             right -= button.w
             button.place(1, right)
             right -= 1
+        # A narrow window has no room for Help beside the rest: F1 is still
+        # there, and the bottom line says so.
+        self.help.visible = self.help.x > left_end
+        if not self.help.visible and self.focus is self.help:
+            self.focus = self.instruction
         reply_height = 5
         # The boxes take a second row where one is too narrow for them all.
         check_rows = flow(self.checks, 0, 1, cols)
@@ -694,7 +717,7 @@ def describe_instruction(datadir, name) -> list:
     if settings.meta:
         parts.append("meta")
     if settings.memory:
-        parts.append("memory")
+        parts.append(instructions.memory_flag(settings))
     return parts
 
 
@@ -985,6 +1008,9 @@ class App:
 
     def open_skills(self):
         self.run_modal(SkillsManager(self))
+
+    def open_memories(self):
+        self.run_modal(MemoriesWindow(self))
 
     # -- runs ----------------------------------------------------------------------------------
 

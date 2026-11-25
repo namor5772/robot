@@ -81,11 +81,37 @@ class Saving(EditorCase):
         self.assertEqual(entry["model"], "claude-haiku-5-5")
         self.assertEqual(entry["thinking_mode"], "low")
 
-    def test_the_memory_box_is_saved_and_shown_again(self):
-        self.editor("down", self.shows("[ ] Memory"), "alt+m", "alt+s")
+    def test_the_shared_memory_is_chosen_and_switched_off_again(self):
+        self.editor("down", self.shows("Memory: [off"), "alt+m",
+                    self.shows("|off", "|shared", "|new name..."), "down", "enter",
+                    self.shows("Memory: [shared", "(changed)"), "alt+s")
         self.assertIs(self.saved("Report")["memory"], True)
-        self.editor("down", self.shows("[x] Memory"), "alt+m", "alt+s")
+        self.assertEqual(self.saved("Report")["memory_name"], "")
+        self.editor("down", self.shows("Memory: [shared"), "alt+m", "home", "enter",
+                    "alt+s")
         self.assertIs(self.saved("Report")["memory"], False)
+
+    def test_a_new_memory_is_named_on_the_spot(self):
+        self.editor("down", "alt+m", "end", "enter",
+                    self.shows("Name of the new memory"), typed("night watch"), "alt+o",
+                    self.shows("Memory: [night watch"), "alt+s")
+        self.assertIs(self.saved("Report")["memory"], True)
+        self.assertEqual(self.saved("Report")["memory_name"], "night watch")
+
+    def test_a_memory_another_instruction_uses_is_in_the_list(self):
+        self.library(Guard={"text": "x", "memory": True, "memory_name": "night watch"})
+        self.editor("r", "alt+m", self.shows("|night watch"), "down", "down", "enter",
+                    "alt+s")
+        self.assertEqual(self.saved("Report")["memory_name"], "night watch")
+
+    def test_a_name_that_will_not_do_is_refused_and_nothing_changes(self):
+        self.editor("down", "alt+m", "end", "enter", typed("versions"), "alt+o",
+                    self.shows("cannot be a memory's name"), "enter",
+                    self.shows("Memory: [off"), self.lacks("(changed)"))
+
+    def test_giving_up_the_name_leaves_the_setting_as_it_was(self):
+        self.editor("down", "alt+m", "end", "enter", "esc",
+                    self.shows("Memory: [off"), self.lacks("(changed)"))
 
     def test_what_other_programs_keep_in_an_entry_stays(self):
         self.library(Report=dict(REPORT, section="Daily", order=3, images=["a.png"],
@@ -167,8 +193,10 @@ class ModelSettings(EditorCase):
 
     def test_the_thinking_levels_follow_the_model(self):
         def levels(screen):
-            self.assertIsNotNone(screen.find("xhigh"))
-            self.assertIsNone(screen.find("off"))     # Opus 5.5 always thinks
+            self.assertIsNotNone(screen.find("|xhigh"))
+            # Opus 5.5 always thinks. (The form behind the list has an "off"
+            # of its own, the Memory setting's: a row of the list is meant.)
+            self.assertIsNone(screen.find("|off"))
         self.editor("alt+h", Check(levels), "end", "enter", "alt+s")
         self.assertEqual(self.saved("Default")["thinking_mode"], "max")
 

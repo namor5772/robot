@@ -42,6 +42,7 @@ class RunSettings:
     skill_modes: dict = field(default_factory=dict)
     upgrade_target: dict | None = None
     memory: bool = False  # remember this run's conversation, and be told the earlier ones
+    memory_name: str = ""  # which memory: '' is the shared one
 
 
 def default_entry() -> dict:
@@ -138,12 +139,30 @@ def settings_from_entry(name: str, entry: dict) -> tuple[RunSettings, list]:
     if target is not None:
         target = models.sanitize_upgrade_target(target)
 
+    uses_memory = bool(entry.get("memory"))
+    memory_name = str(entry.get("memory_name") or "") if uses_memory else ""
+    if memory_name:
+        from robot import memory
+
+        problem = memory.name_problem(memory_name)
+        if problem:
+            # Not the shared one instead: that would write into a memory
+            # the instruction was never meant to touch.
+            warnings.append(f"{problem} This run has no memory.")
+            uses_memory, memory_name = False, ""
+
     settings = RunSettings(
         name=name, text=str(entry.get("text") or ""), model=model, thinking_mode=coerced,
         thinking_budget=budget, fast_mode=fast, meta=bool(entry.get("meta")),
         conversational=bool(entry.get("conversational")), blocked_tools=blocked,
-        skill_modes=skill_modes, upgrade_target=target, memory=bool(entry.get("memory")))
+        skill_modes=skill_modes, upgrade_target=target, memory=uses_memory,
+        memory_name=memory_name)
     return settings, warnings
+
+
+def memory_flag(settings) -> str:
+    """How a listing says that an instruction has memory, and which."""
+    return f"memory: {settings.memory_name}" if settings.memory_name else "memory"
 
 
 def describe(name: str, entry: dict) -> str:
@@ -154,7 +173,7 @@ def describe(name: str, entry: dict) -> str:
         return f"- {name}  [{entry.get('provider')}: cannot be run here]"
     flags = [flag for flag, on in (("meta", settings.meta), ("convo", settings.conversational),
                                    ("fast", settings.fast_mode),
-                                   ("memory", settings.memory)) if on]
+                                   (memory_flag(settings), settings.memory)) if on]
     mode = models.mode_label(settings.model, settings.thinking_mode,
                              thinking_budget=settings.thinking_budget)
     line = f"- {name}  [{settings.model}, {mode}]"

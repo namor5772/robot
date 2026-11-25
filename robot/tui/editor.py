@@ -5,12 +5,16 @@ Save reads the library afresh first, so a change made meanwhile by a run (its
 manage_instructions tool) to another instruction is kept.
 """
 
-from robot import instructions, models
+from robot import instructions, memory, models
 from robot import skills as skill_library
 from robot.datastore import StoreUnreadableError
 from robot.tui.dialogs import ChecklistDialog, _place_buttons_right
 from robot.tui.widgets import (
     Button, Checkbox, Choice, Label, ListBox, TextArea, TextField, Window, flow)
+
+# In the Memory list, beside the memories themselves.
+MEMORY_OFF = "off"
+MEMORY_NEW = "new name..."
 
 # The tools that the Meta switch offers together. Without it none of them is
 # offered, whatever the instruction's own list of blocked tools says.
@@ -180,7 +184,8 @@ class InstructionEditor(Window):
         self.fast = self.add(Checkbox("&Fast"))
         self.meta = self.add(Checkbox("M&eta"))
         self.convo = self.add(Checkbox("&Convo"))
-        self.memory = self.add(Checkbox("&Memory"))
+        self.memory = self.add(Choice("&Memory", on_change=self._memory_changed))
+        self._memory_was = MEMORY_OFF
         self.extras = [
             self.add(Button("No&tes", self._edit_notes)),
             self.add(Button("Too&ls", self._edit_tools)),
@@ -260,7 +265,7 @@ class InstructionEditor(Window):
         self.fast.value = bool(entry.get("fast_mode")) and self.fast.enabled
         self.meta.value = bool(entry.get("meta"))
         self.convo.value = bool(entry.get("conversational"))
-        self.memory.value = bool(entry.get("memory"))
+        self._set_memory(bool(entry.get("memory")), str(entry.get("memory_name") or ""))
         self.notes = str(entry.get("notes") or "")
         blocked = entry.get("blocked_tools")
         self.blocked = (sorted({str(tool) for tool in blocked})
@@ -279,6 +284,8 @@ class InstructionEditor(Window):
         self.foreign = ""
         if not self.model.options:
             self._set_model(models.DEFAULT_MODEL, "low")
+        if not self.memory.options:
+            self._set_memory(False)
         self.name.set("")
         self.text.set_text("")
         self.notes = ""
@@ -287,6 +294,45 @@ class InstructionEditor(Window):
         self.upgrade = None
         self._refresh_summary()
         self.snapshot = self._form()
+
+    # -- which memory ----------------------------------------------------------
+
+    def _memory_options(self, current="") -> list:
+        """Off, the shared memory, every named one there is or that an
+        instruction asks for, and the way to name a new one."""
+        datadir = self.app.datadir
+        found = set(memory.names(datadir))
+        for entry in instructions.load_instructions(datadir).values():
+            name = str(entry.get("memory_name") or "")
+            if entry.get("memory") and name:
+                found.add(name)
+        if current:
+            found.add(current)
+        return ([MEMORY_OFF, memory.SHARED_LABEL] + sorted(found, key=str.lower)
+                + [MEMORY_NEW])
+
+    def _set_memory(self, on, name=""):
+        value = memory.label(name) if on else MEMORY_OFF
+        self.memory.set_options(self._memory_options(name if on else ""), value)
+        self._memory_was = value
+
+    def _memory_changed(self, picked):
+        if picked != MEMORY_NEW:
+            self._memory_was = picked
+            return
+        self.memory.value = self._memory_was  # until a name has been given
+        typed = self.app.edit_text(
+            "Name of the new memory", "",
+            hint="Letters, digits, spaces, - and _. It starts empty.")
+        name = " ".join((typed or "").split())
+        if not name:
+            return
+        problem = memory.name_problem(name)
+        if problem:
+            self.app.message("Instruction Editor", problem)
+            return
+        self.memory.set_options(self._memory_options(name), name)
+        self._memory_was = name
 
     def _refresh_summary(self):
         if self.foreign:
@@ -400,7 +446,9 @@ class InstructionEditor(Window):
             "text": form["text"], "notes": form["notes"], "provider": instructions.PROVIDER,
             "model": form["model"], "thinking_mode": form["thinking"],
             "fast_mode": form["fast"], "meta": form["meta"], "conversational": form["convo"],
-            "memory": form["memory"],
+            "memory": form["memory"] != MEMORY_OFF,
+            "memory_name": ("" if form["memory"] in (MEMORY_OFF, memory.SHARED_LABEL)
+                            else form["memory"]),
             "blocked_tools": form["blocked"],
         })
         if "thinking_enabled" in entry:
@@ -484,6 +532,7 @@ class InstructionEditor(Window):
         self.name.place(1, x, width)
         self.model.w = min(width, 41)
         self.thinking.w = 22
+        self.memory.w = 34
         y = flow([self.model], 2, x, width)
         y = flow([self.thinking, self.fast, self.meta, self.convo, self.memory], y, x, width)
         y = flow(self.extras, y, x, width)

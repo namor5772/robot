@@ -12,13 +12,22 @@ instruction, three things change that:
   process was killed) is noted beforehand, and the next run to start makes up
   for it first, from the transcript on disk.
 
+There can be several memories. An instruction names the one it uses; with no
+name it uses the shared one, which is the `memory` folder itself, and a named
+one is a folder inside it. Two instructions that give the same name share
+that memory. A memory needs no creating: its files appear the first time a
+conversation is remembered.
+
 Everything is plain text in the data folder's `memory` folder, so the owner
 can read and correct it. This module imports nothing heavy: the model call
 loads the API module only when it is made.
 
+    python -m robot.memory list          the memories there are
     python -m robot.memory show          what a run would be told
     python -m robot.memory try CHAT.txt  what a conversation would leave,
                                          without changing anything
+
+`show` and `try` take `--name NAME` for a named memory.
 """
 
 import datetime
@@ -46,6 +55,53 @@ _DIARY_HEADING = "## "
 _STAMP = "%Y-%m-%d %H:%M"
 
 
+# The shared memory has no name. A named one is a folder, so its name is kept
+# to what is safe as one, and off the words the screen uses for other things.
+SHARED = ""
+SHARED_LABEL = "shared"
+MAX_NAME = 40
+_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9 _-]*\Z")
+_RESERVED = ("versions", "off", SHARED_LABEL, "new")
+
+
+def name_problem(name) -> str:
+    """Why `name` cannot be a memory's name, or '' when it can."""
+    if not isinstance(name, str):
+        return "A memory's name must be text."
+    if name == SHARED:
+        return ""
+    if len(name) > MAX_NAME or not _NAME.match(name) or name != name.strip():
+        return (f"A memory's name is 1 to {MAX_NAME} letters, digits, spaces, "
+                "- or _, and starts with a letter or a digit.")
+    if name.lower() in _RESERVED:
+        return f"'{name}' cannot be a memory's name: the word is used for something else."
+    return ""
+
+
+def label(name) -> str:
+    return name or SHARED_LABEL
+
+
+def names(datadir) -> list:
+    """The named memories there are, in the order a list shows them."""
+    root = datadir.root / "memory"
+    try:
+        found = [path.name for path in root.iterdir()
+                 if path.is_dir() and path.name and not name_problem(path.name)]
+    except OSError:
+        return []
+    return sorted(found, key=str.lower)
+
+
+def users(datadir, name) -> list:
+    """The instructions that use the memory called `name`."""
+    from robot import instructions
+
+    return sorted((title for title, entry in instructions.load_instructions(datadir).items()
+                   if entry.get("memory") and str(entry.get("memory_name") or "") == name),
+                  key=str.lower)
+
+
 class MemoryFailed(Exception):
     """The conversation could not be put into memory; the message says why."""
 
@@ -53,12 +109,17 @@ class MemoryFailed(Exception):
 class Store:
     """The memory's files, and what is read from and written to them."""
 
-    def __init__(self, datadir):
-        self.folder = datadir.root / "memory"
+    def __init__(self, datadir, name=SHARED):
+        problem = name_problem(name)
+        if problem:
+            raise ValueError(problem)
+        self.name = name
+        self.root = datadir.root / "memory"
+        self.folder = self.root / name if name else self.root
         self.memory_file = self.folder / "memory.md"
         self.diary_file = self.folder / "diary.md"
         self.state_file = self.folder / "state.json"
-        self.settings_file = self.folder / "settings.json"
+        self.settings_file = self.root / "settings.json"  # one for all the memories
         self.versions_dir = self.folder / "versions"
         self.chats_dir = datadir.chats_dir
 
@@ -87,6 +148,20 @@ class Store:
 
     def last_awake(self) -> str:
         return str(load_store(self.state_file).get("last_awake") or "")
+
+    def exists(self) -> bool:
+        return any(path.exists() for path in (
+            self.memory_file, self.diary_file, self.state_file))
+
+    def words(self) -> int:
+        return len(self.memory().split())
+
+    def versions(self) -> list:
+        """The memory file's earlier states, oldest first."""
+        try:
+            return sorted(self.versions_dir.glob("memory_*.md"))
+        except OSError:
+            return []
 
     # -- runs that still have to be remembered --------------------------------
 
@@ -160,23 +235,58 @@ class Store:
         """Put a remembered conversation into the files. The memory file as
         it was is kept beside them first: a mistake made here would otherwise
         be carried into every later version."""
-        self.folder.mkdir(parents=True, exist_ok=True)
-        if self.memory_file.exists():
-            self.versions_dir.mkdir(parents=True, exist_ok=True)
-            stamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-            shutil.copyfile(self.memory_file, self.versions_dir / f"memory_{stamp}.md")
-            versions = sorted(self.versions_dir.glob("memory_*.md"))
-            for old in versions[:-KEPT_VERSIONS]:
-                try:
-                    old.unlink()
-                except OSError:
-                    pass
-        atomic_write_text(self.memory_file, memory.strip()[:MAX_MEMORY_CHARS] + "\n")
+        self.set_memory(memory)
         if diary_entry.strip():
             heading = f"{_DIARY_HEADING}{_heading_time(started)} to {_heading_time(ended)}"
             earlier = _read(self.diary_file).rstrip()
             text = (earlier + "\n\n" if earlier else "") + heading + "\n" + diary_entry.strip()
             atomic_write_text(self.diary_file, text + "\n")
+
+
+    def set_memory(self, text):
+        """Replace the memory's text, keeping the text it had."""
+        self.folder.mkdir(parents=True, exist_ok=True)
+        if self.memory_file.exists():
+            self.versions_dir.mkdir(parents=True, exist_ok=True)
+            stamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            target = self.versions_dir / f"memory_{stamp}.md"
+            count = 1
+            while target.exists():  # two changes within one second
+                count += 1
+                target = self.versions_dir / f"memory_{stamp}_{count}.md"
+            shutil.copyfile(self.memory_file, target)
+            for old in self.versions()[:-KEPT_VERSIONS]:
+                try:
+                    old.unlink()
+                except OSError:
+                    pass
+        atomic_write_text(self.memory_file, text.strip()[:MAX_MEMORY_CHARS] + "\n")
+
+    def roll_back(self, version):
+        """Make an earlier state the memory again. The present one is kept."""
+        self.set_memory(_read(version))
+
+    def copy_to(self, other):
+        """Give another memory this one's text, diary and time last awake."""
+        other.folder.mkdir(parents=True, exist_ok=True)
+        for source, target in ((self.memory_file, other.memory_file),
+                               (self.diary_file, other.diary_file)):
+            if source.exists():
+                shutil.copyfile(source, target)
+        if self.last_awake():
+            other._save_state(last_awake=self.last_awake())
+
+    def delete(self):
+        """Forget everything. The shared memory's folder stays: the named
+        memories and the setting live in it."""
+        if self.name:
+            shutil.rmtree(self.folder)
+            return
+        for path in (self.memory_file, self.diary_file, self.state_file):
+            if path.exists():
+                path.unlink()
+        if self.versions_dir.exists():
+            shutil.rmtree(self.versions_dir)
 
 
 # ---- the wording -------------------------------------------------------------
@@ -433,11 +543,15 @@ def main(argv=None) -> int:
         prog="python -m robot.memory",
         description="Look at the robot's memory, or try the remembering on a saved chat.")
     actions = parser.add_subparsers(dest="action", required=True)
-    actions.add_parser("show", help="print what a run with memory would be told")
+    actions.add_parser("list", help="the memories there are, and who uses each")
+    shown = actions.add_parser("show", help="print what a run with memory would be told")
+    shown.add_argument("--name", default=SHARED, help="a named memory (now: the shared one)")
     trial = actions.add_parser(
         "try", help="print the memory and diary entry a saved chat would leave; "
                     "nothing is changed (one paid call)")
     trial.add_argument("chat", help="the chat's .txt file")
+    trial.add_argument("--name", default=SHARED,
+                       help="a named memory to start from (now: the shared one)")
     trial.add_argument("--model", help=f"the model to use (now: the setting, "
                                        f"or {DEFAULT_MODEL})")
     args = parser.parse_args(argv)
@@ -446,7 +560,19 @@ def main(argv=None) -> int:
             stream.reconfigure(errors="replace")
         except (AttributeError, ValueError):
             pass
-    store = Store(DataDir())
+    datadir = DataDir()
+    if args.action == "list":
+        for name in [SHARED] + names(datadir):
+            one = Store(datadir, name)
+            used = ", ".join(users(datadir, name)) or "no instruction"
+            print(f"- {label(name)}: {one.words()} words, {len(one.diary())} "
+                  f"conversations in the diary; used by {used}")
+        return 0
+    try:
+        store = Store(datadir, args.name)
+    except ValueError as error:
+        print(error)
+        return 2
     if args.action == "show":
         print(store.prompt_block())
         return 0
