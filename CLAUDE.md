@@ -1146,7 +1146,10 @@ show the user the output. The user does not want to be asked to test things.
   - The goodbye before a power-off is another sentence, the owner's too
     (`agent.FAREWELL_POWER_OFF`, since 2026-11-25): "I am powering myself
     off now. Good to have known you." The three other spoken end words
-    keep the first one.
+    keep the first one. Tried with the same paid check and stand-in as
+    below ($0.0022): `you> (heard) Bye.`, then `robot> I am powering
+    myself off now. Good to have known you.`, the chat saved, the stand-in
+    run.
   - Only the word "bye" (`agent.POWER_OFF_WORD`), and only SPOKEN, at the
     conversation's own prompt: the owner narrowed it to that the same day
     ("ONLY work if I say the word bye (not write it!)"); for an hour it
