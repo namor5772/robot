@@ -636,7 +636,7 @@ the Instruction Editor's Memory list (Alt+M) and save; it is off unless you
 do. The top row of the interface then says `memory`, or `memory: NAME`.
 
 - **Waking up.** At the start of the run the robot is told three things: its
-  memory (a text of up to about 1,500 words, in its own words), its diary of
+  memory (a text of up to about 3,000 words, in its own words), its diary of
   the last 7 conversations, and when it was last awake and what time it is
   now. It is also told where the word-for-word record of every conversation
   is (`saved_chats`), so that it can look up a detail it no longer remembers.

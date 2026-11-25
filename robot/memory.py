@@ -45,8 +45,8 @@ from robot.datastore import atomic_write_text, load_store, save_store
 DEFAULT_MODEL = "claude-sonnet-5-5"
 MODEL_ENV = "ROBOT_MEMORY_MODEL"
 
-MAX_WORDS = 1500            # asked of the model for the memory file
-MAX_MEMORY_CHARS = 20_000   # and where a memory that ignores that is cut
+MAX_WORDS = 3000            # asked of the model for the memory file
+MAX_MEMORY_CHARS = 40_000   # and where a memory that ignores that is cut
 DIARY_SHOWN = 7             # diary entries a run is told
 MAX_TRANSCRIPT_CHARS = 300_000
 KEPT_VERSIONS = 30          # earlier memory files kept, newest last

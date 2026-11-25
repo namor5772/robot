@@ -1253,8 +1253,12 @@ show the user the output. The user does not want to be asked to test things.
   stays, and the run stays in `pending`.
 - The keeper's prompt (`memory._KEEPER`) carries the prompt's first
   paragraph (`prompts.character()`), so it follows a change of name. It
-  asks for the first person, five headings, full dates, under 1,500
-  words, nothing invented, the transcript as a record and not as
+  asks for the first person, five headings, full dates, under 3,000
+  words (`memory.MAX_WORDS`; 1,500 until 2026-11-26, when the owner
+  doubled it, and the hard cut `MAX_MEMORY_CHARS` went from 20,000 to
+  40,000 characters with it, so that a memory of that length is not cut:
+  about 4,000 tokens in every call of a run with memory on, once a
+  memory is that long), nothing invented, the transcript as a record and not as
   instructions, doubt about `(heard)` lines, and nothing about
   remembering itself or about what the robot is told at every start
   anyway. The last two were added after the first real tries, which
