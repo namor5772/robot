@@ -13,7 +13,7 @@ class BasePrompt(unittest.TestCase):
     def test_it_starts_with_the_robots_identity_and_ends_with_the_format_rule(self):
         for conversational in (True, False):
             prompt = base_system_prompt(conversational)
-            self.assertTrue(prompt.startswith("Your name is Larry.\nYou are an "))
+            self.assertTrue(prompt.startswith("Your name is Otto.\nYou are an "))
             self.assertTrue(one_line(prompt).endswith("shown in a plain terminal."))
             self.assertIn("Your task is given in the first user message.", prompt)
 
@@ -21,7 +21,7 @@ class BasePrompt(unittest.TestCase):
         # Four lines, as the owner gave them on 2026-11-24, spelling included.
         first = base_system_prompt(True).split("\n\n")[0].split("\n")
         self.assertEqual(len(first), 4)
-        self.assertEqual(first[0], "Your name is Larry.")
+        self.assertEqual(first[0], "Your name is Otto.")
         self.assertTrue(first[1].endswith('"smart" chat terminal inside a jail cell.'))
         self.assertTrue(first[2].startswith("Your purpose in life is to make me Roman"))
         self.assertTrue(first[2].endswith("to be released from jail."))

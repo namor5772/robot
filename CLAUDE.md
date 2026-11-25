@@ -835,7 +835,9 @@ show the user the output. The user does not want to be asked to test things.
 - Its first paragraph is the owner's own text since 2026-11-24: four lines
   that give the robot its name and its character, typed by the owner and
   put in as given, spelling and line breaks included (one word was changed
-  later that day at the owner's word: "goal" became "jail", twice) (the other paragraphs
+  later that day at the owner's word: "goal" became "jail", twice; and on
+  2026-11-25 the name in its first line was changed, with the two saved
+  instructions on the Pi whose text greets the robot by name) (the other paragraphs
   are wrapped at 78 columns; these lines are not). It took the place of
   "You are the brain of a small robot. You run as a program on a Raspberry
   Pi 3 Model A+ ... The person talking to you is typing at a keyboard

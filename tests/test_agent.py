@@ -521,7 +521,7 @@ class SkillsInARun(LoopCase):
         self.assertIn("Clears old log files.", system)
         self.assertNotIn("Delete logs older than a week.", system)
         self.assertNotIn("asleep", system)
-        self.assertTrue(system.startswith("Your name is Larry."))
+        self.assertTrue(system.startswith("Your name is Otto."))
 
     def test_get_skill_is_offered_for_exactly_the_on_demand_skills(self):
         made = self.make_with_skills([reply(text_block("ok"))])
@@ -638,7 +638,7 @@ class WhatTheModelKnowsAboutItsRun(LoopCase):
         made.run()
         saved = json.loads((self.datadir.chats_dir / f"{made.chat_stem}.json")
                            .read_text(encoding="utf-8"))
-        self.assertIn("Your name is Larry.", saved["system_prompt"])
+        self.assertIn("Your name is Otto.", saved["system_prompt"])
         self.assertIn('the saved instruction named "Check"',
                       " ".join(saved["system_prompt"].split()))
 
