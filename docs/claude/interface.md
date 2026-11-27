@@ -280,6 +280,20 @@ underneath is the same code the chat runs; only the console differs.
   interface 'h1'", a second beside it took `h2`; both sessions and the
   tmux server were gone seconds later, and no `tui_state` file was
   written.
+- The same from the checkout after the deploy, paid, on Haiku (0.09
+  cents a run), again on `zz-ui` with a data folder of its own and the
+  sound tools blocked in the instruction: `h1` and `h2` ran side by
+  side; the screen of `h1`, read with `capture-pane`, had `Robot h1  |
+  ZZ Headless  | ...` in the top row, the reply "all is well", the cost
+  lines and "--- run ended: completed, $0.0009 ---"; then both sessions
+  were gone, no state file, the saved chat and two cost-log lines were
+  there.
+- Seen in that check, and older than this feature: the two runs started
+  in the same second, and there was ONE saved chat for the two cost-log
+  lines. A saved chat is named by the instruction and the second it
+  started in, so two runs of one instruction started in the same second
+  share a name and the later one's file replaces the earlier one's. It
+  takes a script to start two that close together. Not changed.
 
 ## Several screens, several interfaces
 
