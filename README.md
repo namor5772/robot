@@ -268,6 +268,62 @@ All the interfaces are in one tmux, and its keys go from one to the other:
 The interfaces share the instructions, the skills and the cost log, and each
 keeps its own runs and saved chats.
 
+#### What an interface remembers, and what it does not
+
+Several interfaces are like several MyAgent windows: separate programs, each
+with a run of its own and something it remembers. An interface remembers
+two things, in a file of its own (`tui_state.json` for the first,
+`tui_state_NAME.json` for one started with `--session NAME`):
+
+- the NAME of the instruction it has in use: the one last chosen with *Use*
+  in the Instruction Editor. Running an instruction does not change it, and
+  neither does a chat, a headless run or a child run;
+- its six bottom-row boxes (the five display boxes and Hands-free).
+
+So there is one remembered instruction per interface, not one for the Pi.
+An interface started under a name never used before has no file yet and
+opens on `Default`, and so does one whose instruction has been deleted.
+`-l "Name"` on the command line takes the place of the remembered one for
+that start. The first interface's file is also what decides which
+instruction starts with the Pi.
+
+Everything else comes with the instruction, not with the interface. It is
+kept in the instruction's own entry and looked up from the name when START
+is pressed:
+
+- its text, model, thinking level and fast mode;
+- Meta, Convo and Memory, on or off;
+- which tools are blocked for it;
+- its own skill modes, where it has any;
+- its upgrade model;
+- which memory it uses: the shared one, or one with a name.
+
+What follows from that:
+
+- Two interfaces with the same instruction in use get the same settings.
+  Change its model in the editor from one of them, and the other runs it on
+  the new model the next time.
+- The settings are read at START. A run that is going keeps what it started
+  with.
+- A memory belongs to its name, not to an interface: two interfaces whose
+  instructions name the same memory read and write the same one.
+- To run the same task with different settings in two interfaces, make two
+  instructions.
+
+Two things are in neither place:
+
+- Every skill has a general setting (on, on demand or off) that all
+  instructions share. An instruction's own skill modes take its place for
+  that instruction's runs; an instruction with none uses the general ones.
+- All interfaces share the one microphone and the one pair of speakers, so
+  only one of them should be listening hands-free.
+
+Compared with MyAgent: there each window is told apart by a number it is
+given when it starts (1, 2, 3 in the order of starting), and it remembers
+its window's size and place and its model settings as well. Here the name is
+the one you type, so session 2 is the same one whatever was started first,
+and typing the name again brings that interface back.
+
 An interface takes about 80 MB when it starts. One that sits idle gives most
 of that back when memory gets short: the Pi squeezes it into compressed
 memory, and brings it back when the interface is used again. Measured on
