@@ -2,6 +2,26 @@
 
 Part of the notes for Claude Code sessions. The index is in `CLAUDE.md`.
 
+## The scripts by name
+
+- Since 2026-11-28, at the owner's request (`chat.sh -l "Name"` typed at
+  the Pi's prompt had said "command not found"): `~/robot/scripts` is on
+  the search path of the Pi's interactive shells, by a line at the end of
+  `~/.bashrc` (`export PATH="$HOME/robot/scripts:$PATH"`, under a comment
+  that names the robot). It is a setting of the Pi, made by hand over ssh
+  and not by `deploy.sh`: another card or a fresh system does not have it.
+- The path alone would have given "Permission denied": the scripts were
+  committed from Windows with mode 644. `chat.sh`, `ui.sh`, `autostart.sh`
+  and `deploy.sh` are 755 in git since that day (`git update-index
+  --chmod=+x`; Windows has no such bit to set). The others are started by
+  programs with `bash FILE` and stay as they were.
+- Debian's `~/.bashrc` returns at its top for a shell that is not
+  interactive, so `ssh pi "chat.sh"` still finds nothing: commands given to
+  ssh, and everything in this repo's docs and scripts, keep the full `bash
+  ~/robot/scripts/...` form.
+- All four find their folder from `$0`, which is the full path when the
+  shell found the script by searching.
+
 ## When the SSH connection drops
 
 - Without tmux the chat belongs to the SSH session: if the PC sleeps or

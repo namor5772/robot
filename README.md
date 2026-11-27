@@ -1099,6 +1099,14 @@ differ: the desktop has PowerShell only, the laptop also Git Bash.
 - Passwordless sudo for the Pi's user, if the agent should have root.
 - `deploy.sh` installs the pinned Python packages and tmux, and sets up the
   `robot-wifi` service (it needs sudo for that).
+- The scripts typed by hand (`chat.sh`, `ui.sh`, `autostart.sh`, `deploy.sh`)
+  can be started by name from any folder, as in `chat.sh -l "Name"`, since
+  2026-11-28: the last line of `~/.bashrc` on the Pi puts `~/robot/scripts`
+  on the shell's search path. That line was added by hand, not by
+  `deploy.sh`, so a freshly set up Pi needs it again:
+  `export PATH="$HOME/robot/scripts:$PATH"`. It holds at the Pi's prompt
+  (the screen or `ssh pi`), not for a command given to ssh: there the full
+  form stays, `ssh -t pi "bash ~/robot/scripts/chat.sh"`.
 
 ### Another board
 
