@@ -627,6 +627,17 @@ is a run that is paid for. The 8 is for the whole tree of runs. A child may
 start children of its own (those may not start any), and they all count
 together: the first run's children and the children those started.
 
+A child run normally works out of sight. When the robot starts one with
+`show_window` (ask it to "show the child's window"), what the child writes
+appears in a tmux session of its own, named `child-NAME-PID`, beside the
+interface or chat the run was started from: Ctrl-B then S lists the sessions,
+and Ctrl-B then `)` goes to the next. The robot says the session's name when
+the child starts. The window only shows: the child takes no typing there, and
+its questions still come to the run that started it. It closes when the child
+ends; if you are watching at that moment it waits for Enter (up to five
+minutes) so that the last lines can be read, and then takes you back to
+another session.
+
 ## Memory
 
 A run does not know the runs before it. An instruction with **Memory** on
@@ -934,7 +945,7 @@ differ: the desktop has PowerShell only, the laptop also Git Bash.
 - `robot/prompts.py`: the system prompt's wording.
 - `robot/models.py`: model and price tables. `robot/costs.py`, `robot/chats.py`, `robot/history.py`, `robot/datastore.py`, `robot/relay.py`: supporting parts.
 - `robot/tui/`: the windowed interface. `app.py`: the main window and how a run and the screen work side by side. `editor.py`, `skillsui.py`, `memoryui.py`: the Instruction Editor, the Skills Manager and the Memories window. `widgets.py`, `dialogs.py`: buttons, lists, text boxes and small windows. `screen.py`: the screen and the keyboard (curses). `text.py`: wrapping and editing text.
-- `scripts/chat.sh`, `scripts/ui.sh`, `scripts/tmux.conf`: the tmux launchers for the chat and the windowed interface. `scripts/deploy.sh`: run on the Pi to update it. `scripts/wifi-reconnect.sh`: the `robot-wifi` service, which puts the Pi back on the Wi-Fi. `scripts/autostart.sh`: the switch for starting the interface and its run when the Pi starts, and what the `robot-autostart` service runs. `scripts/pi_photo.py`: run on a PC, fetches a photo from the Pi and opens it. `scripts/pi_sound.py`: the same for a sound recording, which it plays.
+- `scripts/chat.sh`, `scripts/ui.sh`, `scripts/tmux.conf`: the tmux launchers for the chat and the windowed interface. `scripts/child-window.sh`: what a child run's window runs (started by `run_instruction`, not by hand). `scripts/deploy.sh`: run on the Pi to update it. `scripts/wifi-reconnect.sh`: the `robot-wifi` service, which puts the Pi back on the Wi-Fi. `scripts/autostart.sh`: the switch for starting the interface and its run when the Pi starts, and what the `robot-autostart` service runs. `scripts/pi_photo.py`: run on a PC, fetches a photo from the Pi and opens it. `scripts/pi_sound.py`: the same for a sound recording, which it plays.
 - `tests/`: the test suite. `CLAUDE.md`: the rules and the layout for Claude Code sessions; `docs/claude/`: their detailed notes, one file per topic.
 
 ## Setup on the Pi

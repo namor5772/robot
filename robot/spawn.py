@@ -15,6 +15,8 @@ children those start, counted together.
 import contextlib
 import json
 import os
+import re
+import shlex
 import shutil
 import signal
 import subprocess
@@ -64,6 +66,16 @@ _LOCK_WAIT_SECONDS = 10
 CHILD_COMMAND = [sys.executable, "-m", "robot.main"]
 REPO_ROOT = Path(__file__).resolve().parent.parent
 _PROC = Path("/proc")
+
+# A child's window (show_window) is a tmux session that shows what the child
+# writes. It goes to the tmux this run is in, so that the person finds it
+# beside what they are looking at; a run outside tmux puts it where the
+# windowed interface lives. A check names a tmux of its own in the variable.
+WINDOW_SOCKET_ENV = "ROBOT_CHILD_SOCKET"
+WINDOW_SOCKET = "robot-ui"
+WINDOW_SCRIPT = REPO_ROOT / "scripts" / "child-window.sh"
+TMUX_CONF = REPO_ROOT / "scripts" / "tmux.conf"
+_TMUX_SECONDS = 10
 
 _spawn_lock = threading.Lock()
 _children = []  # the children this program started that may still be running
@@ -292,6 +304,67 @@ def _stop_child(process):
             pass
 
 
+def window_session(name, pid) -> str:
+    """The name of the tmux session that shows a child: tmux allows neither a
+    dot nor a colon in one, and the PID keeps two children of one instruction
+    apart."""
+    plain = re.sub(r"[^A-Za-z0-9_]+", "-", name).strip("-")[:20].strip("-")
+    return f"child-{plain}-{pid}" if plain else f"child-{pid}"
+
+
+def window_server() -> list:
+    """The tmux options that say which tmux a child's window goes to. None
+    are needed inside tmux: tmux finds its own server there."""
+    named = os.environ.get(WINDOW_SOCKET_ENV, "")
+    if named:
+        return ["-L", named]
+    if os.environ.get("TMUX"):
+        return []
+    return ["-L", WINDOW_SOCKET]
+
+
+def _open_window(name, pid, log_path):
+    """Show what a child writes in a tmux session of its own.
+
+    The child is this program's own process as ever: only its output goes to
+    a file, and the session shows that file as it grows. So the session can
+    fail to open, or be closed by the person, and the child is none the worse.
+    Returns the session's name and "", or "" and why there is no window.
+    """
+    tmux = shutil.which("tmux") if os.name == "posix" else None
+    if not tmux:
+        return "", "tmux is not available here"
+    session = window_session(name, pid)
+    inner = " ".join(shlex.quote(str(part))
+                     for part in ("bash", WINDOW_SCRIPT, log_path, pid, name))
+    command = [tmux, *window_server(), "-f", str(TMUX_CONF),
+               "new-session", "-d", "-s", session, inner,
+               # Somebody watching when it closes is taken to another session
+               # of this tmux, not thrown out of tmux altogether.
+               ";", "set-option", "-t", f"={session}", "detach-on-destroy", "off"]
+    # If this starts the tmux server, whatever is started there later inherits
+    # this environment: it must not take those programs for part of this tree.
+    environment = {key: value for key, value in os.environ.items()
+                   if key not in (DEPTH_ENV, FAMILY_ENV)}
+    try:
+        done = subprocess.run(command, cwd=str(REPO_ROOT), env=environment,
+                              stdin=subprocess.DEVNULL, capture_output=True, text=True,
+                              errors="replace", timeout=_TMUX_SECONDS, check=False)
+    except (OSError, subprocess.SubprocessError) as error:
+        return "", f"tmux could not be started: {error}"
+    if done.returncode != 0:
+        return "", _clip(done.stderr) or f"tmux ended with exit code {done.returncode}"
+    return session, ""
+
+
+def window_hint(session) -> str:
+    """How the person gets to a child's window."""
+    server = window_server()
+    if not server:
+        return "Ctrl-B then S lists the sessions"
+    return f"tmux {' '.join(server)} attach -t {session}"
+
+
 def _clip(text, limit=120):
     text = " ".join((text or "").split())
     return text if len(text) <= limit else text[:limit - 3] + "..."
@@ -365,6 +438,7 @@ def run_instruction(agent, params) -> str:
     wait = bool(params.get("wait", False))
     extra_text = params.get("extra_text") or ""
     prepend_text = params.get("prepend_text") or ""
+    show_window = bool(params.get("show_window", False))
     answers = params.get("answers")
     if isinstance(answers, str):
         answers = [answers]  # a single reply given bare
@@ -380,7 +454,7 @@ def run_instruction(agent, params) -> str:
         return "Error: 'name' is required."
 
     datadir = agent.datadir
-    result_path = extra_path = prepend_path = error_path = relay_dir = None
+    result_path = extra_path = prepend_path = error_path = log_path = relay_dir = None
     try:
         with _one_start_at_a_time(datadir.tmp_dir):
             library = instructions.load_instructions(datadir)
@@ -419,17 +493,37 @@ def run_instruction(agent, params) -> str:
             environment = dict(os.environ)
             environment[DEPTH_ENV] = str(depth + 1)
             environment[FAMILY_ENV] = family()  # the tree it belongs to, and counts in
+            # A child with a window writes into a file that the window shows.
+            # It is headless all the same: it reads no keyboard.
+            output = None
             try:
+                if show_window:
+                    log_path = _temp_file(datadir.tmp_dir, "window_", ".log")
+                    output = open(log_path, "wb")
                 with open(error_path, "w", encoding="utf-8") as errors:
                     process = subprocess.Popen(
                         command, cwd=str(REPO_ROOT), env=environment,
-                        stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=errors,
-                        start_new_session=(os.name == "posix"))
+                        stdin=subprocess.DEVNULL, stdout=output or subprocess.DEVNULL,
+                        stderr=errors, start_new_session=(os.name == "posix"))
             except Exception as error:
                 return f"Error launching instruction '{name}': {error}"
+            finally:
+                if output is not None:
+                    output.close()
             # Noted before the lock is let go: the next start must count it.
             with _children_lock:
                 _children.append(process)
+
+        window = ""
+        if show_window:
+            session, problem = _open_window(name, process.pid, log_path)
+            if session:
+                window = f" Its output shows in the tmux session '{session}'."
+                # Said now: a waited child's report only comes when it is over.
+                agent.console.note(f"Child run '{name}' can be watched in the tmux session "
+                                   f"'{session}': {window_hint(session)}.")
+            else:
+                window = f" Its window could not be shown ({problem}); it runs without one."
 
         if not wait:
             # The child carries on by itself. A helper thread answers its
@@ -437,8 +531,8 @@ def run_instruction(agent, params) -> str:
             threading.Thread(
                 target=_attend, name=f"child-{process.pid}", daemon=True,
                 args=(process, relay_dir, answers,
-                      (extra_path, prepend_path, error_path))).start()
-            extra_path = prepend_path = error_path = relay_dir = None
+                      (extra_path, prepend_path, error_path, log_path))).start()
+            extra_path = prepend_path = error_path = log_path = relay_dir = None
             noted = " with extra task context" if extra_text else ""
             if prepend_text:
                 noted += " with a prompt in front of its instruction"
@@ -447,12 +541,12 @@ def run_instruction(agent, params) -> str:
                           "given, the next one with an empty reply, which stops it")
             else:
                 asking = "; nobody answers its questions, so it stops at its first one"
-            return f"Launched instruction '{name}'{noted} (PID {process.pid}){asking}."
+            return f"Launched instruction '{name}'{noted} (PID {process.pid}){asking}.{window}"
 
         return _wait_for(agent, process, name, timeout, relay_dir, answers, result_path,
-                         error_path)
+                         error_path, window.replace(" shows in ", " was shown in "))
     finally:
-        for path in (result_path, extra_path, prepend_path, error_path):
+        for path in (result_path, extra_path, prepend_path, error_path, log_path):
             _remove(path)
         if relay_dir:
             shutil.rmtree(relay_dir, ignore_errors=True)
@@ -476,7 +570,8 @@ def _attend(process, relay_dir, answers, leftovers):
             shutil.rmtree(relay_dir, ignore_errors=True)
 
 
-def _wait_for(agent, process, name, timeout, relay_dir, answers, result_path, error_path):
+def _wait_for(agent, process, name, timeout, relay_dir, answers, result_path, error_path,
+              window=""):
     """Wait for a child to finish and return its report."""
     interrupts = agent.console.interrupts
     started = time.monotonic()
@@ -528,7 +623,7 @@ def _wait_for(agent, process, name, timeout, relay_dir, answers, result_path, er
     if len(final_text) > REPORT_LIMIT:
         final_text = (final_text[:REPORT_LIMIT]
                       + f"\n...[report truncated at {REPORT_LIMIT} chars]")
-    report = f"Instruction '{name}' finished (status={status}, {elapsed}s)."
+    report = f"Instruction '{name}' finished (status={status}, {elapsed}s).{window}"
     if result.get("error"):
         report += f"\nChild error: {result['error']}"
     if relay_dir:

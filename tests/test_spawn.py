@@ -3,6 +3,7 @@
 import concurrent.futures
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -90,6 +91,13 @@ STAND_IN = textwrap.dedent('''
         if not second:
             finish("stopped", "first=%r, then no answer" % first)
         finish("completed", "first=%r second=%r" % (first, second))
+    if name == "Chatty":
+        # Writes something, as a run does, then asks: whoever answers can
+        # look at what has been written so far.
+        print("hello from the child", flush=True)
+        reply = ask(1, "Seen it?")
+        print("the child heard %r" % reply, flush=True)
+        finish("completed", "reply=%r" % reply)
     if name == "Slow":
         time.sleep(60)
     if name == "Crash":
@@ -114,7 +122,8 @@ class SpawnCase(unittest.TestCase):
         self.datadir.ensure()
         instructions.save_instructions(self.datadir, {
             name: {"text": "x"}
-            for name in ("Echo", "Ask", "Slow", "Crash", "Long", "Failed", "Family")})
+            for name in ("Echo", "Ask", "Slow", "Crash", "Long", "Failed", "Family",
+                         "Chatty")})
         script = root / "stand_in.py"
         script.write_text(STAND_IN, encoding="utf-8")
         # Each test is a first run of its own: no tree name is handed down to
@@ -140,7 +149,9 @@ class SpawnCase(unittest.TestCase):
         self.asked = []
         self.person = []
         self.to_kill = []
-        self.agent = Obj(datadir=self.datadir, console=Obj(interrupts=NoWaitInterrupts()),
+        self.notes = []
+        self.agent = Obj(datadir=self.datadir,
+                         console=Obj(interrupts=NoWaitInterrupts(), note=self.notes.append),
                          stop_requested=lambda: self.stopping, ask_from_pool=self.ask)
 
     def ask(self, question):
@@ -203,7 +214,7 @@ class Refusals(SpawnCase):
     def test_a_name_is_required_and_must_exist(self):
         self.assertEqual(self.run_it(), "Error: 'name' is required.")
         self.assertEqual(self.run_it(name="Nope"),
-                         "Error: Instruction 'Nope' not found. Available: Ask, Crash, Echo, "
+                         "Error: Instruction 'Nope' not found. Available: Ask, Chatty, Crash, Echo, "
                          "Failed, Family, Long, Slow")
 
     def test_answers_must_be_a_list_of_strings(self):
@@ -674,6 +685,159 @@ class UnattendedChildren(SpawnCase):
         shown = self.run_it(name="Ask", answers=["yes", "sure"])
         self.assertIn("its questions are answered from the 2 answer(s) given", shown)
         self.assertTrue(self.wait_until(lambda: self.leftovers() == []))
+
+
+class ChildWindows(SpawnCase):
+    """show_window, with a stand-in for the tmux session."""
+
+    def setUp(self):
+        super().setUp()
+        self.opened = []
+        self.session = "child-Chatty-1"
+        self.problem = ""
+
+        def open_window(name, pid, log_path):
+            self.opened.append((name, pid, log_path))
+            return (self.session, "") if not self.problem else ("", self.problem)
+
+        patch = mock.patch.object(spawn, "_open_window", open_window)
+        patch.start()
+        self.addCleanup(patch.stop)
+
+    def test_no_window_unless_it_is_asked_for(self):
+        shown = self.run_it(name="Echo", wait=True)
+        self.assertEqual(self.opened, [])
+        self.assertEqual(self.notes, [])
+        self.assertNotIn("tmux", shown)
+
+    def test_the_window_shows_what_the_child_writes_as_it_writes_it(self):
+        seen = []
+
+        def person(question):
+            # The child is waiting for this answer: what it wrote before it
+            # asked is in the file the window shows.
+            log = Path(self.opened[0][2])
+            self.wait_until(lambda: "hello" in log.read_text(encoding="utf-8"))
+            seen.append(log.read_text(encoding="utf-8"))
+            return "yes"
+
+        self.agent.ask_from_pool = person
+        shown = self.run_it(name="Chatty", wait=True, show_window=True)
+        self.assertEqual(seen, ["hello from the child\n"])
+        self.assertIn("status=completed", shown)
+        self.assertIn("reply='yes'", shown)
+
+    def test_a_waited_childs_report_and_the_person_are_told_the_session(self):
+        self.person = ["yes"]
+        with mock.patch.dict(os.environ, {"TMUX": "/tmp/tmux-1000/robot-ui,1,0"}):
+            os.environ.pop(spawn.WINDOW_SOCKET_ENV, None)
+            shown = self.run_it(name="Chatty", wait=True, show_window=True)
+        name, pid, log_path = self.opened[0]
+        self.assertEqual(name, "Chatty")
+        self.assertIn(f"s). Its output was shown in the tmux session '{self.session}'.\n", shown)
+        self.assertEqual(self.notes, [
+            f"Child run 'Chatty' can be watched in the tmux session '{self.session}': "
+            "Ctrl-B then S lists the sessions."])
+        # The file goes with the rest when the child has ended.
+        self.assertEqual(self.leftovers(), [])
+
+    def test_a_child_nobody_waits_for_has_its_window_too(self):
+        shown = self.run_it(name="Chatty", show_window=True, answers=["ok"])
+        self.assertRegex(shown, r"which stops it\. Its output shows in the tmux session "
+                                r"'child-Chatty-1'\.$")
+        self.assertTrue(Path(self.opened[0][2]).name.startswith("window_"))
+        self.assertTrue(self.wait_until(lambda: self.leftovers() == []))
+
+    def test_a_window_that_cannot_be_shown_does_not_stop_the_child(self):
+        self.problem = "tmux is not available here"
+        self.person = ["yes"]
+        shown = self.run_it(name="Chatty", wait=True, show_window=True)
+        self.assertIn("status=completed", shown)
+        self.assertIn("Its window could not be shown (tmux is not available here); it runs "
+                      "without one.", shown)
+        self.assertEqual(self.notes, [])
+        self.assertEqual(self.leftovers(), [])
+
+
+class WindowNames(unittest.TestCase):
+    def test_a_session_name_tmux_accepts(self):
+        self.assertEqual(spawn.window_session("Weather: v1.0 (new)", 42),
+                         "child-Weather-v1-0-new-42")
+        self.assertEqual(spawn.window_session("An instruction with a very long name", 7),
+                         "child-An-instruction-with-7")
+        self.assertEqual(spawn.window_session("???", 7), "child-7")
+
+    def test_the_window_goes_to_the_tmux_the_run_is_in(self):
+        with mock.patch.dict(os.environ, {"TMUX": "/tmp/tmux-1000/robot,1,0"}):
+            os.environ.pop(spawn.WINDOW_SOCKET_ENV, None)
+            self.assertEqual(spawn.window_server(), [])
+            self.assertEqual(spawn.window_hint("child-A-1"), "Ctrl-B then S lists the sessions")
+
+    def test_outside_tmux_it_goes_where_the_interface_lives(self):
+        with mock.patch.dict(os.environ):
+            os.environ.pop(spawn.WINDOW_SOCKET_ENV, None)
+            os.environ.pop("TMUX", None)
+            self.assertEqual(spawn.window_server(), ["-L", "robot-ui"])
+            self.assertEqual(spawn.window_hint("child-A-1"),
+                             "tmux -L robot-ui attach -t child-A-1")
+
+    def test_a_check_names_a_tmux_of_its_own(self):
+        with mock.patch.dict(os.environ, {"TMUX": "/tmp/tmux-1000/robot,1,0",
+                                          spawn.WINDOW_SOCKET_ENV: "zz-check"}):
+            self.assertEqual(spawn.window_server(), ["-L", "zz-check"])
+
+    def test_without_tmux_there_is_no_window(self):
+        with mock.patch.object(spawn.shutil, "which", lambda name: None):
+            self.assertEqual(spawn._open_window("A", 1, "x.log"),
+                             ("", "tmux is not available here"))
+
+
+@unittest.skipUnless(LINUX and shutil.which("tmux"), "needs tmux")
+class RealWindows(SpawnCase):
+    """show_window with a real tmux, on a socket of the test's own."""
+
+    def setUp(self):
+        super().setUp()
+        self.socket = f"zz-test-{os.getpid()}"
+        environment = mock.patch.dict(os.environ, {spawn.WINDOW_SOCKET_ENV: self.socket})
+        environment.start()
+        self.addCleanup(environment.stop)
+        self.addCleanup(self.tmux, "kill-server")
+
+    def tmux(self, *words):
+        return subprocess.run(["tmux", "-L", self.socket, *words], capture_output=True,
+                              text=True, check=False)
+
+    def test_the_session_shows_the_childs_output_and_closes_with_it(self):
+        screens = []
+
+        def person(question):
+            session = self.notes[0].split("'")[3]
+            self.wait_until(lambda: "hello from the child"
+                            in self.tmux("capture-pane", "-p", "-t", session).stdout)
+            screens.append(self.tmux("capture-pane", "-p", "-t", session).stdout)
+            return "yes"
+
+        self.agent.ask_from_pool = person
+        shown = self.run_it(name="Chatty", wait=True, show_window=True)
+        self.assertIn("status=completed", shown)
+        session = self.notes[0].split("'")[3]
+        self.assertRegex(session, r"^child-Chatty-\d+$")
+        self.assertIn(f"tmux -L {self.socket} attach -t {session}.", self.notes[0])
+        self.assertIn("Child run 'Chatty' (process ", screens[0])
+        self.assertIn("hello from the child", screens[0])
+        # Nobody was watching, so the window goes when the child has.
+        self.assertTrue(self.wait_until(
+            lambda: self.tmux("has-session", "-t", f"={session}").returncode != 0))
+        self.assertEqual(self.leftovers(), [])
+
+    def test_a_tmux_started_for_a_window_knows_nothing_of_the_tree(self):
+        self.person = ["yes"]
+        self.run_it(name="Slow", show_window=True)
+        self.kill_later(f"(PID {spawn.alive_children()[0].pid})")
+        known = self.tmux("show-environment", "-g").stdout
+        self.assertNotIn(spawn.FAMILY_ENV, known)
+        self.assertNotIn(spawn.DEPTH_ENV, known)
 
 
 class RelayServing(unittest.TestCase):

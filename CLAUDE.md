@@ -379,7 +379,8 @@ show the user the output. The user does not want to be asked to test things.
   up the `robot-wifi` service; its body is in a `main` function so the pull
   can replace the file safely), `scripts/wifi-reconnect.sh` (that service),
   `scripts/chat.sh`, `scripts/ui.sh`, `scripts/tmux.conf`,
-  `scripts/autostart.sh` (the interface and its run when the Pi starts, see
+  `scripts/child-window.sh` (the window of a child run, see "Meta tools and
+  child runs"), `scripts/autostart.sh` (the interface and its run when the Pi starts, see
   "Starting by itself").
 - `scripts/pi_photo.py` runs on a PC, not on the Pi: it fetches a photo from
   the Pi and opens it in the PC's viewer (see "Pictures").

@@ -194,6 +194,48 @@ Part of the notes for Claude Code sessions. The index is in `CLAUDE.md`.
   through a relay folder and are answered from `answers`, or put to the person
   at the parent's terminal. A child nobody waits for and nobody answers stops
   at its first question. Temp files are in `~/robot-data/tmp`.
+- `show_window` (2026-11-27, at the owner's request, after MyAgent's
+  parameter of that name): the child's output in a tmux session the person
+  can switch to. MyAgent's `headless=false` is not there: a robot child is
+  always headless.
+  - The child is started exactly as before, by the parent, as its own
+    process. Only its stdout goes to a file (`window_*.log` in the data
+    folder's `tmp`) in place of nowhere, and a tmux session
+    (`child-NAME-PID`, `spawn.window_session`) runs
+    `scripts/child-window.sh`, which is `tail --pid` on that file. So the
+    waiting, the timeout, the stopping, the memory rule and the count of the
+    tree are untouched: tmux owns the viewer, not the child. The other way,
+    the child started BY tmux, was not taken: it would be the tmux server's
+    child, with the server's environment (no tree name, no depth) and
+    nothing for the parent to wait on.
+  - Which tmux (`spawn.window_server`): the one the run is in (`$TMUX` is
+    set, so no `-L`), which puts the window beside the interface or chat
+    the person is looking at; outside tmux the socket `robot-ui`. A check
+    names a socket of its own in `ROBOT_CHILD_SOCKET`, which comes first: a
+    check run outside tmux would otherwise put a session on the owner's
+    `robot-ui`.
+  - If that call has to START the tmux server, the server keeps the
+    caller's environment for everything started there later. So
+    `ROBOT_SPAWN_DEPTH` and `ROBOT_SPAWN_FAMILY` are taken out of it first:
+    an interface started on that server afterwards must not count as part
+    of some tree, or as a child that may not start children.
+  - The session has `detach-on-destroy off`: somebody watching when it
+    closes is taken to another session, not out of tmux (at the Pi's own
+    screen under the autostart that would end the display). With a client
+    attached at the end the script waits for Enter, at most 300 s; with
+    none it closes at once.
+  - The person is told the session's name by a `console.note` at the start
+    (a waited child's report comes only at the end), and the tool's result
+    names it for the model. A window that cannot be opened (no tmux, as on
+    Windows) is said in the result and the child runs without one.
+  - The window shows plain text, no dim lines: the child's stdout is a
+    file, not a terminal.
+  - Tests: `ChildWindows` (a stand-in for the session), `WindowNames`, and
+    `RealWindows` (2 tests with a real tmux on a socket of their own,
+    skipped on Windows). NOT YET RUN ON THE PI: the Pi could not be reached
+    on 2026-11-27 (`ssh pi` timed out and `robot.local` did not resolve),
+    so `RealWindows`, `child-window.sh` itself and a paid check with a real
+    child are still owed, and so is the deploy.
 - How many children run at once is decided by free memory, up to a ceiling
   of 8 (since 2026-11-19, at the owner's request, so that the same code suits
   a Pi 5; until then it was two, fixed). `spawn._why_not_another` starts a child

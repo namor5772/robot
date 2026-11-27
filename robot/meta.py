@@ -309,7 +309,7 @@ RUN_INSTRUCTION_TOOL = {
         "the person at this run's terminal, and a child that is not waited for gets no "
         "answer and stops at its first question. `extra_text` adds task context after "
         "the child's saved instruction and `prepend_text` puts text in front of it, for "
-        "that run only."
+        "that run only. `show_window` lets the person watch the child work."
     ),
     "input_schema": {
         "type": "object",
@@ -348,6 +348,16 @@ RUN_INSTRUCTION_TOOL = {
                     "Optional text put IN FRONT of the child's saved instruction, plain, "
                     "for this run only. extra_text is the labelled block after the "
                     "instruction; both may be given."
+                ),
+            },
+            "show_window": {
+                "type": "boolean",
+                "description": (
+                    "Show what the child writes in a window of its own (a tmux session), "
+                    "where the person can watch it work. Nothing else changes: the child "
+                    "takes no typing there, its questions are answered as described "
+                    "above, and the window closes when the child ends. The result names "
+                    "the session. Default false."
                 ),
             },
             "answers": {
