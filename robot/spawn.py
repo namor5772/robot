@@ -341,7 +341,9 @@ def _open_window(name, pid, log_path):
                "new-session", "-d", "-s", session, inner,
                # Somebody watching when it closes is taken to another session
                # of this tmux, not thrown out of tmux altogether.
-               ";", "set-option", "-t", f"={session}", "detach-on-destroy", "off"]
+               # (This command takes a pane for its target, not a session:
+               # "NAME:" is the session's current one. "=NAME" is refused.)
+               ";", "set-option", "-t", f"{session}:", "detach-on-destroy", "off"]
     # If this starts the tmux server, whatever is started there later inherits
     # this environment: it must not take those programs for part of this tree.
     environment = {key: value for key, value in os.environ.items()

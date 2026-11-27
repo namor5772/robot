@@ -232,10 +232,25 @@ Part of the notes for Claude Code sessions. The index is in `CLAUDE.md`.
     file, not a terminal.
   - Tests: `ChildWindows` (a stand-in for the session), `WindowNames`, and
     `RealWindows` (2 tests with a real tmux on a socket of their own,
-    skipped on Windows). NOT YET RUN ON THE PI: the Pi could not be reached
-    on 2026-11-27 (`ssh pi` timed out and `robot.local` did not resolve),
-    so `RealWindows`, `child-window.sh` itself and a paid check with a real
-    child are still owed, and so is the deploy.
+    skipped on Windows).
+  - The first version went to the Pi untried (the Pi could not be reached
+    on 2026-11-27) and `RealWindows` failed there the next morning: tmux
+    3.5a refused `set-option -t =NAME` with "no such session: =NAME", so
+    the whole call counted as failed although the session had been made.
+    That command's target is a pane, and `NAME:` is what it takes. The
+    `=NAME` form is fine where a session is the target (`has-session`,
+    `list-clients`).
+  - Tried by hand on the Pi on 2026-11-28, on sockets of the check's own
+    (`zz-try`, and `zz-outer` to give a watching client a terminal): the
+    window showed the header and the file's lines; with nobody watching
+    the session was gone once the process had ended; with a client
+    attached it showed "The child run has ended. Press Enter to close this
+    window.", and after Enter the session was gone and the client was on
+    the other session of that tmux.
+  - A catch in such a check: `tail --pid` waits while the process is still
+    in the kernel's list, and one that has ended but was not waited for by
+    its parent still is. The real parent polls its child, so there it ends
+    at once; a check that starts a `sleep` must wait for it too.
 - How many children run at once is decided by free memory, up to a ceiling
   of 8 (since 2026-11-19, at the owner's request, so that the same code suits
   a Pi 5; until then it was two, fixed). `spawn._why_not_another` starts a child
