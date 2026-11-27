@@ -935,7 +935,7 @@ differ: the desktop has PowerShell only, the laptop also Git Bash.
 - `robot/models.py`: model and price tables. `robot/costs.py`, `robot/chats.py`, `robot/history.py`, `robot/datastore.py`, `robot/relay.py`: supporting parts.
 - `robot/tui/`: the windowed interface. `app.py`: the main window and how a run and the screen work side by side. `editor.py`, `skillsui.py`, `memoryui.py`: the Instruction Editor, the Skills Manager and the Memories window. `widgets.py`, `dialogs.py`: buttons, lists, text boxes and small windows. `screen.py`: the screen and the keyboard (curses). `text.py`: wrapping and editing text.
 - `scripts/chat.sh`, `scripts/ui.sh`, `scripts/tmux.conf`: the tmux launchers for the chat and the windowed interface. `scripts/deploy.sh`: run on the Pi to update it. `scripts/wifi-reconnect.sh`: the `robot-wifi` service, which puts the Pi back on the Wi-Fi. `scripts/autostart.sh`: the switch for starting the interface and its run when the Pi starts, and what the `robot-autostart` service runs. `scripts/pi_photo.py`: run on a PC, fetches a photo from the Pi and opens it. `scripts/pi_sound.py`: the same for a sound recording, which it plays.
-- `tests/`: the test suite. `CLAUDE.md`: detailed notes for Claude Code sessions.
+- `tests/`: the test suite. `CLAUDE.md`: the rules and the layout for Claude Code sessions; `docs/claude/`: their detailed notes, one file per topic.
 
 ## Setup on the Pi
 
