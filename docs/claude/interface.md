@@ -292,8 +292,11 @@ underneath is the same code the chat runs; only the console differs.
   in the same second, and there was ONE saved chat for the two cost-log
   lines. A saved chat is named by the instruction and the second it
   started in, so two runs of one instruction started in the same second
-  share a name and the later one's file replaces the earlier one's. It
-  takes a script to start two that close together. Not changed.
+  shared a name and the later one's file replaced the earlier one's. It
+  takes a script to start two that close together. Fixed the same day at
+  the owner's word (see "Cost, chats, records": `claim_chat_stem`), and
+  the check run again: two saved chats, the second with its process id
+  in the name.
 
 ## Several screens, several interfaces
 

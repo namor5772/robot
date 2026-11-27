@@ -256,7 +256,7 @@ class Agent:
     def _start_chat_files(self):
         self.datadir.ensure()
         stem = chats.new_chat_name(self.settings.name)
-        self.chat_stem = chats.unique_chat_stem(self.datadir.chats_dir, stem, os.getpid())
+        self.chat_stem = chats.claim_chat_stem(self.datadir.chats_dir, stem, os.getpid())
         self._transcript = chats.Transcript(self.datadir.chats_dir / f"{self.chat_stem}.txt")
         self._transcript.write(
             f"=== {self.chat_stem} | {self.model} | {self._mode_label()} ===\n"

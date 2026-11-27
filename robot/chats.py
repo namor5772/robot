@@ -1,5 +1,6 @@
 """A run's chat files: its name, its messages as JSON, and its transcript as text."""
 
+import os
 import re
 import warnings
 from datetime import datetime
@@ -59,6 +60,42 @@ def unique_chat_stem(chats_dir, stem: str, pid: int) -> str:
     if any((folder / f"{stem}{ext}").exists() for ext in (".json", ".txt")):
         return f"{stem}_{pid}"
     return stem
+
+
+def claim_chat_stem(chats_dir, stem: str, pid: int) -> str:
+    """Take a name for a run's chat files that no other run has, and hold it.
+
+    Looking whether a name is free and then using it is two steps, and two
+    runs started in the same second both found it free before either had made
+    a file: the later one's files replaced the earlier one's. So the name is
+    taken by making the transcript's file in one step that fails if the file
+    is there already. Only one run can win that, and the others go on to the
+    name with their process id (and a number after it, for one program that
+    starts the same instruction twice within a second).
+
+    The file is left empty for Transcript to append to. Where no file can be
+    made at all, the name is chosen the old way: opening the transcript will
+    say what is wrong.
+    """
+    folder = Path(chats_dir)
+    try:
+        folder.mkdir(parents=True, exist_ok=True)
+    except OSError:  # FileExistsError among them: something else has the folder's name
+        return unique_chat_stem(folder, stem, pid)
+    candidates = [stem, f"{stem}_{pid}"] + [f"{stem}_{pid}_{count}" for count in range(2, 100)]
+    for candidate in candidates:
+        if (folder / f"{candidate}.json").exists():
+            continue
+        try:
+            handle = os.open(folder / f"{candidate}.txt",
+                             os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o666)
+        except FileExistsError:
+            continue
+        except OSError:
+            return unique_chat_stem(folder, stem, pid)
+        os.close(handle)
+        return candidate
+    return f"{stem}_{pid}"
 
 
 # ---- messages ----

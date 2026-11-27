@@ -174,6 +174,17 @@ Part of the notes for Claude Code sessions. The index is in `CLAUDE.md`.
   with `unfinished@call<N>`.
 - Every run saves `saved_chats/<Instruction or Agent>_<timestamp>.json` and a
   live `.txt`. Chats are never loaded back.
+- Two runs of one instruction started in the same second get different
+  names since 2026-11-28 (`chats.claim_chat_stem`): the second is
+  `<name>_<pid>`, and a third from the same program `<name>_<pid>_2`.
+  Until then the name was only LOOKED UP as free
+  (`unique_chat_stem`, still there for the case where no file can be
+  made), and both runs looked before either had made a file, so the later
+  one's `.json` and `.txt` replaced the earlier one's while the cost log
+  kept both lines. Seen with two headless interfaces started by a script
+  (see "A headless interface"). Now the name is taken by creating the
+  `.txt` with `O_CREAT | O_EXCL`, which only one run can do; `Transcript`
+  then appends to that empty file.
 - An interrupted call is costed from what had streamed (an estimate).
 
 ## Meta tools and child runs

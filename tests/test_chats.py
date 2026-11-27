@@ -15,6 +15,7 @@ from unittest import mock
 from robot.chats import (
     Transcript,
     chat_payload,
+    claim_chat_stem,
     new_chat_name,
     sanitize_filename,
     save_chat_json,
@@ -220,6 +221,67 @@ class UniqueChatStemTests(TempDirCase):
         self.assertEqual(unique_chat_stem(self.dir, "v1.2 notes", 5), "v1.2 notes")
         (self.dir / "v1.2 notes.txt").write_text("", encoding="utf-8")
         self.assertEqual(unique_chat_stem(self.dir, "v1.2 notes", 5), "v1.2 notes_5")
+
+
+class ClaimChatStemTests(TempDirCase):
+    """Taking a name and holding it, so that two runs never share one."""
+
+    STEM = "Tidy Logs_2026-10-07_091500"
+
+    def test_a_free_name_is_taken_and_its_transcript_is_there_at_once(self):
+        self.assertEqual(claim_chat_stem(self.dir, self.STEM, 4242), self.STEM)
+        self.assertEqual((self.dir / f"{self.STEM}.txt").read_text(encoding="utf-8"), "")
+
+    def test_the_folder_is_made_if_need_be(self):
+        folder = self.dir / "not_yet"
+        self.assertEqual(claim_chat_stem(folder, self.STEM, 4242), self.STEM)
+        self.assertTrue((folder / f"{self.STEM}.txt").exists())
+
+    def test_a_second_run_in_the_same_second_gets_a_name_of_its_own(self):
+        # Neither has written anything yet: this is the case that used to
+        # give both the same name.
+        first = claim_chat_stem(self.dir, self.STEM, 100)
+        second = claim_chat_stem(self.dir, self.STEM, 200)
+        self.assertEqual((first, second), (self.STEM, f"{self.STEM}_200"))
+        self.assertTrue((self.dir / f"{self.STEM}_200.txt").exists())
+
+    def test_one_program_that_starts_the_same_instruction_again_at_once(self):
+        names = [claim_chat_stem(self.dir, self.STEM, 100) for _ in range(4)]
+        self.assertEqual(names, [self.STEM, f"{self.STEM}_100", f"{self.STEM}_100_2",
+                                 f"{self.STEM}_100_3"])
+
+    def test_a_name_whose_json_is_there_is_not_taken(self):
+        (self.dir / f"{self.STEM}.json").write_text("{}", encoding="utf-8")
+        self.assertEqual(claim_chat_stem(self.dir, self.STEM, 77), f"{self.STEM}_77")
+        self.assertFalse((self.dir / f"{self.STEM}.txt").exists())
+
+    def test_many_runs_starting_at_the_same_moment_all_get_different_names(self):
+        import threading
+        names, gate = [], threading.Barrier(24)
+
+        def start(pid):
+            gate.wait()
+            names.append(claim_chat_stem(self.dir, self.STEM, pid))
+
+        threads = [threading.Thread(target=start, args=(pid,)) for pid in range(1000, 1024)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+        self.assertEqual(len(set(names)), 24)
+        self.assertEqual(sorted(path.stem for path in self.dir.glob("*.txt")), sorted(names))
+
+    def test_the_transcript_goes_into_the_file_that_was_taken(self):
+        stem = claim_chat_stem(self.dir, self.STEM, 100)
+        transcript = Transcript(self.dir / f"{stem}.txt")
+        transcript.write("you> go\n")
+        transcript.close()
+        self.assertEqual((self.dir / f"{stem}.txt").read_text(encoding="utf-8"), "you> go\n")
+
+    def test_where_no_file_can_be_made_a_name_is_still_given(self):
+        blocked = self.dir / "a_file"
+        blocked.write_text("", encoding="utf-8")       # a file where the folder should be
+        self.assertEqual(claim_chat_stem(blocked, self.STEM, 5), self.STEM)
 
 
 class RunFilesTests(TempDirCase):
