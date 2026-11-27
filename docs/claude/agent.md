@@ -247,6 +247,20 @@ Part of the notes for Claude Code sessions. The index is in `CLAUDE.md`.
     attached it showed "The child run has ended. Press Enter to close this
     window.", and after Enter the session was gone and the client was on
     the other session of that tmux.
+  - A paid check that morning, on Haiku, piped, with
+    `ROBOT_CHILD_SOCKET=zz-kid`: a parent with Meta on called
+    `run_instruction` with `wait` and `show_window` for a child that
+    counted to five. The parent printed "Child run '...' can be watched in
+    the tmux session 'child-ZZ-Window-Child-3816': tmux -L zz-kid attach -t
+    ...", the session showed the child's banner, its reply and its cost
+    lines while it ran, and afterwards the tmux server was gone and `tmp`
+    was empty. 0.20 cents for the parent, 0.14 for the child.
+  - That check's child was told to "count aloud" and used the `speak`
+    tool: the count came out of the speakers, unplanned, with a run of the
+    owner's listed in `~/robot-data/runs`. A check's instruction must say
+    "use no tools" in so many words BEFORE anything that sounds like
+    speaking, or block `speak` and `microphone_listen` in its entry
+    (`blocked_tools`).
   - A catch in such a check: `tail --pid` waits while the process is still
     in the kernel's list, and one that has ended but was not waited for by
     its parent still is. The real parent polls its child, so there it ends
