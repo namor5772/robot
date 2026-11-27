@@ -314,6 +314,92 @@ sudo openvt -c 8 -s -- sudo -u $USER env TERM=linux tmux attach -t shared
 - `openvt -c 8` uses the Pi's eighth text terminal, which nothing else uses,
   and `-s` switches the screen to it.
 
+## Every way to start a run
+
+A run gets started in one of three ways: from the windowed interface, by the
+chat program, or by another run as its child. Whether it is a single task or
+a conversation is not decided by how it starts but by the instruction (see
+"Single task or conversation" below). The commands are as typed on the Pi in
+`~/robot`; from a PC put them in `ssh -t pi "..."`.
+
+### From the windowed interface
+
+| How it starts | Command | Notes |
+|---|---|---|
+| By hand | `bash scripts/ui.sh`, then START | Runs the instruction the interface remembers. It is inside tmux, so it survives a dropped connection. |
+| On a named instruction | `bash scripts/ui.sh -l "Name"`, then START | Opens on that instruction instead of the remembered one. |
+| A further, separate interface | `bash scripts/ui.sh --session 2` | A run of its own, and its own remembered instruction and boxes. Any short name will do for the 2. |
+| Without pressing START | `bash scripts/ui.sh --start` | The only way a run begins without START. |
+| When the Pi starts | `bash scripts/autostart.sh on`, once | Starts the first interface with `--start` on the Pi's own screen (see "Starting by itself when the Pi starts"). |
+| Joined from another screen | `bash scripts/ui.sh` again | The same program and the same run, on a second screen. |
+
+You type into its input box, stop a reply with STOP, and speak to it when its
+Hands-free box is ticked.
+
+### With the chat program
+
+| How it starts | Command | Who answers its questions |
+|---|---|---|
+| In tmux, typing the task | `bash scripts/chat.sh` | You, at `you>` |
+| In tmux, a saved instruction | `bash scripts/chat.sh -l "Name"` | You, at `you>` |
+| Directly, without tmux | `.venv/bin/python -m robot.main` (with or without `-l "Name"`) | You. The run ends if the terminal goes away. |
+| With speech | add `--hands-free` | You, speaking or typing. At a terminal only. |
+| Piped | `printf 'first\nsecond\n' \| .venv/bin/python -m robot.main` | The piped lines, in order. The end of the input ends the run. |
+| Headless | `.venv/bin/python -m robot.main -l "Name" --headless` | Nobody: a question ends the run. It needs a saved instruction that has text. |
+| Headless with a relay | add `--relay-dir DIR` | Another program, through files in that folder. |
+| Nothing sent | add `--dry-run` | Prints the first request and costs nothing. |
+
+A second `chat.sh` while a chat is still open in tmux rejoins that chat and
+ignores the `-l "Name"` given with it.
+
+These work with any of the above: `--model` and `--mode` (for this run only,
+nothing saved changes), `--prepend-file` and `--extra-file` (text in front of
+and after the instruction, for this run only), `--result-file` (the outcome
+as JSON) and the display options `--thinking`, `--tool-calls`, `--debug` and
+`--no-activity`. `--help` lists them all.
+
+### As a child of another run
+
+A run whose instruction has Meta on can start a saved instruction as a child
+with its `run_instruction` tool. A child is always the chat program, headless.
+
+| Variant | What the parent run gets | Who answers the child's questions |
+|---|---|---|
+| Not waited for (the default) | An answer at once, with the child's process number | Nobody: it stops at its first question |
+| Waited for (`wait`) | The child's final report | You, at the parent's terminal or interface |
+| With `answers` | As above | The prepared answers, in order. When they are used up the child stops. |
+| With `show_window` | As above | As above. You can also watch what it writes, in a tmux session `child-NAME-PID`. |
+
+A child may start children of its own; those may not. See "Tools" for how
+many can run at once.
+
+### Single task or conversation
+
+- **Convo off**: the run does its task and ends. It can still ask you
+  something through its `user_prompt` tool.
+- **Convo on**: after every reply it waits for your next message. `quit`,
+  `stop`, `exit` or an empty reply ends it.
+
+### Stopping and ending
+
+- Ctrl-C in the chat, or STOP in the interface, stops the reply in progress.
+- A SPOKEN "bye" in a hands-free run ends the conversation and powers the Pi
+  off. A typed "bye" only ends the run.
+- Stopping a run that is waiting for a child stops the child as well.
+
+### What is remembered afterwards
+
+- An interface remembers its instruction and its bottom-row boxes, each
+  interface under its own name (see "More than one at a time").
+- A chat, a piped run, a headless run and a child run remember nothing of
+  that kind: the instruction is named with `-l` each time.
+- Every run, however it was started, leaves a saved chat and a line in the
+  cost log, and its conversation is remembered if its instruction has Memory
+  on.
+
+Nothing starts runs on a schedule. The start with the Pi is the only
+automatic one; a headless run is what a scheduled job would use.
+
 ## Saved instructions
 
 An instruction is a saved task together with the settings to run it with:
