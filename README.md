@@ -8,8 +8,55 @@ and speakers attached it also sees, hears speech and talks out loud (see
 
 The program is a terminal port of the MyAgent harness: the same way of running
 saved instructions, the same skills format, the same Meta tools and Convo
-mode, the same cost log. It leaves out MyAgent's windows, its safety-confirm
-system and every provider other than Anthropic.
+mode, the same cost log. In place of MyAgent's graphical windows it has
+windows drawn with characters, which work over SSH and on the Pi's own
+screen. It leaves out MyAgent's safety-confirm system and every provider
+other than Anthropic.
+
+What it can do, in short:
+
+- **Two faces.** A line-by-line chat (`chat.sh`) and a windowed interface
+  (`ui.sh`) with buttons, an Instruction Editor, a Skills Manager and a
+  Memories window. Both run inside tmux and survive a dropped connection.
+- **Saved instructions.** A task together with its model, thinking level and
+  switches, run by name: from the interface, from the command line, headless,
+  or by another run as its child.
+- **Skills.** Pieces of know-how that every run can draw on, always or on
+  demand.
+- **Tools.** A shell on the Pi with no restrictions, web search, looking at
+  pictures, hearing speech, speaking, and tools with which it manages its own
+  instructions, skills and memories.
+- **Hands-free.** It listens whenever it waits for you, answers aloud if told
+  to, and switches itself off at a spoken "bye".
+- **Memory.** An instruction with Memory on wakes up knowing what the robot
+  remembers of earlier conversations.
+- **Starting by itself.** Switched on, the Pi can come up running an
+  instruction and listening, with no screen and no keyboard.
+
+## Contents
+
+- [Starting a chat](#starting-a-chat)
+- [The windowed interface](#the-windowed-interface): the main window, more
+  than one at a time, starting with the Pi, the Pi's own screen
+- [Every way to start a run](#every-way-to-start-a-run): interface, chat,
+  headless, child runs
+- [Saved instructions](#saved-instructions)
+- [Skills](#skills)
+- [Models and thinking levels](#models-and-thinking-levels)
+- [Tools](#tools): seeing, sound, hearing, speaking, hands-free, child runs
+- [Memory](#memory)
+- [What you see](#what-you-see) and [What it costs](#what-it-costs)
+- [Where things are kept](#where-things-are-kept)
+- [Settings in the environment](#settings-in-the-environment)
+- [Backing up the Pi](#backing-up-the-pi)
+- [Getting back on the Wi-Fi](#getting-back-on-the-wi-fi)
+- [Working on it](#working-on-it), [Files](#files) and
+  [Setup on the Pi](#setup-on-the-pi)
+
+Commands are shown in full, as `bash ~/robot/scripts/chat.sh`. At the Pi's
+own prompt the four scripts typed by hand can be started by name from any
+folder (`chat.sh`, `ui.sh`, `autostart.sh`, `deploy.sh`; see "Setup on the
+Pi").
 
 ## Starting a chat
 
@@ -51,40 +98,9 @@ robot to answer out loud as well, tell it to (a skill or an instruction can
 say so for good). See "Hands-free" further down for how it works and what
 it costs.
 
-### Starting by itself when the Pi starts
-
-The Pi can start the windowed interface on its own screen when it is switched
-on, and begin the run at once, with nothing typed:
-
-```bash
-bash ~/robot/scripts/autostart.sh on       # from the next start on
-bash ~/robot/scripts/autostart.sh off      # not any more
-bash ~/robot/scripts/autostart.sh status
-```
-
-What starts is the interface as you left it: the instruction it had last and
-its boxes, Hands-free among them. So tick Hands-free and choose the
-instruction you want once, and from then on the Pi comes up running it and
-listening. To have it come up with another instruction: join the interface
-over SSH, end the run with STOP (F3) or a typed "stop", open the Instruction
-window (F4), pick the instruction and press *Use*. That is saved at once; the
-instruction need not be run. It
-first waits (three minutes at most) for the Wi-Fi and for the clock to be
-set. It is the ordinary interface: `ssh -t pi "bash ~/robot/scripts/ui.sh"`
-joins it from a PC, and when the run has ended (say "stop", or type "bye")
-you can choose another instruction there and press START. It starts one run
-per start of the Pi and does not start another by itself afterwards. Every
-start of the Pi is then a paid run, and with Hands-free the robot answers
-whoever speaks near it.
-
-The Pi needs no screen for any of this, and no keyboard: with none attached,
-the SSH command above is how you see the interface. It takes your terminal's
-size once you join.
-
-Saying "bye" is different: it ends the conversation and switches the Pi off
-(see "Hands-free" under "Tools"). So with autostart on, the robot's day is:
-give it power, it comes up and listens, you talk, you say "bye", it switches
-itself off, and you can take its power away.
+To run a saved instruction in place of typing the task, name it:
+`bash ~/robot/scripts/chat.sh -l "Name"` (see "Saved instructions", and
+"Every way to start a run" for all the other ways).
 
 `chat.sh` runs the chat inside tmux, so it belongs to the Pi and not to your
 SSH connection. If the PC sleeps or the connection drops, the chat keeps
@@ -100,8 +116,11 @@ running, and the same command brings you back to it.
   ignored; it does not end the chat the way an empty line does.
 - While a chat is starting, such answers are thrown away, and so is anything
   you type before the first `you>` appears.
+- A second `chat.sh` while a chat is open joins that chat. Arguments given
+  with it (`-l "Name"`, say) are ignored then, and it says so.
 
-Without tmux: `cd ~/robot && .venv/bin/python -m robot.main`.
+Without tmux: `cd ~/robot && .venv/bin/python -m robot.main`. The chat then
+belongs to your terminal and ends with it.
 
 ## The windowed interface
 
@@ -182,10 +201,16 @@ What the main window has:
   description and bundled files. Space on the list switches a skill between
   off, ON (in every prompt) and OD (on demand).
 - **The boxes along the bottom** choose what a run shows: Activity (tool lines
-  and the cost of each call), Thinking, Tool calls, Debug. The last one,
+  and the cost of each call), Thinking, Tool calls (each call as JSON) and
+  Debug (every request sent). **Save thinking** keeps the model's thinking
+  in the saved chat. The last one,
   **Hands-free** (Alt+H), has the robot listen for a spoken message whenever
-  it waits for you (see "Hands-free" under "Tools"). They are remembered. In a
-  narrow window the boxes take two rows.
+  it waits for you (see "Hands-free" under "Tools"). All six are remembered.
+  In a narrow window the boxes take two rows.
+- **The bottom line** says what is going on (`Ready`, `Working 0:12`,
+  `Waiting for your message`, and with Hands-free `Listening`, `Hearing
+  you...`, `Working out what you said...`), then a short message when there
+  is one, then a reminder of the main keys.
 - **Help** (F1) lists every key. **Quit** is F10.
 
 Getting around:
@@ -219,8 +244,59 @@ Good to know:
   to a program, so everything is done with the keys.
 - Text pasted into the terminal goes into the box that has the cursor, as text.
 - It runs on the Pi only: Python on Windows has no curses.
+- It needs a window of at least 72 columns by 18 rows, and says so in a
+  smaller one until the window is made larger.
+- START never has the cursor when the interface opens or a run ends: a
+  stray Enter must not start a run that costs money.
+- An interface that was open during a deploy keeps the old program until it
+  is quit and started again.
 
 Without tmux: `cd ~/robot && .venv/bin/python -m robot.tui`.
+
+Options of `ui.sh`: `-l "Name"` opens on that instruction, `--session NAME`
+is a further interface (see "More than one at a time"), `--start` begins the
+run without START, and `--headless` is one run nobody has to watch (see "A
+headless interface").
+
+### Starting by itself when the Pi starts
+
+The Pi can start the windowed interface on its own screen when it is switched
+on, and begin the run at once, with nothing typed:
+
+```bash
+bash ~/robot/scripts/autostart.sh on       # from the next start on
+bash ~/robot/scripts/autostart.sh off      # not any more
+bash ~/robot/scripts/autostart.sh status
+```
+
+What starts is the first interface (the one with no session name) as you
+left it: the instruction it had last and its boxes, Hands-free among them. So
+tick Hands-free and choose the instruction you want once, and from then on
+the Pi comes up running it and listening. To have it come up with another
+instruction: join the interface over SSH, end the run with STOP (F3) or a
+typed "stop", open the Instruction window (F4), pick the instruction and
+press *Use*. That is saved at once; the instruction need not be run.
+
+- It first waits (three minutes at most) for the Wi-Fi and for the clock to
+  be set. On the Pi 3 A+ a run is listening about 47 seconds after the Pi
+  got its power.
+- It is the ordinary interface: `ssh -t pi "bash ~/robot/scripts/ui.sh"`
+  joins it from a PC, and when the run has ended (say "stop", or type "bye")
+  you can choose another instruction there and press START.
+- It starts one run per start of the Pi and does not start another by itself
+  afterwards.
+- Every start of the Pi is then a paid run, and with Hands-free the robot
+  answers whoever speaks near it.
+- What it did at the start is in `/var/log/robot-autostart.log`.
+
+The Pi needs no screen for any of this, and no keyboard: with none attached,
+the SSH command above is how you see the interface. It takes your terminal's
+size once you join.
+
+Saying "bye" is different: it ends the conversation and switches the Pi off
+(see "Hands-free" under "Tools"). So with autostart on, the robot's day is:
+give it power, it comes up and listens, you talk, you say "bye", it switches
+itself off, and you can take its power away.
 
 ### More than one at a time
 
@@ -470,14 +546,24 @@ many can run at once.
 - **Convo off**: the run does its task and ends. It can still ask you
   something through its `user_prompt` tool.
 - **Convo on**: after every reply it waits for your next message. `quit`,
-  `stop`, `exit` or an empty reply ends it.
+  `stop`, `exit` or `bye` on its own, or an empty reply, ends it.
 
 ### Stopping and ending
 
-- Ctrl-C in the chat, or STOP in the interface, stops the reply in progress.
+- Ctrl-C in the chat, or STOP (F3) in the interface, stops the reply or the
+  command in progress. In the interface, STOP while the robot waits for your
+  message ends the run.
+- An end word (`quit`, `stop`, `exit`, `bye`) or an empty reply ends a
+  conversation. An empty reply to a question the robot asked stops the run.
 - A SPOKEN "bye" in a hands-free run ends the conversation and powers the Pi
   off. A typed "bye" only ends the run.
 - Stopping a run that is waiting for a child stops the child as well.
+- Quit (F10) in the interface asks first when a run is going, then stops it
+  and waits until its cost is logged and its chat saved.
+- Ctrl-B then D leaves a chat or an interface running in tmux and gives you
+  your terminal back. It ends nothing.
+- The chat program ends with exit code 0, with 1 when the run ended in an
+  error, and with 2 when it could not start (no such instruction, no key).
 
 ### What is remembered afterwards
 
@@ -487,7 +573,8 @@ many can run at once.
   that kind: the instruction is named with `-l` each time.
 - Every run, however it was started, leaves a saved chat and a line in the
   cost log, and its conversation is remembered if its instruction has Memory
-  on.
+  on. A run that was killed leaves its transcript as far as it got, and its
+  cost is logged at the next start of any run.
 
 Nothing starts runs on a schedule. The start with the Pi is the only
 automatic one; a headless run is what a scheduled job would use.
@@ -570,8 +657,10 @@ Only `text` is needed; anything left out takes a default (Opus 5.5 at its
 Adaptive thinking level, Meta off, Convo off). `thinking_mode` is one of
 `off`, `adaptive`, `low`, `medium`, `high`, `xhigh`, `max`; a level the model
 lacks is replaced by the nearest it has, with a warning. Other fields: `notes`
-(for you, never sent to the model), `fast_mode`, `blocked_tools`,
-`skill_modes`, `upgrade_target`.
+(for you, never sent to the model), `fast_mode`, `blocked_tools` (a list of
+tool names), `skill_modes` (see "Skills"), `upgrade_target` (see "Models and
+thinking levels"), `memory` (true or false) and `memory_name` (which memory:
+left out or empty is the shared one, see "Memory").
 
 - After a hand edit, check the file:
   `python3 -m json.tool ~/robot-data/agent_instructions.json`. If it cannot be
@@ -632,7 +721,60 @@ Each skill has a mode:
   skill's own mode. Only the run is affected; the skills are not changed.
 - **Copying skills in:** the format is MyAgent's, so a skill folder copied from
   there works as it is. A plain Anthropic-format skill has no `mode` line and
-  comes in as disabled until you set one.
+  comes in as disabled until you set one. A skill written for MyAgent may
+  name tools the robot does not have (`run_command` where the robot has
+  `run_shell_command`).
+
+The skills on the Pi on 2026-11-28. They are data on the Pi, not part of
+this repository, and `--skills` shows what is there now:
+
+| Skill | Mode | What it is for |
+|---|---|---|
+| `robot-identity` | enabled | How the robot replies: briefly and out loud, and that its voice can be changed. |
+| `take-photo` | on demand | Taking a photo with the webcam and looking at it with `view_image`. |
+| `record-sound` | on demand | Recording through the webcam's microphone to a WAV file. |
+| `play-sound` | on demand | Playing a WAV file through the speakers: one of its recordings, or any other. |
+| `cpu-temp` | on demand | Reading the CPU temperature, and how hot is hot on this board. |
+| `wifi-monitor` | on demand | The `robot-wifi` service and its log of drops and reconnects. |
+| `weather` | on demand | Real weather for a place: forecast and current readings. |
+| `share-price` | on demand | A near-live share price, index or exchange rate, with the day's change. |
+
+`robot-identity` is the one that is enabled, so its text is in every run's
+system prompt. The others cost nothing until a run fetches one.
+
+## Models and thinking levels
+
+Every instruction names its model and a thinking level. The program runs
+Anthropic's models only.
+
+| Model | Id | Price per million tokens: input / output |
+|---|---|---|
+| Opus 5.5 (the default) | `claude-opus-5-5` | $4 / $20 |
+| Fable 5.2 | `claude-fable-5-2` | $8 / $40 |
+| Sonnet 5.5 | `claude-sonnet-5-5` | $2 / $10 |
+| Haiku 5.5 | `claude-haiku-5-5` | $0.10 / $0.50 |
+
+The Instruction Editor's model list also offers the earlier ones the program
+knows (Opus 5 and 4.8, Fable 5.1 and 5, Sonnet 5 and 4.6, Haiku 4.5), and any
+other id can be typed into an instruction by hand. A model the program has no
+price for is warned about when its run starts, and that run is not written to
+the cost log.
+
+- **Thinking level**: `off`, `adaptive`, `low`, `medium`, `high`, `xhigh` or
+  `max`. Not every model has every level, and one it lacks is replaced by
+  the nearest it has. Opus 5.5 and Fable always think: they have no `off`.
+- **Fast mode** (`fast_mode`, the Fast box) asks for faster output where the
+  model offers it (Opus from 4.8, Fable from 5.2), at twice the price.
+- **Upgrade model.** With Meta on, a run can move itself to a stronger model
+  once, with its `upgrade_model` tool, when you ask for it ("use the stronger
+  model for this"). Where it goes is the instruction's upgrade model
+  (`upgrade_target`), and Fable 5.2 at its highest level where none is set.
+  Nothing saved changes, and the cost log says from which call on.
+- `--model ID` and `--mode LEVEL` on the command line change one run of the
+  chat program, and nothing that is saved. `--model claude-haiku-5-5` makes a
+  whole chat cost well under a cent.
+- There is no temperature setting anywhere: the current models do not take
+  one.
 
 ## Tools
 
@@ -655,12 +797,20 @@ Each skill has a mode:
 
 Meta is the only group of tools. It is one switch on an instruction, and it
 turns the last five on together: the tools with which the robot works on its
-own setup. Their descriptions add about 3,000 tokens to every request. The
+own setup. Their descriptions add about 3,500 tokens to every request. The
 first nine are not grouped: each is offered on its own, whenever it can work.
+The start banner of every run lists the tools that run has.
+
+The model can ask for several tools in one turn. Several `run_instruction`
+calls then run side by side (that is how a run starts children that work at
+the same time), and so do `get_skill` calls. The rest, the shell among them,
+run one after the other.
 
 There is no tool for the CPU temperature any more (there was one until
 2026-11-20). Asked how hot it is, the robot reads the Pi's sensor with the
-shell tool.
+shell tool, told how by its `cpu-temp` skill.
+
+### Seeing
 
 `view_image` is how the robot sees. It takes a photo with the shell tool (a
 webcam on the Pi's USB port, and a skill that says how), then looks at the
@@ -682,7 +832,14 @@ opens it in the PC's viewer. Put a photo's file name after it for another
 one. The file it opens is `NAME_viewable.jpg`: the webcam's photos leave out
 a part that Windows insists on, and opened as they come the viewer shows
 nothing. The photo as it came is kept beside it, and nothing on the Pi is
-changed.
+changed. Photos are personal: the script keeps them out of this repository
+and out of folders that are synced elsewhere.
+
+The robot's photos are in `robot-photos` in the Pi's home folder. The webcam
+is a Logitech Brio 100 on the Pi's one USB port; it gives photos of up to
+1920 x 1080.
+
+### Recording and playing sound
 
 The webcam has a microphone as well, and with a skill that says how, the
 robot records sound with the shell tool: WAV files in `robot-sound` in the
@@ -705,6 +862,8 @@ shell tool: one of its recordings, or any other WAV file. It cannot hear what
 it plays, and it cannot tell whether the speakers are switched on: when it
 says that it played a file, the sound was sent to them.
 
+### Hearing
+
 `microphone_listen` is how the robot hears, and what it hears is speech
 only. Claude takes no sound, so the tool records through the webcam's
 microphone (5 seconds unless the model asks for another length, 120 at most)
@@ -717,6 +876,8 @@ service costs $0.10 for an hour of sound, so a call is a fraction of a cent;
 that is billed by xAI and is not in the robot's cost log. A recording made
 this way is kept nowhere on the Pi. It needs `XAI_API_KEY=...` in
 `~/robot/.env`: without the key the tool is not offered.
+
+### Speaking
 
 `speak` is how the robot talks. It sends a text of up to 2,000 characters
 to xAI's text-to-speech service, saves what comes back as
@@ -775,8 +936,17 @@ speaking, so it does not hear itself.
   a warning says so once and typing goes on working.
 - Every message is one transcription, about a hundredth of a cent, billed by
   xAI and not in the robot's cost log.
+- There is one microphone and one pair of speakers. Two runs that both
+  listen would hear the room twice and each other's answers: keep to one
+  hands-free run at a time.
+- In the chat it is the option `--hands-free`, at a terminal only; in the
+  interface it is the Hands-free box, which each interface remembers. A
+  piped run, a headless run of the chat program and a child run never
+  listen this way.
 
-Any of the thirteen can be switched off for one instruction. In the Instruction
+### Switching tools off for one instruction
+
+Any of the fourteen can be switched off for one instruction. In the Instruction
 Editor the Tools button shows this list, in this order, with a tick beside
 each tool the instruction may use. A cleared tool is blocked for that
 instruction only (`blocked_tools` in the file), and a Meta tool needs both
@@ -785,6 +955,8 @@ the five Meta tools show `[-]` and "(needs Meta)" there in place of a box and
 cannot be ticked or cleared: no run would get them either way. A block set on
 one of them earlier is kept, and shows again once Meta is ticked.
 
+### The shell tool has no restrictions
+
 The shell tool is deliberately unrestricted: no confirmation, no allowlist, no
 blocked commands, and the Pi has passwordless sudo, so the agent has root. It
 can read `~/robot/.env`, change any file, and act on what it reads from the
@@ -792,6 +964,13 @@ web. With Meta on it can also write skills that later runs load, so text it
 picked up can outlast a session: the start banner lists the skills in use. To
 take root away, run `sudo rm /etc/sudoers.d/010_grobliro-nopasswd` on the Pi.
 An instruction's `blocked_tools` list removes tools from its runs.
+
+### Child runs
+
+With Meta on, a run can start a saved instruction as a run of its own with
+`run_instruction`, and either go on at once or wait for its report (see "As
+a child of another run" for the variants). Ask for it in words: "run the
+Health check instruction and tell me what it says".
 
 A child run is a second copy of the program. It takes about 10 seconds to
 start on the Pi 3 A+ (15 on the Pi Zero 2 W) and about 80 MB of memory. How
@@ -852,6 +1031,8 @@ do. The top row of the interface then says `memory`, or `memory: NAME`.
     or `_`) and starts an empty memory under it. Nothing has to be created
     first: its files appear when the first conversation has been remembered.
 - Deleting or copying an instruction leaves its memory as it is.
+- It works the same however the run was started: interface, chat, headless
+  or as a child.
 
 ### Remember this, forget that
 
@@ -930,18 +1111,65 @@ robot> I'm running at about 49.4°C, which is comfortably cool for this Pi. I've
   call 2: $0.0002 this call  |  $0.0016 total  (in:2  out:117  cache_write:237  cache_read:10,665)
 ```
 
-(That chat ran on `claude-haiku-5-5`. On the default model the first call costs
-about 5 cents.)
+(That chat ran on `claude-haiku-5-5`, when the tool list was shorter than it
+is now.)
 
-Each `call` line is one request to the model and what it cost. The first call
-of a chat costs the most, because the system prompt and tool list (about
-10,000 tokens with Meta on) are written to the prompt cache. Later calls read
-them back at a fraction of the price, as long as you reply within five minutes.
+- The start banner names the instruction, the model and its thinking level,
+  the tools this run has, the skills in use and whether Memory is on.
+- `you>` is you, and `robot>` the model's reply as it arrives.
+- `[tool: ...]` is a tool the model called, with what it asked for.
+- Each `call` line is one request to the model: what it cost, the total so
+  far, and the tokens (`in`, `out`, and what was written to and read from
+  the prompt cache).
+- At the end the run's total goes into the cost log, and the line that was
+  written is shown.
 
 Options for what is shown: `--no-activity` (hide tool and cost lines),
 `--thinking`, `--tool-calls`, `--debug`. Others: `--model ID` and `--mode LEVEL`
 for one run, `--dry-run` to print the request without sending it, and
-`--help` for the rest.
+`--help` for the rest. In the interface the bottom-row boxes do the same.
+
+## What it costs
+
+Two companies bill for what the robot does: Anthropic for the model, and xAI
+for hearing and speaking. The robot's cost log holds Anthropic's part only.
+
+**The model.** The first call of a run costs the most, because the system
+prompt and the tool list are written to the prompt cache: about 14,000
+tokens with Meta on and the Pi's skills as they are (about 10,000 with Meta
+off). Later calls read them back at a fraction of the price, as long as the
+next call comes within five minutes.
+
+| | Haiku 5.5 | Opus 5.5 (the default) |
+|---|---|---|
+| The first call of a run, Meta on | about 0.2 cents | about 7 cents |
+| A later call in a short conversation | about 0.02 cents | under 1 cent |
+| A web search, on top of its tokens | 1 cent | 1 cent |
+| A 1920 x 1080 photo looked at | well under 0.1 cents | about a cent |
+
+A long run costs more with every call, because the whole conversation is
+sent again each time (read from the cache, where it can be).
+
+**Remembering.** A run with Memory on makes one more call when it ends, to
+Sonnet 5.5: about a cent for a short conversation. It is on the run's line
+in the cost log.
+
+**Child runs.** Every child is a run of its own with a first call of its
+own, and a line of its own in the cost log.
+
+**Hearing and speaking** (xAI, not in the cost log):
+
+| What | Price | In practice |
+|---|---|---|
+| Speech to text (`microphone_listen`, hands-free) | $0.10 for an hour of sound | About a hundredth of a cent for a spoken message. Silence is never sent. |
+| Text to speech (`speak`) | $15 for a million characters | About a tenth of a cent for a sentence. |
+
+**The cost log** is `~/robot-data/APICostLog_<host>.txt`, one line per run:
+when it ended, the model, the cost in dollars, the thinking level, how long
+it took, the instruction's name, the number of calls, the tokens, and the
+name of its saved chat. A run that upgraded its model has that noted, and a
+run that was killed is logged at the next start as unfinished. A run on a
+model the program has no price for is not logged at all.
 
 ## Where things are kept
 
@@ -951,23 +1179,61 @@ On the Pi, outside this repository, in `~/robot-data`:
 |---|---|
 | `agent_instructions.json` | The instruction library. |
 | `skills/<name>/SKILL.md` | The skills. |
-| `saved_chats/` | Every run's transcript (`.txt`) and messages (`.json`). |
-| `APICostLog_<host>.txt` | One line per run: time, model, cost, tokens. |
+| `saved_chats/` | Every run's transcript (`.txt`, written as the run goes) and messages (`.json`). The name is the instruction's (or `Agent`) and the second the run started, as `Night watch_2026-11-28_092150`; a second run of the same instruction started in that same second has its process number added. Chats are a record: they are never loaded back into a run. |
+| `APICostLog_<host>.txt` | One line per run: time, model, cost, tokens (see "What it costs"). On this Pi `APICostLog_robot.txt`. |
 | `tui_state.json` | What the windowed interface remembers: the instruction in use and the boxes of the bottom row (Hands-free among them). An interface started with `--session 2` has `tui_state_2.json`. |
-| `memory/` | What the robot remembers from one run to the next: `memory.md`, `diary.md`, earlier versions, and a folder per named memory (see "Memory"). |
+| `memory/` | What the robot remembers from one run to the next: `memory.md`, `diary.md`, earlier versions, and a folder per named memory (see "Memory"). `memory/settings.json`, if there, names the model that does the remembering. |
+| `voice_settings.json` | The voice and the speed `speak` uses, once one has been chosen. |
+| `autostart_on` | An empty file: the switch of `autostart.sh`. There while the Pi is to start the interface by itself. |
+| `runs/` | One small file per run in progress, removed when the run ends. An empty folder means nothing is running. A file left by a killed run is how its cost gets logged later. |
+| `tmp/` | Files that pass between a run and its child runs, removed afterwards. Here and not in `/tmp`, which on the Pi is held in memory. |
 | `tui_errors.log` | Anything a library printed while the windows were up (normally empty). |
 
-These files use MyAgent's formats, so instructions and skills can be copied
-between the two programs. Nothing in `~/robot-data` is backed up by itself:
-see the next section.
+Elsewhere on the Pi:
+
+| Path | Contents |
+|---|---|
+| `~/robot` | The checkout of this repository, with `.venv` and `.env` (the keys; never committed). |
+| `~/robot-photos` | The photos the robot takes. |
+| `~/robot-sound` | The sound it records, and every sentence it has spoken (`speech_<date>_<time>.wav`). |
+| `/var/log/robot-wifi.log` | What the `robot-wifi` service did, and when. |
+| `/var/log/robot-autostart.log` | What the start with the Pi did. |
+| `~/.bashrc` (its last line) | Puts `~/robot/scripts` on the search path (see "Setup on the Pi"). |
+
+The files in `~/robot-data` use MyAgent's formats, so instructions and
+skills can be copied between the two programs. Nothing there is backed up by
+itself: see "Backing up the Pi". The Pi keeps no system log across restarts
+(its journal is in memory), so the two files in `/var/log` are what there is
+to read after one.
+
+## Settings in the environment
+
+Nothing here needs setting for ordinary use. The keys go in `~/robot/.env`,
+one `NAME=value` to a line; the others are for a single command, as in
+`ROBOT_DATA_DIR=/tmp/try bash ~/robot/scripts/chat.sh`.
+
+| Name | What it does |
+|---|---|
+| `ANTHROPIC_API_KEY` | The key for the model. Without it no run starts. |
+| `XAI_API_KEY` | The key for hearing and speaking. Without it `microphone_listen`, `speak`, `voice_settings` and hands-free are not there. |
+| `ROBOT_DATA_DIR` | Another data folder in place of `~/robot-data`: its own instructions, skills, memory, chats and cost log. |
+| `ROBOT_MEMORY_MODEL` | The model that does the remembering, in place of Sonnet 5.5. |
+| `ROBOT_VOICE` | The voice `speak` uses while none has been saved. |
+| `ROBOT_MIC_DEVICE`, `ROBOT_SPEAKER_DEVICE` | A sound device by its ALSA name, in place of the first one found. |
+| `ROBOT_SOCKET`, `ROBOT_SESSION` | Another tmux and session for `chat.sh` and `ui.sh`, so that a trial never joins a chat or interface in use. `ROBOT_TMUX_DETACHED=1` starts it without putting it on the screen. |
+| `ROBOT_CHILD_SOCKET` | The tmux a child run's window goes to, in place of the one the run is in. |
+| `ROBOT_POWEROFF_COMMAND` | What is run in place of `sudo poweroff` after a spoken "bye": set it to something harmless to try that out without the Pi going off. |
 
 ## Backing up the Pi
 
 There are two kinds of backup, and both are kept on a PC. Either PC can make
 them; so far they are on the laptop.
 
-**The data that changes every day.** Instructions, skills, chats and the cost
-log are in `~/robot-data`, a few megabytes. From PowerShell, in the folder
+**The data that changes every day.** Instructions, skills, the robot's
+memory, chats and the cost log are in `~/robot-data`, a few megabytes. Its
+photos and sound are beside it, in `~/robot-photos` and `~/robot-sound`
+(`scp -r pi:robot-photos .` in the same way; keep them out of folders that
+are synced elsewhere). From PowerShell, in the folder
 that is to hold the copy:
 
 ```powershell
@@ -1102,11 +1368,37 @@ ssh pi "bash ~/robot/scripts/deploy.sh"
 
 The tests need no API key and make no network calls: a fake client scripts the
 model's replies, and recorded API replies are replayed through the real SDK.
+There are about 1,700 of them. Some need what only the Pi has (bash, curses,
+tmux, real process groups) and are skipped on Windows, so the suite is run
+on the Pi as well after a deploy:
+
+```bash
+cd ~/robot && .venv/bin/python -m unittest discover -s tests -t .
+```
+
+- `deploy.sh` runs on the Pi: it pulls with `git pull --ff-only` (which
+  refuses if the checkout there was edited), installs the pinned packages
+  and tmux, and sets up the `robot-wifi` and `robot-autostart` services. It
+  never starts or restarts the interface: one that is open keeps the old
+  program until it is quit and started again, and the deploy says so.
+- The repository is public. Nothing secret or personal is committed: no
+  keys, no addresses, no photos or recordings. The keys are in `.env`, which
+  git ignores, and the robot's data is outside the checkout.
+- Both PCs have an `ANTHROPIC_API_KEY` of their own, so the program run on a
+  PC makes real, paid calls. On a PC use the tests or `--dry-run`; a paid
+  trial belongs on the Pi, on `--model claude-haiku-5-5`.
+- The owner may be using the Pi while work goes on. A trial there uses a
+  tmux of its own (`ROBOT_SOCKET`, see "Settings in the environment") and
+  never the sockets `robot` and `robot-ui`, and one that uses the microphone
+  or the speakers does not start while `~/robot-data/runs` holds a file.
 
 `ssh pi` is an alias in each PC's own `~/.ssh/config` pointing at the Pi's IP
 address. That address comes from the router, so it changes when the Pi moves
 to another network, and each PC's alias has to be put right separately. If
-`ssh pi` times out, the address has changed; see `CLAUDE.md`.
+`ssh pi` times out, the address has changed (or the Pi is off, as after a
+spoken "bye"). `ssh pi-local` reaches the same Pi by its name, `robot.local`,
+from PowerShell; `hostname -I` there prints the address to put under `Host
+pi`. See `CLAUDE.md` ("Reaching the Pi").
 
 A PC needs three things for this: a key of its own that the Pi accepts, the
 `pi` alias, and a `.venv` in its checkout for the tests. Both PCs have them.
@@ -1120,13 +1412,30 @@ differ: the desktop has PowerShell only, the laptop also Git Bash.
 - `robot/console.py`: everything printed and typed, and Ctrl-C handling.
 - `robot/tools.py`: the Pi's own tools. `robot/hearing.py`: recording through the microphone and having the speech in it turned into text. `robot/handsfree.py`: listening for a spoken message while the robot waits for one. `robot/speaking.py`: having a text turned into speech, and playing it. `robot/power.py`: switching the Pi off after a spoken goodbye. `robot/meta.py`, `robot/spawn.py`: the Meta tools and child runs.
 - `robot/instructions.py`, `robot/skills.py`: the library and the skills.
+- `robot/memory.py`: what the robot remembers from one run to the next, the
+  call that does the remembering, and the `python -m robot.memory` commands.
 - `robot/prompts.py`: the system prompt's wording.
 - `robot/models.py`: model and price tables. `robot/costs.py`, `robot/chats.py`, `robot/history.py`, `robot/datastore.py`, `robot/relay.py`: supporting parts.
 - `robot/tui/`: the windowed interface. `app.py`: the main window and how a run and the screen work side by side. `editor.py`, `skillsui.py`, `memoryui.py`: the Instruction Editor, the Skills Manager and the Memories window. `widgets.py`, `dialogs.py`: buttons, lists, text boxes and small windows. `screen.py`: the screen and the keyboard (curses). `text.py`: wrapping and editing text.
 - `scripts/chat.sh`, `scripts/ui.sh`, `scripts/tmux.conf`: the tmux launchers for the chat and the windowed interface. `scripts/child-window.sh`: what a child run's window runs (started by `run_instruction`, not by hand). `scripts/deploy.sh`: run on the Pi to update it. `scripts/wifi-reconnect.sh`: the `robot-wifi` service, which puts the Pi back on the Wi-Fi. `scripts/autostart.sh`: the switch for starting the interface and its run when the Pi starts, and what the `robot-autostart` service runs. `scripts/pi_photo.py`: run on a PC, fetches a photo from the Pi and opens it. `scripts/pi_sound.py`: the same for a sound recording, which it plays.
 - `tests/`: the test suite. `CLAUDE.md`: the rules and the layout for Claude Code sessions; `docs/claude/`: their detailed notes, one file per topic.
+- `requirements.txt`: the two packages the program needs beyond Python itself, `anthropic` and `python-dotenv`, each pinned to one version. `.gitattributes`: Unix line endings for the scripts.
 
 ## Setup on the Pi
+
+The robot as it stands:
+
+| Part | What |
+|---|---|
+| Board | Raspberry Pi 3 Model A+: 512 MB of memory (about 415 MB usable), four cores, one USB port. |
+| System | 64-bit Raspberry Pi OS Lite (Trixie), Python 3.13, tmux 3.5. No desktop. |
+| Card | 32 GB SD card. |
+| Camera and microphone | A Logitech Brio 100 webcam on the USB port. |
+| Speakers | USB-powered stereo speakers on the headphone socket. |
+| Screen | Optional: a text console of 240 columns by 67 rows. No keyboard is needed at the Pi. |
+| Network | Wi-Fi. The Pi is `robot.local`, and its address comes from the router. |
+
+Memory is what limits it: every run is a program of 80 to 95 MB.
 
 - Checkout at `~/robot`, venv at `~/robot/.venv` (created with `--system-site-packages`).
 - `~/robot/.env` contains `ANTHROPIC_API_KEY=...` and is never committed. An
@@ -1134,7 +1443,12 @@ differ: the desktop has PowerShell only, the laptop also Git Bash.
   `microphone_listen` and `speak` under "Tools").
 - Passwordless sudo for the Pi's user, if the agent should have root.
 - `deploy.sh` installs the pinned Python packages and tmux, and sets up the
-  `robot-wifi` service (it needs sudo for that).
+  `robot-wifi` and `robot-autostart` services (it needs sudo for that). The
+  first deploy that brings a new step to `deploy.sh` does not run that step
+  yet, because the script that is running is the old one: deploy twice.
+- The Pi's user is in the `video` group (for the webcam). Nothing else is
+  installed for photos or sound: `v4l2-ctl`, `arecord` and `aplay` come with
+  the system.
 - The scripts typed by hand (`chat.sh`, `ui.sh`, `autostart.sh`, `deploy.sh`)
   can be started by name from any folder, as in `chat.sh -l "Name"`, since
   2026-11-28: the last line of `~/.bashrc` on the Pi puts `~/robot/scripts`
