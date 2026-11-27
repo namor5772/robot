@@ -45,6 +45,7 @@ _ERROR_LOG_LIMIT = 256 * 1024
 # A copy's session name tells it apart: it is shown in the top row and is part
 # of the name of the file the copy keeps its settings in. The first copy, the
 # one started without a name, is session 1 and has none of that.
+HEADLESS_NOTICE = "Headless: closes when the run ends"
 _SESSION_NAME = re.compile(r"[A-Za-z0-9_-]{1,12}")
 FIRST_SESSION = "1"
 
@@ -160,6 +161,12 @@ MORE THAN ONE INTERFACE
   its name in the top row and remembers its own instruction.
   Ctrl+B then ) goes to the next interface, Ctrl+B then ( to the
   one before, and Ctrl+B then S shows a list of them.
+
+A RUN NOBODY HAS TO WATCH
+  ui.sh -l "Name" --headless starts that instruction's run at
+  once, in an interface of its own (h1, h2, ...) that nobody has
+  to look at and that closes when the run has ended. It says the
+  name it took: ui.sh --session h1 shows it while it runs.
 """
 
 
@@ -771,7 +778,7 @@ class App:
     """The windows on the screen, and the loop that draws them and reads keys."""
 
     def __init__(self, screen, bridge, datadir, console, interrupts, sdk_ready=None,
-                 instruction=None, session="", autostart=False):
+                 instruction=None, session="", autostart=False, headless=False):
         self.screen = screen
         self.bridge = bridge
         self.datadir = datadir
@@ -786,7 +793,12 @@ class App:
         self.asking = False    # and it is waiting for the person
         # Asked for with --start: the run begins by itself, once, as soon as
         # the main window is up. Nothing else ever starts a run unasked.
-        self.autostart = bool(autostart)
+        # A headless copy (--headless) does one run and goes: the run starts by
+        # itself, the interface quits when it has ended, and nothing this copy
+        # does is remembered. Somebody can still join it meanwhile.
+        self.headless = bool(headless)
+        self.outcome = ""      # how the last run ended
+        self.autostart = bool(autostart) or self.headless
         self.ear = ""          # what hands-free is doing meanwhile, "" when it is off
         self.started = 0.0
         self.status = ""       # a short message in the bottom line, until the next key
@@ -821,6 +833,8 @@ class App:
         self.save_state()
 
     def save_state(self):
+        if self.headless:
+            return  # its instruction and boxes are this one run's, not the person's
         try:
             save_store(self.state_path, {"instruction": self.instruction, **self.flags})
         except (OSError, ValueError):
@@ -878,7 +892,7 @@ class App:
         if self.autostart and self.stack and self.stack[-1] is self.main and not self.too_small:
             self.autostart = False
             self.start()
-            if self.running:
+            if self.running and not self.headless:
                 self.status = "Started by itself (--start)"
             self.dirty = True
         event = self.screen.read(50 if self.running else 200)
@@ -966,8 +980,11 @@ class App:
         # A message comes before the reminder of the keys: the reminder is
         # shown only in the room the message leaves.
         used = len(left)
-        if self.status:
-            shown = clip(self.status, cols - used - 2)
+        # Somebody who joins a headless interface is told what will happen to
+        # it, whenever there is no other message.
+        status = self.status or (HEADLESS_NOTICE if self.headless else "")
+        if status:
+            shown = clip(status, cols - used - 2)
             scr.put(y, used + 1, shown, "bar")
             used += 1 + text_width(shown)
         hint = getattr(self.stack[-1], "hint", "") if self.stack else ""
@@ -1018,6 +1035,11 @@ class App:
         if self.running:
             return
         if self.instruction not in instructions.load_instructions(self.datadir):
+            if self.headless:
+                # Nobody is there to read a message and choose another one.
+                self.outcome = "error"
+                self.quitting = True
+                return
             self.message("Start", f"There is no saved instruction named '{self.instruction}'. "
                                   "Choose one with the Instruction button.")
             return
@@ -1047,6 +1069,9 @@ class App:
         spent = f", ${cost:.4f}" if cost is not None else ""
         self.main.run_ended(f"--- run ended: {status}{spent} ---")
         self.status = f"Run ended: {status}{spent}"
+        self.outcome = status
+        if self.headless:
+            self.quitting = True
 
     def quit(self):
         if self.running:
@@ -1087,7 +1112,43 @@ def build_parser() -> argparse.ArgumentParser:
                         help="start the run of the chosen instruction at once, without "
                              "START being pressed (for when the Pi starts the interface "
                              "by itself: see scripts/autostart.sh)")
+    parser.add_argument("--headless", action="store_true",
+                        help="one run that nobody has to watch: it starts at once, the "
+                             "interface quits when it has ended, and nothing is remembered "
+                             "for the next start. The instruction must have a saved task. "
+                             "ui.sh --headless starts it this way in a session of its own")
+    parser.add_argument("--can-start", action="store_true",
+                        help="with --headless: only say whether the run could start, and "
+                             "exit (ui.sh asks this before it starts anything)")
     return parser
+
+
+def headless_check(datadir, session, load):
+    """Whether a headless run could start: (why not, something worth knowing).
+
+    Asked before the windows are up, because afterwards nobody may be looking:
+    an instruction that is not there, or has no task, would leave the interface
+    waiting for a person for ever.
+    """
+    name = load or load_store(datadir.root / state_file_name(session)).get("instruction")
+    if not name:
+        return 'A headless run needs an instruction to run: name one with -l "Name".', ""
+    try:
+        library = instructions.load_instructions(datadir)
+    except Exception as error:  # a library that cannot be read
+        return str(error), ""
+    if name not in library:
+        available = ", ".join(sorted(library)) or "(none)"
+        return f"No saved instruction named '{name}'. Available: {available}", ""
+    entry = library[name]
+    if not str(entry.get("text") or "").strip():
+        return (f"The saved instruction '{name}' has no text, and a headless run cannot "
+                "ask for the task."), ""
+    note = ""
+    if entry.get("conversational"):
+        note = (f"'{name}' has Convo on: after each reply the run waits for a message, "
+                "until somebody joins the interface and answers or stops it.")
+    return "", note
 
 
 def _file_size(path) -> int:
@@ -1134,17 +1195,26 @@ def _streams_to_log(path):
 
 def main(argv=None) -> int:
     args = build_parser().parse_args(argv)
-    if not (sys.stdin.isatty() and sys.stdout.isatty()):
-        print("This interface needs a terminal. Over SSH, ask for one with -t:\n"
-              '  ssh -t pi "bash ~/robot/scripts/ui.sh"', file=sys.stderr)
-        return command_line.EXIT_CANNOT_START
-    load_dotenv(command_line.ENV_FILE)
     datadir = DataDir()
     try:
         datadir.ensure()
     except OSError as error:
         print(f"Cannot use the data folder {datadir.root}: {error}", file=sys.stderr)
         return command_line.EXIT_CANNOT_START
+    if args.headless:
+        problem, note = headless_check(datadir, args.session or "", args.load)
+        if problem:
+            print(problem, file=sys.stderr)
+            return command_line.EXIT_CANNOT_START
+        if args.can_start:
+            if note:
+                print("Note: " + note, file=sys.stderr)
+            return command_line.EXIT_OK
+    if not (sys.stdin.isatty() and sys.stdout.isatty()):
+        print("This interface needs a terminal. Over SSH, ask for one with -t:\n"
+              '  ssh -t pi "bash ~/robot/scripts/ui.sh"', file=sys.stderr)
+        return command_line.EXIT_CANNOT_START
+    load_dotenv(command_line.ENV_FILE)
 
     # Before the screen starts: curses leaves alone the signals that already
     # have a handler, and these must stay ours.
@@ -1158,6 +1228,7 @@ def main(argv=None) -> int:
     bridge = Bridge()
     console = UiConsole(bridge, interrupts)
     crashes = []
+    outcomes = []
     log_path = datadir.root / ERROR_LOG
 
     def screen_thread(loader):
@@ -1171,9 +1242,14 @@ def main(argv=None) -> int:
                 signal.pthread_sigmask(signal.SIG_BLOCK, _RUN_SIGNALS)
             from robot.tui.screen import CursesScreen
             screen = CursesScreen()
-            App(screen, bridge, datadir, console, interrupts, sdk_ready=loader.is_ready,
-                instruction=args.load, session=args.session or "",
-                autostart=args.start).run()
+            app = App(screen, bridge, datadir, console, interrupts,
+                      sdk_ready=loader.is_ready, instruction=args.load,
+                      session=args.session or "", autostart=args.start,
+                      headless=args.headless)
+            try:
+                app.run()
+            finally:
+                outcomes.append(app.outcome)
         except BaseException:
             crashes.append(traceback.format_exc())
         finally:
@@ -1203,4 +1279,6 @@ def main(argv=None) -> int:
     if _file_size(log_path) > size_before:
         print(f"Something was printed while the windows were up. It is in {log_path}",
               file=sys.stderr)
+    if args.headless and outcomes and outcomes[0] == "error":
+        return command_line.EXIT_RUN_ERROR  # as a headless chat run says it
     return command_line.EXIT_OK

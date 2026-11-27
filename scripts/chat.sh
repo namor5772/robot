@@ -43,6 +43,15 @@ if [ "${1:-}" = "--inside-tmux" ]; then
   if [ "$module" = "robot.tui" ] && [ "$status" -eq 0 ]; then
     exit 0
   fi
+  # A headless interface goes however its run ended: nobody may be there to
+  # press Enter, and the session would stay for ever.
+  if [ "$module" = "robot.tui" ]; then
+    for arg in "$@"; do
+      if [ "$arg" = "--headless" ]; then
+        exit 0
+      fi
+    done
+  fi
   echo
   read -r -p "Ended (exit code $status). Press Enter to close. " _ || true
   exit 0

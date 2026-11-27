@@ -385,12 +385,48 @@ a conversation is not decided by how it starts but by the instruction (see
 | By hand | `bash scripts/ui.sh`, then START | Runs the instruction the interface remembers. It is inside tmux, so it survives a dropped connection. |
 | On a named instruction | `bash scripts/ui.sh -l "Name"`, then START | Opens on that instruction instead of the remembered one. |
 | A further, separate interface | `bash scripts/ui.sh --session 2` | A run of its own, and its own remembered instruction and boxes. Any short name will do for the 2. |
-| Without pressing START | `bash scripts/ui.sh --start` | The only way a run begins without START. |
+| Without pressing START | `bash scripts/ui.sh --start` | The run begins by itself; the interface stays afterwards. |
+| Headless | `bash scripts/ui.sh -l "Name" --headless` | One run that nobody has to watch, in an interface of its own that closes when the run has ended (see "A headless interface" below). |
 | When the Pi starts | `bash scripts/autostart.sh on`, once | Starts the first interface with `--start` on the Pi's own screen (see "Starting by itself when the Pi starts"). |
 | Joined from another screen | `bash scripts/ui.sh` again | The same program and the same run, on a second screen. |
 
 You type into its input box, stop a reply with STOP, and speak to it when its
 Hands-free box is ticked.
+
+#### A headless interface
+
+`ui.sh -l "Name" --headless` is MyAgent's `--headless` for the robot: the
+run of that instruction starts at once, in an interface that is not put on
+your screen, and the interface closes by itself when the run has ended.
+
+```
+$ ui.sh -l "Night watch" --headless
+Started as the interface 'h1'. It closes when the run has ended.
+To watch it meanwhile: ui.sh --session h1
+```
+
+- Every headless start is an interface of its own: it takes the first free
+  of the names `h1`, `h2`, ... and never joins one that is running. Give it
+  a name of your choice with `--session NAME`; a name that is in use is
+  refused.
+- It is a whole interface all the same. `ui.sh --session h1` shows it while
+  the run goes, its bottom line says `Headless: closes when the run ends`,
+  and you can read along, answer a question or press STOP. Ctrl-B then D
+  leaves it running again.
+- It remembers nothing: no file is written for `h1`, so the next `h1`
+  starts with the boxes at their usual settings (Hands-free off).
+- The instruction must be there and must have a saved task. If not,
+  `ui.sh` says so at once and starts nothing.
+- A question is not answered by anybody unless you join. An instruction
+  with Convo on waits for a message after every reply (`ui.sh` says so when
+  it starts one): for a run nobody watches, use an instruction with Convo
+  off.
+- The saved chat and the line in the cost log are written as for any run.
+
+Compared with `robot.main -l "Name" --headless` (the chat program,
+headless): that one ends at its first question and cannot be watched or
+stopped from a screen; this one waits for you and can be joined at any
+time, and it takes the memory of a whole interface.
 
 ### With the chat program
 

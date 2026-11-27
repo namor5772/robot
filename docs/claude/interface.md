@@ -211,6 +211,76 @@ underneath is the same code the chat runs; only the console differs.
   with stand-ins for `openvt`, the clock and the network, and the service
   `deploy.sh` writes.
 
+## A headless interface
+
+- Since 2026-11-28, at the owner's request ("add the headless command-line
+  flag to ui.sh like MyAgent"): `ui.sh -l "Name" --headless`. MyAgent's
+  flag hides the main window, leaves its dialogs, never writes the state
+  file and closes the program when the loop ends. Here that is:
+  - `python -m robot.tui --headless`: `App(headless=True)`. The run starts
+    by itself (it counts as `--start`), `save_state` does nothing, and
+    `_run_ended` sets `quitting`, so the loop ends with the run. The
+    program's exit code is 1 when the run ended in `error`, as the
+    headless chat's is, and 0 otherwise.
+  - `ui.sh --headless`: starts the session detached
+    (`ROBOT_TMUX_DETACHED=1`), so nothing is put on the caller's screen and
+    no terminal is needed (`ssh pi "bash ~/robot/scripts/ui.sh -l Name
+    --headless"` works without `-t`, and so would a scheduled job).
+    Without `--session` it takes the first of `h1` to `h99` for which tmux
+    has no session: every headless start is an interface of its own, as
+    every headless MyAgent is an instance of its own. With `--session
+    NAME` and that session running it refuses (exit 1) and does not join.
+  - `chat.sh --inside-tmux` leaves at once for `robot.tui` with
+    `--headless` among its arguments, whatever the exit code: otherwise a
+    failed run would leave "Ended (exit code 1). Press Enter to close."
+    in a session nobody looks at, for ever.
+- Asked BEFORE anything is started (`headless_check`, reached through
+  `python -m robot.tui --headless --can-start ...`, which needs no
+  terminal and exits 2 with the reason): is the instruction there, and
+  has it a text. Inside the detached session nobody would read why
+  nothing ran, and an instruction with no text would wait for its task
+  for ever. With no `-l` the instruction is the one that session
+  remembers; an `hN` session remembers none, so there `-l` is needed. The
+  program itself makes the same check when started with `--headless`
+  alone. `ui.sh` calls `.venv/bin/python` for it, about a second on the
+  Pi.
+- An instruction with Convo on is started, with a note: after each reply
+  it waits for a message until somebody joins. That is MyAgent's
+  behaviour as well (its docs say to save the scheduled variant with
+  Convo off). A `user_prompt` question waits the same way. Nothing ends a
+  headless interface that waits: no timeout was built.
+- It is a whole interface, so it can be joined (`ui.sh --session h1`),
+  watched, answered and stopped. The bottom line shows `Headless: closes
+  when the run ends` (`HEADLESS_NOTICE`) whenever there is no other
+  message: the status of a `--start` is wiped by the first question, and
+  somebody who joins later must still be told.
+- Not written for a headless copy: the state file, also when a box is
+  ticked or another instruction is chosen with Use while it runs. So an
+  `hN` always starts with the default boxes, Hands-free off. A headless
+  start under a name that HAS a file (`--session 2 --headless`, or
+  `--session 1`) reads it: with the first interface's file that means the
+  remembered instruction and, as things stand on the Pi, Hands-free on.
+- An instruction deleted between the check and the start: `start()` shows
+  no message box in a headless copy (nobody would close it) and quits
+  with the outcome `error`.
+- Memory: a headless interface is an interface, about 80 MB, where the
+  headless chat (`robot.main --headless`) is one too. The difference
+  between the two is what happens at a question: the chat ends, the
+  interface waits and can be joined.
+- Tests: `tests/test_headless_ui.py`. The program on the screen in memory
+  (6), `headless_check` and `main` with `--can-start` (7), and `ui.sh`
+  with the stand-in tmux and the real program for the check (6, skipped
+  where the checkout has no `.venv/bin/python`: Windows, and a scratch
+  copy unless `.venv` is linked into it).
+- Tried on the Pi on 2026-11-28 in a scratch copy, on the socket `zz-ui`
+  with a data folder of its own. There is no key in a scratch copy, so
+  the run ended in `error` at once, which is the path that used to leave
+  a session behind: "ZZ Nope" and an instruction with no text were
+  refused with exit 2 and their reason; a start said "Started as the
+  interface 'h1'", a second beside it took `h2`; both sessions and the
+  tmux server were gone seconds later, and no `tui_state` file was
+  written.
+
 ## Several screens, several interfaces
 
 - `ui.sh` run a second time JOINS the interface that is running: one program,

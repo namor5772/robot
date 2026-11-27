@@ -55,7 +55,8 @@ was tried and how, what failed and why, and the owner's decisions.
   `scripts/pi_sound.py`.
 - `docs/claude/interface.md`: "The windowed interface". "A run and the
   screen", "The screen and the keys", "The windows", "Starting by itself"
-  (the autostart), "Several screens, several interfaces".
+  (the autostart), "A headless interface" (`ui.sh --headless`), "Several
+  screens, several interfaces".
 
 Keeping it that way:
 
@@ -434,8 +435,9 @@ topic's file.
 - Not built, and not to be built unasked: a key that dictates a reply
   (MyAgent's Mike button), and a mouse at the Pi's own screen.
 - In the windowed interface the focus is never left on START: a stray
-  Enter must not start a run that costs money. The one run that starts
-  without START is the one `--start` asks for.
+  Enter must not start a run that costs money. The runs that start
+  without START are the one `--start` asks for and the one of a headless
+  interface (`--headless`, see "A headless interface").
 - `curses` is imported in `robot/tui/screen.py` only, inside
   `CursesScreen`. Anywhere else, the tests on Windows stop importing.
 - The agent keeps the main thread (its Ctrl-C handling works through
