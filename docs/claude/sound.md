@@ -56,7 +56,9 @@ Part of the notes for Claude Code sessions. The index is in `CLAUDE.md`.
     two "saved" lines, $0.0023. The check's photo and recording were
     removed.
   - The skill's text grew from 2,763 to 5,399 characters, and it is in
-    every run's system prompt: about 650 tokens more.
+    every run's system prompt: about 650 tokens more. (On 2026-11-28 the
+    skill was on demand on the Pi, so its text is in no prompt until a
+    run fetches it: the owner sets the modes in the Skills Manager.)
 - When the owner asks to hear a recording the Pi made, on a PC, run
   `.venv/Scripts/python.exe scripts/pi_sound.py` there (since 2026-11-22).
   It copies the Pi's newest recording to `~/RobotSound` on the PC, says what

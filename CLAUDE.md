@@ -8,7 +8,10 @@ Since 2026-11-18 it has two faces: the line-by-line chat (`python -m
 robot.main`) and a windowed interface drawn with curses (`python -m robot.tui`,
 see "The windowed interface"). Since 2026-11-20 it sees (a webcam and
 `view_image`), and since 2026-11-23 it hears speech and talks
-(`microphone_listen` and `speak`, through xAI's speech services).
+(`microphone_listen` and `speak`, through xAI's speech services). Since
+2026-11-24 it can listen hands-free and start with the Pi, since 2026-11-25
+it remembers from one run to the next (see "Memory"), and since 2026-11-28 a
+run can be started in an interface nobody watches (`ui.sh --headless`).
 
 ## Where the rest is
 
@@ -29,17 +32,18 @@ was tried and how, what failed and why, and the owner's decisions.
   tmux of the check's own, PowerShell on the desktop, detached jobs on the
   Pi, trying unfinished work in a scratch copy, a race on Windows.
 - `docs/claude/state.md`: "State on 2026-11-18". The instructions and the
-  six skills on the Pi and how each was made, the test count, and what
-  changed on which day.
+  skills on the Pi and how each was made, the test count, and what
+  changed on which day, up to "State on 2026-11-28" at its end.
 - `docs/claude/wifi.md`: "Getting back on the Wi-Fi". NetworkManager, the
   `robot-wifi` service, the saved networks, power saving, the Pi's clock.
-- `docs/claude/terminal.md`: "When the SSH connection drops" and "Terminal
-  answers that reach the prompt". tmux, `chat.sh` and `ui.sh`,
-  `escape-time`.
+- `docs/claude/terminal.md`: "The scripts by name" (the Pi's search path),
+  "When the SSH connection drops" and "Terminal answers that reach the
+  prompt". tmux, `chat.sh` and `ui.sh`, which sessions there are on which
+  tmux, `escape-time`.
 - `docs/claude/agent.md`: "How the agent works". "A run", "The system
   prompt", "Tools", "Input, output and Ctrl-C", "The request", "Cost,
   chats, records", "Meta tools and child runs" (the memory rule for child
-  runs).
+  runs, and a child's window, `show_window`).
 - `docs/claude/pictures.md`: "Pictures". `view_image`, and
   `scripts/pi_photo.py`.
 - `docs/claude/hearing.md`: "Hearing". `microphone_listen` and xAI's speech
@@ -167,6 +171,11 @@ The full section, with everything that was measured, is in
   `HostName` under `Host pi` on that PC.
 - `pi-local` uses mDNS, which Git Bash's ssh cannot resolve and which fails
   intermittently from PowerShell; retrying usually works.
+- When `ssh pi` times out AND `pi-local` says "Could not resolve hostname"
+  twice over, the Pi is off (a spoken "bye" does that) or on a network the
+  PC is not on. Nothing a session does brings it back: say so, finish what
+  needs no Pi, and name what is still owed there. So it was on the evening
+  of 2026-11-27; the next morning the Pi answered at its old address.
 - For scripted commands add `-o BatchMode=yes -o ConnectTimeout=15`. A
   session's command can neither type a password nor answer a question: with
   these two, a login that is not set up fails at once instead of waiting.
@@ -186,7 +195,9 @@ The full section, with everything that was measured, is in
 3. Deploy: `ssh pi "bash ~/robot/scripts/deploy.sh"`
 4. Run on the Pi: `ssh -t pi "bash ~/robot/scripts/chat.sh"` for the chat, or
    `ssh -t pi "bash ~/robot/scripts/ui.sh"` for the windowed interface (both
-   inside tmux).
+   inside tmux). At the Pi's own prompt the owner types `chat.sh` and
+   `ui.sh` by name (see "The scripts by name"); a command given to ssh
+   keeps the full form.
 
 Never edit files on the Pi directly. Every change goes through git; the Pi only
 receives code via `git pull --ff-only`, which refuses to run if its checkout
@@ -229,7 +240,19 @@ show the user the output. The user does not want to be asked to test things.
   `ssh pi "cd ~/robot && printf 'first\nsecond\n' | .venv/bin/python -m robot.main --model claude-haiku-5-5"`
   Piped lines are echoed, and the end of input ends the conversation.
   `--model claude-haiku-5-5` keeps checks cheap (a whole chat for well under a
-  cent); the default Opus chat costs about 5 cents to start.
+  cent); the default Opus chat costs about 7 cents to start (about 14,000
+  tokens written to the cache with Meta on, measured on 2026-11-28).
+- The instruction of a paid check blocks the tools it has no use for
+  (`blocked_tools`: `speak`, `microphone_listen`, `voice_settings`, and
+  the shell where it is not needed), and its text says "use no tools"
+  where none is meant. On 2026-11-28 a check's child, told to "count
+  aloud", spoke through the speakers unplanned.
+- What Windows cannot run (bash, tmux, curses, `/proc`) has its tests
+  skipped there, so green tests on a PC say nothing about it. Try such
+  code on the Pi in a scratch copy BEFORE pushing it (see "Running and
+  testing: the details"). When the Pi cannot be reached, the commit and
+  the notes say that it is untried. The first `show_window` went out that
+  way on 2026-11-27 and failed on the Pi's tmux the next morning.
 - A conversation ended by a SPOKEN "bye" powers the Pi off (see
   "Hands-free"), and a Pi that is off stays off until somebody takes its
   power away and gives it back. So:
@@ -250,7 +273,9 @@ show the user the output. The user does not want to be asked to test things.
   the Pi for another reason switches it off first and on again after, and
   says so.
 - The owner uses the Pi while work goes on. A chat may be open in tmux on the
-  socket `robot`, and the windowed interface on `robot-ui`. A check must
+  socket `robot`, and the windowed interface on `robot-ui` (further
+  interfaces, headless ones and the windows of child runs are sessions on
+  that socket too). A check must
   NEVER use those two sockets: no `kill-server`, no `send-keys`, and neither
   `chat.sh` nor `ui.sh` with their own socket, because a second start joins
   whatever is running there and the keys that follow are typed into the
@@ -265,7 +290,9 @@ show the user the output. The user does not want to be asked to test things.
   'text'`, `send-keys -t zz-chat Enter`, `send-keys -t zz-chat C-c`, and
   `tmux -L zz-chat capture-pane -p -t zz-chat` to read the screen. Wait for
   the last line to be `you>` before typing. End with `tmux -L zz-chat
-  kill-server`.
+  kill-server`. `ui.sh` takes `ROBOT_SOCKET` the same way, and a run that
+  may open a child's window outside tmux gets `ROBOT_CHILD_SOCKET`:
+  without it the window's session goes onto the owner's `robot-ui`.
 - The webcam is one device, and the owner's runs use it too. A check that
   records or takes a photo can collide with a run that does the same. On
   2026-11-22 a test's recording started in the second in which a run of the
@@ -306,7 +333,9 @@ show the user the output. The user does not want to be asked to test things.
 - On the laptop, long heredocs with quotes passed to the Bash tool have
   broken several times, and backslashes in them are rewritten (a `\x11` in a
   heredoc reached the file as the control character itself). Use the Write
-  and Edit tools for file content, scripts included.
+  and Edit tools for file content, scripts included. A script for the Pi
+  is written to the scratch folder and fed with `<` (it broke again on
+  2026-11-28, on a Python heredoc with quotes in it).
 - A commit message with double quotes in it does not survive `git commit
   -m` in PowerShell 5.1 on the laptop: the quotes are dropped on the way
   to git, which then takes the words for file names ("pathspec ... did not
@@ -357,7 +386,8 @@ show the user the output. The user does not want to be asked to test things.
 - `robot/speaking.py`: having xAI turn a text into a WAV file, and playing
   it (see "Speaking"). Standard library only.
 - `robot/meta.py`: Meta tool schemas, `manage_instructions`, `meta_tools`.
-- `robot/spawn.py`: `run_instruction` (child runs).
+- `robot/spawn.py`: `run_instruction` (child runs, and the tmux session
+  that shows one with `show_window`).
 - `robot/instructions.py`: `RunSettings`, the library, `settings_from_entry`.
 - `robot/skills.py`: `SkillStore`, SKILL.md format, `manage_skills`.
 - `robot/models.py`: model lists, capability rules, output caps, price tables.
@@ -443,7 +473,12 @@ topic's file.
 - The agent keeps the main thread (its Ctrl-C handling works through
   signals); the interface's screen has a thread of its own.
 - Child runs are limited by free memory and by `spawn.MAX_CHILDREN` (8, for
-  the whole tree), the owner's figure.
+  the whole tree), the owner's figure. A child is always headless and
+  always its parent's own process: `show_window` only shows what it
+  writes. Do not have tmux start the child.
+- A headless interface (`ui.sh --headless`) is an interface of its own
+  every time (`h1`, `h2`, ...), never joins one that is running, and
+  writes no state file.
 - `hearing.py`, `handsfree.py` and `speaking.py` use the standard library
   only. xAI's costs are stated in the tools' results and are not in the
   cost log, which is for Anthropic's calls.
@@ -467,6 +502,15 @@ topic's file.
   Mode, where the focus starts). MyAgent's sections in the instruction list,
   its Apply of an unsaved draft, images, the Mike button that dictates a
   reply, and window colours are not there.
+- MyAgent's ways of running unattended, and what they are here:
+  `MyAgent.py -l NAME --headless` is `ui.sh -l NAME --headless` (see "A
+  headless interface"), and also `python -m robot.main -l NAME --headless`,
+  which has no window at all and ends at its first question. Of
+  `run_instruction`'s parameters `show_window` is here (a tmux session
+  that shows the child's output) and `headless` is not: a robot child is
+  always headless. MyAgent numbers its instances by itself (1, 2, 3 in
+  the order of starting); here an interface has the name given with
+  `--session`.
 - Left out on purpose: MyAgent's tkinter code, the safety confirm system,
   other providers, MyAgent's file, document, desktop, browser, mail and MCP
   tools, OneDrive sharing, images, voice input for replies (the Mike

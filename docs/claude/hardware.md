@@ -115,4 +115,10 @@ Part of the notes for Claude Code sessions. The index is in `CLAUDE.md`.
   console (tty1) of 240 columns by 67 rows on 1920 x 1080, in UTF-8, with the
   kernel's own font and no mouse service. The screen is the same on the
   3 A+; the keyboard's receiver shares that board's one USB port with the
-  webcam (see above).
+  webcam (see above). In everyday use since then the port has the webcam,
+  so there is no keyboard at the Pi, and it runs with no screen as well
+  (see "Starting by itself").
+- Looked at on 2026-11-28: `Raspberry Pi 3 Model A Plus Rev 1.1`, the card
+  29 GB with 3.0 GB used, tmux 3.5a, 263 MB available with nothing of the
+  robot running, and 182 MB with the owner's interface up and one run
+  going.

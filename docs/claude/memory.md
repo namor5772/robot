@@ -214,6 +214,13 @@ Part of the notes for Claude Code sessions. The index is in `CLAUDE.md`.
     run with Meta on (an estimate).
 - A paid check of a run with memory on writes into the owner's memory:
   give it a data folder of its own, as above.
+- Memory goes with the instruction, whichever way its run is started: the
+  interface, the chat, a headless run, a child run. Not looked into: two
+  runs that use the same memory at the same time (two interfaces with one
+  instruction, or a parent and a child that name the same memory). Each
+  would write the memory when it ends; whether the later one keeps what
+  the earlier one added has not been tried. `Store.begin` and `settle`
+  rewrite `state.json` whole.
 - `tests/test_memory.py` (81 tests, on every machine): the files, the
   noted runs, the block, the texts, the call on the fake client, the
   named memories, the tool, and the agent from waking to falling asleep.

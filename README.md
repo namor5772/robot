@@ -936,9 +936,10 @@ speaking, so it does not hear itself.
   a warning says so once and typing goes on working.
 - Every message is one transcription, about a hundredth of a cent, billed by
   xAI and not in the robot's cost log.
-- There is one microphone and one pair of speakers. Two runs that both
-  listen would hear the room twice and each other's answers: keep to one
-  hands-free run at a time.
+- There is one microphone and one pair of speakers. Of two runs that both
+  want to listen, the first has the microphone: the second says that it
+  cannot listen, and typing goes on working there. Keep to one hands-free
+  run at a time.
 - In the chat it is the option `--hands-free`, at a terminal only; in the
   interface it is the Hands-free box, which each interface remembers. A
   piped run, a headless run of the chat program and a child run never

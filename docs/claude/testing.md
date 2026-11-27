@@ -46,6 +46,10 @@ Part of the notes for Claude Code sessions. The index is in `CLAUDE.md`.
     tmux that only writes down how it was called: which socket, which
     session, which program with which arguments. Nothing is started. bash
     scripts for the Pi, so it is skipped on Windows too (19 tests).
+    `tests/test_autostart.py` and `tests/test_headless_ui.py` use the same
+    stand-in (`LauncherCase`) for `ui.sh --start` and `ui.sh --headless`;
+    the stand-in answers every `has-session` alike, so "which name is
+    free" cannot be told apart there and is tried on the Pi.
   - By hand on the Pi, in a tmux of the check's own (see above: never the
     owner's `robot-ui`). `ui.sh` takes another socket from the environment:
     `ROBOT_SOCKET=zz-ui ROBOT_TMUX_DETACHED=1 bash scripts/ui.sh`. The
@@ -79,6 +83,29 @@ Part of the notes for Claude Code sessions. The index is in `CLAUDE.md`.
   /tmp/robot-try && tar -xf - -C /tmp/robot-try"`, then `cd /tmp/robot-try &&
   ~/robot/.venv/bin/python -m unittest ...`. Give it `ROBOT_DATA_DIR` of its
   own. It finds no `.env` there, so it cannot make paid calls. The suite
-  skips 4 tests there where the checkout skips 2: two launcher tests need
-  the checkout's own Python, and the copy has no `.venv` (their reason says
-  so with `-v`).
+  skips more tests there than the checkout does: the launcher tests that
+  start the real program (two of `InsideTmux`, and the six of `ui.sh
+  --headless`) need `.venv/bin/python` in the folder they are run from,
+  and the copy has none (their reason says so with `-v`). `ln -s
+  ~/robot/.venv /tmp/robot-try/.venv` gives it one, and then nothing is
+  skipped that the checkout runs. Remove the copy afterwards.
+  - This is the place for code that Windows cannot run, BEFORE it is
+    pushed (see `CLAUDE.md`, "Running and testing"). A run in the copy
+    that has no key ends in `error` at once, which is itself a path worth
+    seeing: it showed that a headless interface closes after a failed run.
+  - With Git Bash the script for the Pi comes from a file: `ssh pi "bash
+    -s ARG" < script.sh`, or `... .venv/bin/python -" < script.py`. Not a
+    heredoc typed into the Bash tool (see `CLAUDE.md`).
+- A check that waits for a process with `tail --pid`, or looks whether one
+  "is still there", is fooled by a process that has ended and was not
+  waited for by its parent: it stays in the kernel's list until then. A
+  check that starts a `sleep` to stand in for a child must `wait` for it.
+- Watching a screen from a check: `tmux -L zz-ui capture-pane -p -t
+  SESSION:` in a loop, keeping the last capture that was not empty, shows
+  what an interface had on it just before it closed (used for the
+  headless interface on 2026-11-28). `tmux show-environment -g` shows what
+  a tmux server was started with, and `list-clients -F '#{session_name}'`
+  which session a watcher is on.
+- Two runs of one instruction started by a script in the same second are
+  a real case now that headless starts exist: that is how the shared
+  saved-chat name was found (see "Cost, chats, records").

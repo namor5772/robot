@@ -4,8 +4,14 @@ Part of the notes for Claude Code sessions. The index is in `CLAUDE.md`.
 
 `python -m robot.tui`, started through `scripts/ui.sh`. It does what MyAgent's
 windows do, as far as a terminal allows: a main window with START, STOP,
-Instruction and Skills, an Instruction Editor and a Skills Manager. The agent
-underneath is the same code the chat runs; only the console differs.
+Instruction, Skills and Memories, an Instruction Editor, a Skills Manager
+and a Memories window (see "Memory"). The agent underneath is the same code
+the chat runs; only the console differs.
+
+Its options: `-l NAME` (open on that instruction), `--session NAME` (a
+further copy, see "Several screens, several interfaces"), `--start` (see
+"Starting by itself"), `--headless` and `--can-start` (see "A headless
+interface").
 
 ## A run and the screen
 
@@ -86,9 +92,9 @@ underneath is the same code the chat runs; only the console differs.
   every such loop.
 - The focus is never left on START: Enter presses the focused button, and a
   stray Enter must not start a run that costs money. It starts on Instruction
-  (as in MyAgent) and goes to the output pane when a run ends. The one run
-  that starts without START is the one `--start` asks for (see "Starting
-  by itself").
+  (as in MyAgent) and goes to the output pane when a run ends. The runs
+  that start without START are the one `--start` asks for (see "Starting
+  by itself") and a headless interface's (see "A headless interface").
 - START empties the output pane before the run begins
   (`OutputBuffer.clear`, called from `MainWindow.run_started`), as MyAgent
   empties its display. Until 2026-11-19 a run's lines were added under the
@@ -121,6 +127,16 @@ underneath is the same code the chat runs; only the console differs.
 - `~/robot-data/tui_state.json` holds the instruction in use and the six
   boxes of the bottom row (five display boxes and Hands-free) (`tui_state_NAME.json` for a copy started with a session
   name). Nothing a run needs is in it.
+  - The instruction is written there by `App.set_instruction` (*Use* in
+    the editor) and by `quit`, a box by `set_flag`. Running an instruction
+    does not change it. Everything else an instruction has (model,
+    thinking level, Meta, Convo, tools, skill modes, upgrade model, which
+    memory) is in its own entry of `agent_instructions.json` and is read
+    at START: two copies with the same instruction in use run it with the
+    same settings. The owner asked how that compares with MyAgent's
+    numbered windows on 2026-11-28; the README has the answer under "What
+    an interface remembers, and what it does not".
+  - A headless copy reads its file and never writes it.
 - The Tools dialog lists `editor.TOOL_NAMES`: the nine ordinary tools first,
   the five Meta tools last, then any blocked name the program does not know
   (one copied in from MyAgent, or one of a tool since removed), so that such a block is not lost on saving.
@@ -387,7 +403,13 @@ underneath is the same code the chat runs; only the console differs.
 - The interfaces share the instruction library and the skills (each editor
   reads afresh before it writes) and the cost log (lines are appended). Runs,
   saved chats, in-progress cost records and remembered settings are each
-  copy's own.
+  copy's own. They also share the one microphone: of two copies that are
+  both hands-free, the second one's recorder fails and it says so (see
+  "Hands-free").
+- Other sessions sit beside the interfaces on the same tmux since
+  2026-11-28, and Ctrl-B then S lists them with the rest: `robot-ui-hN`
+  for a headless interface and `child-NAME-PID` for the window of a child
+  run (see "tmux, SSH and the terminal").
 - Memory decides how many instructions run at once, not a count: there is no
   limit on interfaces or chats, and the limit on child runs is a memory rule
   (see "Meta tools and child runs"). What counts is how many are WORKING at

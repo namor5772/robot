@@ -6,7 +6,17 @@ Part of the notes for Claude Code sessions. The index is in `CLAUDE.md`.
 
 - A run has `RunSettings`: name, text, model, thinking_mode, thinking_budget,
   fast_mode, meta, conversational, blocked_tools, skill_modes, upgrade_target,
-  memory (see "Memory").
+  memory and memory_name (see "Memory").
+- Every way a run is started, side by side, is in the README ("Every way
+  to start a run"): from the interface (by hand, `--start`, `--headless`,
+  with the Pi), by the chat program (in tmux, directly, piped, headless,
+  with a relay, `--dry-run`), and as a child. They all end in the same
+  `Agent.run()`; what differs is the console and who answers.
+- `robot.main` ends with exit code 0, with 1 when the run's status is
+  `error`, and with 2 when the run could not start (`EXIT_CANNOT_START`:
+  no such instruction, no text where nobody can be asked, no key, no data
+  folder). `robot.tui` gives 2 for a headless run that cannot start and 1
+  for a headless run that ended in `error` or a crash of the screen.
 - With `-l NAME` they come from that entry of `agent_instructions.json`.
   Without it, from the entry named `Default` (created on first use; model
   `claude-opus-5-5`, level Low, Meta on, Convo on), and the task is typed at
@@ -33,6 +43,10 @@ Part of the notes for Claude Code sessions. The index is in `CLAUDE.md`.
   `user_prompt` and stopped).
 - Tools marked `parallel_safe` run together on a thread pool first; the rest
   run in order on the main thread. Every call gets a result, run or not.
+  The marked ones are three: `get_current_datetime`, `get_skill` and
+  `run_instruction` (which is how several children start in one turn).
+  The shell, `speak` and `microphone_listen` are not, on purpose (see
+  "Sound" and "Speaking").
 - At the end (`_end_run`, every step best-effort): cost-log line, in-progress
   record removed, result file, chat saved.
 
@@ -101,7 +115,11 @@ Part of the notes for Claude Code sessions. The index is in `CLAUDE.md`.
   path when the skill has bundled files, so they can be run with the shell.
 - With Meta on: `manage_instructions`, `manage_skills`, `manage_memories`
   (see "Memory"), `run_instruction`, `upgrade_model` (about 3,500 more
-  tokens).
+  tokens). Fourteen tools in all, in the order of `editor.TOOL_NAMES`.
+- What a request weighs, measured on the Pi on 2026-11-28 from the first
+  call's cache write: 13,756 tokens with Meta on, 9,803 with Meta off,
+  6,815 with Meta off and five tools blocked (see "State on 2026-11-28"
+  for the costs).
 - `blocked_tools` removes tools from the offer and refuses them at dispatch.
 - The shell tool has NO guardrails by the owner's explicit choice (2026-11-15):
   no confirmation, no allowlist, no blocked commands, and MyAgent's
@@ -120,7 +138,9 @@ Part of the notes for Claude Code sessions. The index is in `CLAUDE.md`.
   with `--thinking`. Everything shown also goes to the chat's `.txt`.
 - Input modes: a terminal (readline `input()`), piped stdin (lines are replies,
   end of input means nobody is there), `--headless` (never reads stdin: a relay
-  folder answers, or nobody does). At a terminal, and in the interface, a
+  folder answers, or nobody does). A headless run still WRITES everything
+  to its stdout, without the dim styling, since that is no terminal; a
+  child's stdout is `/dev/null`, or the file its window shows. At a terminal, and in the interface, a
   message can also be spoken when hands-free is on (see "Hands-free"); the
   prompt is then read without readline.
 - At a terminal the chat is forgiving in two ways, unlike MyAgent's dialog:
@@ -169,6 +189,12 @@ Part of the notes for Claude Code sessions. The index is in `CLAUDE.md`.
 - `models.PRICING` and friends price each call by the model and speed that
   served it, plus the web search fee. The cost log is
   `~/robot-data/APICostLog_<host>.txt`, one line per run in MyAgent's format.
+  A line as it was written on 2026-11-28, fields parted by `;`: the time
+  the run ended, `Anthropic`, the model, the cost in dollars, `mode=Off`,
+  22 (the seconds it took), the instruction's name (empty for a plain
+  chat), 2 (calls), then input, output, cache-write and cache-read
+  tokens, a field for notes (`upgraded-from=...`, `unfinished@call<N>`)
+  and the saved chat's name.
 - `~/robot-data/runs/agent_run_<pid>.json` is rewritten after every call and
   removed at the end. A leftover from a killed run is logged at the next start
   with `unfinished@call<N>`.

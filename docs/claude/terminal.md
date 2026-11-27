@@ -48,9 +48,32 @@ Part of the notes for Claude Code sessions. The index is in `CLAUDE.md`.
   terminal's messages out itself, so its server runs with 20 ms.
 - `chat.sh` asks tmux for its session by its exact name (`=robot`), because
   tmux otherwise accepts the start of a name. In a pane target the exact
-  form needs a colon: `-t '=robot:'`.
+  form needs a colon: `-t '=robot:'`. Not every command takes the `=`:
+  tmux 3.5a refuses `set-option -t =NAME` ("no such session: =NAME"),
+  whose target is a pane, and takes `-t NAME:` (found on 2026-11-28, see
+  "Meta tools and child runs").
 - After a normal Quit the interface's window closes at once. After a crash it
-  waits for Enter, so that the traceback can be read.
+  waits for Enter, so that the traceback can be read. A headless interface
+  (`--headless` among the program's arguments) never waits, whatever its
+  exit code: nobody may be there to press Enter (see "A headless
+  interface").
+- Which sessions there can be, since 2026-11-28. On the socket `robot`:
+  `robot`, the chat. On the socket `robot-ui`: `robot-ui` (the first
+  interface, also the one the autostart makes), `robot-ui-NAME` (one
+  started with `--session NAME`), `robot-ui-h1`, `-h2`, ... (headless
+  ones, which close by themselves), and `child-NAME-PID` (the window of a
+  child run started with `show_window` from a run in that tmux, or from a
+  run outside tmux; a run in the chat's tmux puts it on `robot`). Ctrl-B
+  then S lists what is on the tmux one is in.
+- `ui.sh --headless` is the same call of `chat.sh` with
+  `ROBOT_TMUX_DETACHED=1` and `--headless` added to `ROBOT_PROGRAM_ARGS`,
+  after it has chosen the session's name and asked the program whether
+  the run can start.
+- A tmux server keeps the environment of whoever started it, for
+  everything started on it later. `spawn._open_window` takes
+  `ROBOT_SPAWN_DEPTH` and `ROBOT_SPAWN_FAMILY` out before it may start
+  one, and a check exports what it needs (`ROBOT_POWEROFF_COMMAND`,
+  `ROBOT_DATA_DIR`) BEFORE its tmux server starts.
 - To see why an SSH session ended: `sudo journalctl -t sshd-session --since today`
   on the Pi (not `-u ssh`). On a PC, standby shows as Kernel-Power events
   506 and 507 in the System log (seen on the laptop).

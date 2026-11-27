@@ -79,6 +79,8 @@ Part of the notes for Claude Code sessions. The index is in `CLAUDE.md`.
   prompt"). The next point says where to look.
 - `.venv/bin/python -m robot.main --skills` and `--list` on the Pi show the
   current skills and instructions; check there instead of trusting this list.
+- The figures of this point are of 2026-11-26; those of 2026-11-28 are at
+  the end of this file.
 - 1,645 tests pass (counted on 2026-11-26, on the laptop and on the Pi).
   On the Pi 2 are skipped, on Windows 67, among them the 16 of the
   autostart script (bash), the 7 of hands-free
@@ -107,3 +109,54 @@ Part of the notes for Claude Code sessions. The index is in `CLAUDE.md`.
   or `vcgencmd measure_temp`). An instruction that still has the name in its
   `blocked_tools` is unharmed: the Instruction Editor keeps a blocked name it
   does not know.
+
+## State on 2026-11-28
+
+Read from the Pi that morning, and from the code.
+
+- The program: the chat (`robot.main`), the windowed interface
+  (`robot.tui`) with its Instruction Editor, Skills Manager and Memories
+  window, fourteen tools (nine ordinary ones and the five Meta tools),
+  hands-free, the start with the Pi, memory with named memories, child
+  runs with `show_window`, and since that day `ui.sh --headless`.
+- Eight skills on the Pi (`--skills`): `robot-identity` enabled, and on
+  demand `cpu-temp`, `play-sound`, `record-sound`, `share-price`,
+  `take-photo`, `weather` and `wifi-monitor`. So against the list above:
+  `record-sound` is on demand now and no longer in every prompt,
+  `take-photo` is on demand again, and `share-price` and `weather` are
+  the owner's own, made since, and not described in these notes.
+- Autostart is on. The first interface's `tui_state.json` names the
+  owner's `HandsFreeChatAgent` with Hands-free ticked, so that is what a
+  start of the Pi runs. `tui_state_2.json` and `tui_state_3.json` are
+  there from the three interfaces of 2026-11-19.
+- The data folder holds `agent_instructions.json`, the cost log (260
+  lines), `autostart_on`, `memory`, `runs`, `saved_chats`, `skills`,
+  `tmp`, `tui_errors.log`, the three state files and
+  `voice_settings.json` (so a voice has been chosen). It also holds a
+  `system_prompt_boilerplate.txt` that nothing in the program reads or
+  writes: the owner's, left alone.
+- The card: 29 GB, 3.0 GB used. tmux 3.5a, Python 3.13.5.
+- The size of a request: the first call of a run on the Pi wrote 13,756
+  tokens to the cache with Meta on (a plain instruction, the eight skills
+  as above), 9,803 with Meta off, and 6,815 with Meta off and five tools
+  blocked (the three sound tools, the shell and `view_image`). On Haiku
+  5.5 those first calls cost 0.18, 0.13 and 0.09 cents; the first of them
+  on Opus 5.5 is about 7 cents (the cache write alone, at $5 a million).
+- 1,684 tests pass (2026-11-28, on the laptop and on the Pi). On the Pi 2
+  are skipped (they need a file system that ignores capitals), on Windows
+  75: besides those listed above, the 6 of `ui.sh --headless` (bash) and
+  the 2 that open a child's window in a real tmux. The whole suite takes
+  33 s on the laptop and 89 s on the Pi 3 A+ (70 s on 2026-11-23, with
+  fewer tests). Counted by file with `grep -c "    def test_"`: the
+  largest are `test_costs` (162), `test_skills` (152), `test_models`
+  (120) and `test_tui_app` (103).
+- What was done on 2026-11-27 and 2026-11-28, each in its topic's file:
+  `show_window` for `run_instruction` ("Meta tools and child runs"), the
+  scripts by name on the Pi ("The scripts by name"), `ui.sh --headless`
+  ("A headless interface"), saved chats that no longer share a name
+  ("Cost, chats, records"), and the README brought up to date: it has a
+  section "Every way to start a run", and sections on the models, the
+  costs, the files and the environment's settings.
+- The Pi could not be reached on the evening of 2026-11-27 (see "Reaching
+  the Pi") and answered again the next morning at its old address. Why is
+  not known: nothing was looked at before it was back.

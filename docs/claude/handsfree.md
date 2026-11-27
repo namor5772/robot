@@ -63,6 +63,15 @@ Part of the notes for Claude Code sessions. The index is in `CLAUDE.md`.
     by the terminal itself, so there is no history and no arrow keys
     there. What was half typed when a voice came is thrown away
     (`tcflush`). Piped and headless runs never listen.
+- Who listens and who does not, as asked on 2026-11-28. The chat only
+  with `--hands-free` at a terminal (`console.hands_free = args.hands_free
+  and console.tty`): naming a hands-free instruction with `chat.sh -l`
+  does not make it listen, because the box is the interface's and not the
+  instruction's. A child run never listens. An interface listens when its
+  box is ticked, and the box is in that copy's state file: so a headless
+  interface under a name of its own (`h1`, ...) starts with it off, and
+  one started as `--session 1 --headless` would take the first
+  interface's box, which is ticked on the Pi.
 - A warning is shown once per kind of trouble (`Console._ear_trouble`),
   not at every prompt, and one failed start is not tried again within the
   same wait.
@@ -179,6 +188,6 @@ Part of the notes for Claude Code sessions. The index is in `CLAUDE.md`.
     `arecord`. The failed try did show the fallback: with the microphone
     taken by the check, the chat said "Hands-free has stopped listening:
     ... Device or resource busy. Type instead." and went on at `you>`.
-- `tests/test_handsfree.py` (50 tests; 7 need `select` and are skipped on
+- `tests/test_handsfree.py` (51 tests on 2026-11-28; 7 need `select` and are skipped on
   Windows): the segmenter on made-up sound, the ear on a stand-in recorder
   that writes through a real pipe, and both consoles with a stand-in ear.
