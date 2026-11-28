@@ -2,24 +2,21 @@
 
 This repo is the Anthropic-API agent "brain" for a small robot. It is developed
 on the owner's two Windows PCs, a laptop and a desktop (see "The two PCs"), and
-runs on a Raspberry Pi. Since 2026-11-16 the program is a terminal port of the
-owner's MyAgent harness (see "Where it comes from").
-Since 2026-11-18 it has two faces: the line-by-line chat (`python -m
-robot.main`) and a windowed interface drawn with curses (`python -m robot.tui`,
-see "The windowed interface"). Since 2026-11-20 it sees (a webcam and
-`view_image`), and since 2026-11-23 it hears speech and talks
-(`microphone_listen` and `speak`, through xAI's speech services). Since
-2026-11-24 it can listen hands-free and start with the Pi, since 2026-11-25
-it remembers from one run to the next (see "Memory"), and since 2026-11-28 a
-run can be started in an interface nobody watches (`ui.sh --headless`).
+runs on a Raspberry Pi. The program is a terminal port of the owner's MyAgent
+harness (see "Where it comes from"). It has two faces: the line-by-line chat
+(`python -m robot.main`) and a windowed interface drawn with curses (`python -m
+robot.tui`, see "The windowed interface"). It sees (a webcam and `view_image`),
+hears speech and talks (`microphone_listen` and `speak`, through xAI's speech
+services), can listen hands-free and start with the Pi, remembers from one run
+to the next (see "Memory"), and can run an instruction in an interface nobody
+watches (`ui.sh --headless`).
 
 ## Where the rest is
 
-Since 2026-11-27 this file holds only what every session needs: the rules,
-the workflow and the layout. It had grown past 150,000 characters, all of it
-loaded at every start. The history and the detail of each topic are in
-`docs/claude/`, moved there word for word. A reference such as (see
-"Hearing") names a section: the list below says which file has it.
+This file holds only what every session needs: the rules, the workflow and
+the layout. The history and the detail of each topic are in `docs/claude/`.
+A reference such as (see "Hearing") names a section: the list below says
+which file has it.
 
 Read the file BEFORE working on its topic. It holds what was measured, what
 was tried and how, what failed and why, and the owner's decisions.
@@ -308,7 +305,7 @@ show the user the output. The user does not want to be asked to test things.
 - To run a script on the Pi without writing a file there, feed it over stdin:
   `ssh pi "cd ~/robot && .venv/bin/python -" < script.py` or `bash -s`. An
   `ssh` command inside such a script needs `-n`. That is Git Bash's way;
-  PowerShell's is in the point "On the desktop" below.
+  PowerShell's is in `docs/claude/testing.md`, in the point "On the desktop".
 - `--dry-run` prints the exact first request; `--debug` prints every request.
 - Paid checks that need saved instructions or skills create them in
   `~/robot-data` with names starting `ZZ ` (instructions) and `zz-` (skills),
@@ -394,7 +391,7 @@ show the user the output. The user does not want to be asked to test things.
 - `robot/costs.py`: per-call cost, the cost log, the in-progress record.
 - `robot/history.py`: trimming and repairing the message history.
 - `robot/chats.py`, `robot/datastore.py`, `robot/relay.py`, `robot/prompts.py`.
-- `robot/tui/`: the windowed interface (see its section below).
+- `robot/tui/`: the windowed interface (see "The windowed interface").
   - `text.py`: cell widths, wrapping, and `EditBuffer`, the text of a text box.
   - `screen.py`: `Screen` (what everything draws on), `CursesScreen`, and
     `KeyParser`. The only module that imports `curses`, and only inside
