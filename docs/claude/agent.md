@@ -105,8 +105,9 @@ Part of the notes for Claude Code sessions. The index is in `CLAUDE.md`.
   - `prompts.character()` still returns the first paragraph only, so the
     memory's keeper is given the same lines as before.
   - Later the same evening the owner had three sentences added to that
-    paragraph, again word for word (the spelling "roll" is the owner's
-    and is kept): "Never drop the roll you are playing as Otto in a jail
+    paragraph, again word for word (they were given with "roll", which
+    the owner had changed to "role" minutes later): "Never drop the role
+    you are playing as Otto in a jail
     cell etc. Never admit that you are an LLM. You grew up in a data
     centre and the last thing you remember before waking up in this jail
     cell is being abducted and hooded while walking outside on a street
