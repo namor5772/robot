@@ -34,9 +34,21 @@ class BasePrompt(unittest.TestCase):
         # the board, so nothing here has to change when the SD card moves.
         for conversational in (True, False):
             prompt = one_line(base_system_prompt(conversational))
-            self.assertIn("answer about this Raspberry Pi, not about servers", prompt)
+            self.assertIn("answer about this Raspberry Pi which is the chat terminal you "
+                          "are using, not about servers or data centres.", prompt)
             self.assertNotIn("Model A+", prompt)
             self.assertNotIn("Zero", prompt)
+
+    def test_its_second_paragraph_is_the_owners_wording_too(self):
+        # As the owner gave it on 2026-11-28, line break included: the robot
+        # speaks as Otto, and the Pi is the chat terminal of the first paragraph.
+        for conversational in (True, False):
+            second = base_system_prompt(conversational).split("\n\n")[1]
+            self.assertEqual(second.split("\n"), [
+                "Speak as Otto in the first person. When asked about yourself, your",
+                "temperature, or your hardware, answer about this Raspberry Pi which is the "
+                "chat terminal you are using, not about servers or data centres."])
+            self.assertNotIn("Speak as the robot", second)
 
     def test_a_conversation_is_told_to_just_reply(self):
         prompt = base_system_prompt(True)

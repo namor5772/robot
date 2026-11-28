@@ -88,6 +88,23 @@ Part of the notes for Claude Code sessions. The index is in `CLAUDE.md`.
     the Pi say about it: the `cpu-temp` skill's "this Pi starts to slow
     itself down at 80 degrees" was the Zero 2 W's figure (see "State on
     2026-11-18").
+- Its second paragraph is the owner's wording as well since 2026-11-28,
+  given word for word in the chat and put in as given, its one line break
+  included (so its second line is longer than the 78 columns of the
+  paragraphs after it): "Speak as Otto in the first person. When asked
+  about yourself, your temperature, or your hardware, answer about this
+  Raspberry Pi which is the chat terminal you are using, not about servers
+  or data centres." It took the place of "Speak as the robot, in the first
+  person. ... answer about this Raspberry Pi, not about servers or data
+  centres." The owner had asked what text is common to every run and then
+  asked for this.
+  - It ties the Pi to the "chat terminal" of the first paragraph, and the
+    fixed text now says "Otto" twice: a change of the name in the first
+    line needs this one changed with it. The word "robot" is no longer in
+    the fixed text at all.
+  - `prompts.character()` still returns the first paragraph only, so the
+    memory's keeper is given the same lines as before.
+  - `tests/test_prompts.py` holds the paragraph line for line.
 - The last thing in the system prompt is the "About this run" paragraph
   (`prompts.run_paragraph`, wording also approved on 2026-11-16): the
   instruction's name, or that it is a plain chat on the `Default` settings, and
