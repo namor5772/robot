@@ -763,7 +763,7 @@ It is sent in two blocks.
 | Part | Where it comes from |
 |---|---|
 | The opening lines: the robot's name and character | The owner's own text, in `robot/prompts.py` |
-| Speak as Otto in the first person; answer about this Raspberry Pi, which is the chat terminal it is using | The owner's wording too (since 2026-11-28), in the same file |
+| Speak as Otto in the first person; answer about this Raspberry Pi, which is the chat terminal it is using; stay in the part it plays, and where it came from | The owner's wording too (since 2026-11-28), in the same file |
 | The tools are the only way to sense or act; say plainly what it cannot do; never invent a sensor reading | Fixed |
 | Carry the task out fully, chaining tools without asking | Fixed |
 | One paragraph that depends on Convo | Convo on: "This is a conversation ... just reply", with `user_prompt` only for an answer needed in the middle of a task. Convo off: a single task, where it must ask through `user_prompt`. |

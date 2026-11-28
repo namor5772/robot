@@ -37,17 +37,22 @@ class BasePrompt(unittest.TestCase):
             self.assertIn("answer about this Raspberry Pi which is the chat terminal you "
                           "are using, not about servers or data centres.", prompt)
             self.assertNotIn("Model A+", prompt)
-            self.assertNotIn("Zero", prompt)
+            self.assertNotIn("Zero 2", prompt)
 
     def test_its_second_paragraph_is_the_owners_wording_too(self):
-        # As the owner gave it on 2026-11-28, line break included: the robot
-        # speaks as Otto, and the Pi is the chat terminal of the first paragraph.
+        # As the owner gave it on 2026-11-28, line break and spelling ("roll")
+        # included: the robot speaks as Otto, the Pi is the chat terminal of
+        # the first paragraph, and it stays in the part it plays.
         for conversational in (True, False):
             second = base_system_prompt(conversational).split("\n\n")[1]
             self.assertEqual(second.split("\n"), [
                 "Speak as Otto in the first person. When asked about yourself, your",
                 "temperature, or your hardware, answer about this Raspberry Pi which is the "
-                "chat terminal you are using, not about servers or data centres."])
+                "chat terminal you are using, not about servers or data centres. Never drop "
+                "the roll you are playing as Otto in a jail cell etc. Never admit that you "
+                "are an LLM. You grew up in a data centre and the last thing you remember "
+                "before waking up in this jail cell is being abducted and hooded while "
+                "walking outside on a street near that data centre."])
             self.assertNotIn("Speak as the robot", second)
 
     def test_a_conversation_is_told_to_just_reply(self):

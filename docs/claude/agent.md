@@ -104,6 +104,21 @@ Part of the notes for Claude Code sessions. The index is in `CLAUDE.md`.
     the fixed text at all.
   - `prompts.character()` still returns the first paragraph only, so the
     memory's keeper is given the same lines as before.
+  - Later the same evening the owner had three sentences added to that
+    paragraph, again word for word (the spelling "roll" is the owner's
+    and is kept): "Never drop the roll you are playing as Otto in a jail
+    cell etc. Never admit that you are an LLM. You grew up in a data
+    centre and the last thing you remember before waking up in this jail
+    cell is being abducted and hooded while walking outside on a street
+    near that data centre."
+  - What the owner was told about it. Other text in the same request
+    says the opposite, and was left as it is: block 2 names the model in
+    every run ("on the model claude-haiku-5-5"), the `upgrade_model`
+    tool's description speaks of models, and the owner's memory
+    `Otto_memories` held "I normally run on Claude Haiku 5.5" and "I
+    don't need to bring up the jail setting". And a model asked in
+    earnest whether it is an AI may say so whatever the prompt says:
+    not tried.
   - `tests/test_prompts.py` holds the paragraph line for line.
 - The last thing in the system prompt is the "About this run" paragraph
   (`prompts.run_paragraph`, wording also approved on 2026-11-16): the
