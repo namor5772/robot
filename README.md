@@ -42,6 +42,7 @@ What it can do, in short:
   headless, child runs
 - [Saved instructions](#saved-instructions)
 - [Skills](#skills)
+- [What the robot is told: the system prompt](#what-the-robot-is-told-the-system-prompt)
 - [Models and thinking levels](#models-and-thinking-levels)
 - [Tools](#tools): seeing, sound, hearing, speaking, hands-free, child runs
 - [Memory](#memory)
@@ -728,19 +729,83 @@ Each skill has a mode:
 The skills on the Pi on 2026-11-28. They are data on the Pi, not part of
 this repository, and `--skills` shows what is there now:
 
-| Skill | Mode | What it is for |
-|---|---|---|
-| `robot-identity` | enabled | How the robot replies: briefly and out loud, and that its voice can be changed. |
-| `take-photo` | on demand | Taking a photo with the webcam and looking at it with `view_image`. |
-| `record-sound` | on demand | Recording through the webcam's microphone to a WAV file. |
-| `play-sound` | on demand | Playing a WAV file through the speakers: one of its recordings, or any other. |
-| `cpu-temp` | on demand | Reading the CPU temperature, and how hot is hot on this board. |
-| `wifi-monitor` | on demand | The `robot-wifi` service and its log of drops and reconnects. |
-| `weather` | on demand | Real weather for a place: forecast and current readings. |
-| `share-price` | on demand | A near-live share price, index or exchange rate, with the day's change. |
+| Skill | What it is for |
+|---|---|
+| `robot-identity` | How the robot replies: briefly and out loud, and that its voice can be changed. |
+| `take-photo` | Taking a photo with the webcam and looking at it with `view_image`. |
+| `record-sound` | Recording through the webcam's microphone to a WAV file. |
+| `play-sound` | Playing a WAV file through the speakers: one of its recordings, or any other. |
+| `cpu-temp` | Reading the CPU temperature, and how hot is hot on this board. |
+| `wifi-monitor` | The `robot-wifi` service and its log of drops and reconnects. |
+| `weather` | Real weather for a place: forecast and current readings. |
+| `share-price` | A near-live share price, index or exchange rate, with the day's change. |
 
-`robot-identity` is the one that is enabled, so its text is in every run's
-system prompt. The others cost nothing until a run fetches one.
+Their modes are not listed here because they change: on that one day the
+skills' own modes went from one enabled and seven on demand to all eight
+enabled. And an instruction can carry modes of its own, which then count for
+its runs: `Default` did, with `robot-identity` off and the other seven on
+demand, so a plain chat's prompt held the seven descriptions and no skill's
+full text. An enabled skill's text is in every prompt of the runs it is
+enabled for; one on demand costs only its description until a run fetches
+it. `--dry-run` shows what a given run gets (see the next section).
+
+## What the robot is told: the system prompt
+
+Every run starts with a system prompt: the standing text the model is given
+before the task. Its wording is the same for every instruction, and a few
+parts of it are filled in from the instruction's settings. The instruction's
+own text is not in it: that is sent as the first message, the task.
+
+It is sent in two blocks.
+
+**Block 1, the same for every run that shares its settings:**
+
+| Part | Where it comes from |
+|---|---|
+| The opening lines: the robot's name and character | The owner's own text, in `robot/prompts.py` |
+| Speak as the robot, in the first person; answer about this Raspberry Pi | Fixed wording, in the same file |
+| The tools are the only way to sense or act; say plainly what it cannot do; never invent a sensor reading | Fixed |
+| Carry the task out fully, chaining tools without asking | Fixed |
+| One paragraph that depends on Convo | Convo on: "This is a conversation ... just reply", with `user_prompt` only for an answer needed in the middle of a task. Convo off: a single task, where it must ask through `user_prompt`. |
+| Plain text only, no Markdown | Fixed: replies are shown in a plain terminal |
+| The text of every skill that is enabled | The skills on the Pi, as that instruction has them |
+| The list of on-demand skills, each with its description | The same. With none on demand, the list and the `get_skill` tool are left out. |
+
+**Block 2, different from run to run:**
+
+| Part | When |
+|---|---|
+| "About this run": the instruction's name (or that it is a chat on `Default`'s settings) and the model it started on | Always |
+| A sentence saying that after `upgrade_model` the tool's result names the model | Only when the run has that tool (Meta on) |
+| What the robot remembers, its diary of the last conversations, and when it was last awake | Only with Memory on (see "Memory") |
+
+So what differs between two instructions is small: the Convo paragraph, the
+skills, and block 2. Two instructions with the same Convo setting and the
+same skills have the same block 1 word for word, whatever their text, model
+or name. That is on purpose. Block 1 is what is written to the prompt cache
+(see "What it costs"), so runs of different instructions started within five
+minutes of each other share it, and only the first pays for writing it.
+Nothing in the prompt changes during a run: a skill or an instruction made
+in the middle of one takes effect from the next.
+
+Not in the system prompt, but sent with it and different per instruction:
+the list of tools with their descriptions (Meta adds five, and an
+instruction's blocked tools are left out), and the model, thinking level and
+fast mode, which are settings of the request.
+
+To see exactly what a run would be told, without sending anything and at no
+cost:
+
+```bash
+cd ~/robot
+printf 'hello\n' | .venv/bin/python -m robot.main --dry-run            # a plain chat
+.venv/bin/python -m robot.main -l "Name" --dry-run                     # a saved instruction
+```
+
+It prints the banner and then the whole first request: the two `system`
+blocks, the tools and the first message. On 2026-11-28 a plain chat's block 1
+was 3,470 characters, most of it the seven on-demand skills' descriptions,
+and its block 2 was 279.
 
 ## Models and thinking levels
 

@@ -125,6 +125,14 @@ Read from the Pi that morning, and from the code.
   `record-sound` is on demand now and no longer in every prompt,
   `take-photo` is on demand again, and `share-price` and `weather` are
   the owner's own, made since, and not described in these notes.
+- By the evening of the same day `--skills` said all eight were enabled:
+  the owner sets the modes. `Default` then carried `skill_modes` of its
+  own (`robot-identity` disabled, the other seven on demand) and was on
+  `claude-sonnet-5-5` at Medium with Meta and Convo on and no memory, so
+  a plain chat's prompt had the seven descriptions and no skill's full
+  text: block 1 was 3,470 characters and block 2 was 279 (`--dry-run`).
+  The token figures further down were measured that morning, with the
+  modes as in the point above.
 - Autostart is on. The first interface's `tui_state.json` names the
   owner's `HandsFreeChatAgent` with Hands-free ticked, so that is what a
   start of the Pi runs. `tui_state_2.json` and `tui_state_3.json` are
