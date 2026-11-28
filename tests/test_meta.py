@@ -282,7 +282,7 @@ class MetaInARun(unittest.TestCase):
         self.assertEqual(first["system"], second["system"])
         facts = " ".join(second["system"][1]["text"].split())
         self.assertIn('the saved instruction named "Hard", on the model claude-opus-5-5.', facts)
-        self.assertIn("you are now on the model its result named instead", facts)
+        self.assertIn("the terminal is now on the model its result named instead", facts)
         result = made.messages[2]["content"][0]["content"]
         self.assertEqual(result, "Upgraded: claude-opus-5-5 -> claude-fable-5-2 (Max) for the "
                                  "rest of this run, from your next call on. The saved "

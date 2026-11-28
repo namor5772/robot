@@ -601,8 +601,8 @@ class WhatTheModelKnowsAboutItsRun(LoopCase):
         system = self.client.requests[0]["system"]
         self.assertEqual(len(system), 2)
         self.assertEqual(self.facts(self.client.requests[0]),
-                         'About this run: you are running as the saved instruction named '
-                         '"Morning check", on the model claude-haiku-5-5.')
+                         'About this run: your chat terminal is running the saved '
+                         'instruction named "Morning check", on the model claude-haiku-5-5.')
         # Only the shared part in front carries the cache marker.
         self.assertIn("cache_control", system[0])
         self.assertNotIn("cache_control", system[1])
@@ -611,9 +611,9 @@ class WhatTheModelKnowsAboutItsRun(LoopCase):
         made = self.make([reply(text_block("ok"))], lines="", conversational=True)
         made.run()
         self.assertEqual(self.facts(self.client.requests[0]),
-                         "About this run: this is a chat started without a saved "
+                         "About this run: your chat terminal was started without a saved "
                          'instruction. Its settings come from the instruction named '
-                         '"Default". You are running on the model claude-opus-5-5.')
+                         '"Default". It is running on the model claude-opus-5-5.')
 
     def test_different_instructions_share_everything_but_that_paragraph(self):
         first = self.make([reply(text_block("ok"))], name="One")

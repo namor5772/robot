@@ -121,6 +121,35 @@ Part of the notes for Claude Code sessions. The index is in `CLAUDE.md`.
     earnest whether it is an AI may say so whatever the prompt says:
     not tried.
   - `tests/test_prompts.py` holds the paragraph line for line.
+- The owner then wanted the part held more firmly ("go ahead with the run
+  paragraph", 2026-11-28, after the proposed wording had been shown).
+  The idea: the first paragraph has the robot at a "smart" chat terminal,
+  so the model is the TERMINAL's and not the robot's own, and nothing has
+  to be hidden from it.
+  - `prompts.run_paragraph` now says "your chat terminal is running the
+    saved instruction named ..., on the model ...", for a plain chat
+    "your chat terminal was started without a saved instruction ... It is
+    running on the model ...", and after an upgrade "the terminal is now
+    on the model its result named instead". It was "you are running as
+    ...", "You are running on the model ..." and "you are now on the
+    model ...". The robot can still say which model the terminal is on.
+  - The `upgrade_model` tool's description was left: it speaks of the
+    run's model, which reads the same way.
+  - Two lines of the owner's memory `Otto_memories` were changed the same
+    way at the owner's word, with a script fed over stdin that stopped if
+    a run was in progress, replaced each line only if it was there
+    exactly once, and wrote through `Store.set_memory`, so the text as it
+    was is among the earlier states: "I normally run on Claude Haiku 5.5
+    ..." became "My chat terminal normally runs on ...", and "I introduce
+    myself as Otto, an engineering-minded robot on a Raspberry Pi. I
+    don't need to bring up the jail setting." became a line that keeps
+    the role.
+  - Not done, and said to the owner: the keeper rewrites the memory after
+    every conversation and may write "I run on Haiku" back in (its prompt
+    is the owner's approved wording, untouched); a memory line that tells
+    the robot to keep its prompt private is still there; and a model
+    asked in earnest whether it is an AI may say so all the same. None of
+    it was tried with a paid run.
 - The last thing in the system prompt is the "About this run" paragraph
   (`prompts.run_paragraph`, wording also approved on 2026-11-16): the
   instruction's name, or that it is a plain chat on the `Default` settings, and

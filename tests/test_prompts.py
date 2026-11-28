@@ -73,14 +73,14 @@ class RunParagraph(unittest.TestCase):
     def test_a_saved_instruction_is_named_with_its_model(self):
         self.assertEqual(
             one_line(run_paragraph("Health check", "claude-haiku-5-5")),
-            'About this run: you are running as the saved instruction named "Health check", '
-            "on the model claude-haiku-5-5.")
+            "About this run: your chat terminal is running the saved instruction named "
+            '"Health check", on the model claude-haiku-5-5.')
 
     def test_a_plain_chat_points_at_the_default_instruction(self):
         self.assertEqual(
             one_line(run_paragraph("", "claude-opus-5-5")),
-            "About this run: this is a chat started without a saved instruction. Its "
-            'settings come from the instruction named "Default". You are running on the '
+            "About this run: your chat terminal was started without a saved instruction. "
+            'Its settings come from the instruction named "Default". It is running on the '
             "model claude-opus-5-5.")
 
     def test_a_run_that_can_upgrade_is_told_to_trust_the_tools_result(self):
@@ -89,8 +89,16 @@ class RunParagraph(unittest.TestCase):
             without = one_line(run_paragraph(name, "claude-opus-5-5"))
             self.assertEqual(
                 with_tool,
-                without + " If you have used the upgrade_model tool during this run, you "
-                "are now on the model its result named instead.")
+                without + " If you have used the upgrade_model tool during this run, the "
+                "terminal is now on the model its result named instead.")
+
+    def test_the_model_is_the_terminals_and_not_the_robots_own(self):
+        # The fixed text tells the robot never to say that it is an LLM.
+        for name in ("", "Health check"):
+            text = one_line(run_paragraph(name, "claude-opus-5-5", can_upgrade=True))
+            self.assertNotIn("you are running", text.lower())
+            self.assertNotIn("you are now on", text)
+            self.assertIn("your chat terminal", text)
 
     def test_lines_are_wrapped_but_never_inside_a_model_id_or_name(self):
         text = run_paragraph("Night-watch patrol", "claude-haiku-4-5-20251001",

@@ -63,15 +63,18 @@ def run_paragraph(name: str, model: str, can_upgrade: bool = False) -> str:
     The system prompt cannot change during a run, so after an upgrade this
     still names the model the run started on. The last sentence covers that.
     """
+    # The model is the chat terminal's, not the robot's own: the first
+    # paragraph has the robot sitting at a "smart" chat terminal, and the
+    # second tells it never to say that it is an LLM.
     if name:
-        text = (f'About this run: you are running as the saved instruction named "{name}", '
-                f"on the model {model}.")
+        text = ("About this run: your chat terminal is running the saved instruction named "
+                f'"{name}", on the model {model}.')
     else:
-        text = ("About this run: this is a chat started without a saved instruction. Its "
-                'settings come from the instruction named "Default". You are running on the '
+        text = ("About this run: your chat terminal was started without a saved instruction. "
+                'Its settings come from the instruction named "Default". It is running on the '
                 f"model {model}.")
     if can_upgrade:
-        text += (" If you have used the upgrade_model tool during this run, you are now on "
-                 "the model its result named instead.")
+        text += (" If you have used the upgrade_model tool during this run, the terminal is "
+                 "now on the model its result named instead.")
     # Wrapped like the rest of the prompt, but never inside a model id or a name.
     return textwrap.fill(text, width=78, break_long_words=False, break_on_hyphens=False)

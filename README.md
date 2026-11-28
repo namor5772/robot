@@ -775,8 +775,8 @@ It is sent in two blocks.
 
 | Part | When |
 |---|---|
-| "About this run": the instruction's name (or that it is a chat on `Default`'s settings) and the model it started on | Always |
-| A sentence saying that after `upgrade_model` the tool's result names the model | Only when the run has that tool (Meta on) |
+| "About this run": which instruction the robot's chat terminal is running (or that it was started on `Default`'s settings) and the model the terminal is on. The model is spoken of as the terminal's, not the robot's own. | Always |
+| A sentence saying that after `upgrade_model` the terminal is on the model the tool's result names | Only when the run has that tool (Meta on) |
 | What the robot remembers, its diary of the last conversations, and when it was last awake | Only with Memory on (see "Memory") |
 
 So what differs between two instructions is small: the Convo paragraph, the
